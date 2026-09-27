@@ -1,0 +1,121 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Cap,Cairo Black,120,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,8,3,2,60,60,560,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.74,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أنا حضرت
+Dialogue: 0,0:00:00.74,0:00:01.60,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}فترة {\c&H0AD6FF&}زيدان{\c&HFFFFFF&}
+Dialogue: 0,0:00:01.60,0:00:02.20,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}هذا اللاعب
+Dialogue: 0,0:00:02.20,0:00:02.68,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}من عالم
+Dialogue: 0,0:00:02.68,0:00:03.32,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}ثاني من
+Dialogue: 0,0:00:03.32,0:00:04.13,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}كوكب{\c&HFFFFFF&} {\c&H0AD6FF&}آخر{\c&HFFFFFF&}
+Dialogue: 0,0:00:04.13,0:00:04.59,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}وسألت كل
+Dialogue: 0,0:00:04.59,0:00:05.13,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}واحد فيهم
+Dialogue: 0,0:00:05.13,0:00:05.46,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}من هو
+Dialogue: 0,0:00:05.46,0:00:05.94,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أفضل لاعب
+Dialogue: 0,0:00:05.94,0:00:06.83,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}في التاريخ
+Dialogue: 0,0:00:06.83,0:00:07.74,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}بالنسبة لك
+Dialogue: 0,0:00:07.74,0:00:08.28,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}طبعاً أغلبهم
+Dialogue: 0,0:00:08.28,0:00:08.79,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}جابوا اللي
+Dialogue: 0,0:00:08.79,0:00:09.10,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}يقول
+Dialogue: 0,0:00:09.10,0:00:09.57,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}كريستيانو{\c&HFFFFFF&}
+Dialogue: 0,0:00:09.57,0:00:10.08,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}واللي يقول
+Dialogue: 0,0:00:10.08,0:00:10.37,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}ميسي{\c&HFFFFFF&}
+Dialogue: 0,0:00:10.37,0:00:10.81,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}ما عدا
+Dialogue: 0,0:00:10.81,0:00:11.56,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}واحد فقط
+Dialogue: 0,0:00:11.56,0:00:11.97,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}طلع عن
+Dialogue: 0,0:00:11.97,0:00:12.64,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}المألوف
+Dialogue: 0,0:00:12.64,0:00:12.97,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}قال
+Dialogue: 0,0:00:12.97,0:00:13.65,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أنا بالنسبة
+Dialogue: 0,0:00:13.65,0:00:14.03,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}لي أفضل
+Dialogue: 0,0:00:14.03,0:00:14.43,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}لاعب في
+Dialogue: 0,0:00:14.43,0:00:15.02,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}التاريخ هو
+Dialogue: 0,0:00:15.02,0:00:16.00,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}زين{\c&HFFFFFF&} {\c&H0AD6FF&}الدين{\c&HFFFFFF&} {\c&H0AD6FF&}زيدان{\c&HFFFFFF&}
+Dialogue: 0,0:00:16.00,0:00:16.25,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}قال
+Dialogue: 0,0:00:16.13,0:00:16.49,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}عبد الله
+Dialogue: 0,0:00:16.49,0:00:17.23,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أنا حضرت
+Dialogue: 0,0:00:17.23,0:00:18.07,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}فترة {\c&H0AD6FF&}زيدان{\c&HFFFFFF&}
+Dialogue: 0,0:00:18.07,0:00:18.67,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}هذا اللاعب
+Dialogue: 0,0:00:18.67,0:00:19.15,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}من عالم
+Dialogue: 0,0:00:19.15,0:00:19.79,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}ثاني من
+Dialogue: 0,0:00:19.79,0:00:20.60,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}كوكب{\c&HFFFFFF&} {\c&H0AD6FF&}آخر{\c&HFFFFFF&}
+Dialogue: 0,0:00:20.60,0:00:21.08,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}المهم رجعت
+Dialogue: 0,0:00:21.08,0:00:21.77,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}البيت وجاني
+Dialogue: 0,0:00:21.77,0:00:22.10,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}فضول
+Dialogue: 0,0:00:22.70,0:00:23.44,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أبي أشوف
+Dialogue: 0,0:00:23.44,0:00:23.76,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}وش سوى
+Dialogue: 0,0:00:23.76,0:00:24.38,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}زيدان{\c&HFFFFFF&} في
+Dialogue: 0,0:00:24.38,0:00:25.23,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مباراة واحدة
+Dialogue: 0,0:00:25.23,0:00:25.48,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}بس
+Dialogue: 0,0:00:25.40,0:00:26.10,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}المهم دورت
+Dialogue: 0,0:00:26.10,0:00:26.68,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}وقلت خليني
+Dialogue: 0,0:00:26.68,0:00:27.12,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أدخل على
+Dialogue: 0,0:00:27.12,0:00:27.87,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مباراة {\c&HFF904A&}فرنسا{\c&HFFFFFF&}
+Dialogue: 0,0:00:27.87,0:00:28.79,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}والبرازيل{\c&HFFFFFF&}
+Dialogue: 0,0:00:28.79,0:00:29.40,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}في عام
+Dialogue: 0,0:00:29.40,0:00:30.33,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}1998{\c&HFFFFFF&}
+Dialogue: 0,0:00:30.33,0:00:30.84,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أبي أشوف
+Dialogue: 0,0:00:30.84,0:00:31.36,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}المباراة
+Dialogue: 0,0:00:31.36,0:00:31.63,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}هذي
+Dialogue: 0,0:00:31.63,0:00:32.57,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}90{\c&HFFFFFF&} دقيقة
+Dialogue: 0,0:00:32.57,0:00:33.03,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مش ملخص
+Dialogue: 0,0:00:33.03,0:00:33.84,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}ولا أهداف
+Dialogue: 0,0:00:33.84,0:00:34.26,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}ولا لا
+Dialogue: 0,0:00:34.26,0:00:34.51,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}لا
+Dialogue: 0,0:00:34.47,0:00:35.33,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}90{\c&HFFFFFF&} دقيقة
+Dialogue: 0,0:00:35.93,0:00:36.30,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أول ما
+Dialogue: 0,0:00:36.30,0:00:36.61,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}خلصت
+Dialogue: 0,0:00:36.61,0:00:37.80,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}التسعين{\c&HFFFFFF&} دقيقة
+Dialogue: 0,0:00:37.80,0:00:38.46,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}كلمت هذا
+Dialogue: 0,0:00:38.46,0:00:39.31,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}صاحبي قلت
+Dialogue: 0,0:00:39.31,0:00:39.56,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}له يا
+Dialogue: 0,0:00:39.55,0:00:40.10,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}ولد انت
+Dialogue: 0,0:00:40.10,0:00:40.65,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}محظوظ في
+Dialogue: 0,0:00:40.65,0:00:41.75,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}هالدنيا جداً
+Dialogue: 0,0:00:41.75,0:00:42.49,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}محظوظ إنك
+Dialogue: 0,0:00:42.49,0:00:43.02,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}تابعت
+Dialogue: 0,0:00:43.02,0:00:44.27,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}زين{\c&HFFFFFF&} {\c&H0AD6FF&}الدين{\c&HFFFFFF&} {\c&H0AD6FF&}زيدان{\c&HFFFFFF&}
+Dialogue: 0,0:00:44.27,0:00:44.71,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أنا قاعد
+Dialogue: 0,0:00:44.71,0:00:45.02,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أتكلم عن
+Dialogue: 0,0:00:45.02,0:00:45.60,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مباراة وحدة
+Dialogue: 0,0:00:45.60,0:00:46.22,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}فما بالك
+Dialogue: 0,0:00:46.22,0:00:46.83,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}في مسيرة
+Dialogue: 0,0:00:46.83,0:00:47.57,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}زيدان{\c&HFFFFFF&} كاملة
+Dialogue: 0,0:00:47.57,0:00:48.46,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}كنت أتمنى
+Dialogue: 0,0:00:48.46,0:00:49.02,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}إن في
+Dialogue: 0,0:00:49.02,0:00:49.39,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}يوم من
+Dialogue: 0,0:00:49.39,0:00:50.50,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}الأيام أشاهد
+Dialogue: 0,0:00:50.50,0:00:51.20,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مباراة كاملة
+Dialogue: 0,0:00:51.20,0:00:51.86,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}90{\c&HFFFFFF&} دقيقة
+Dialogue: 0,0:00:51.86,0:00:52.32,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}زيدان{\c&HFFFFFF&} يلعب
+Dialogue: 0,0:00:52.32,0:00:52.67,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}وفي عز
+Dialogue: 0,0:00:52.67,0:00:53.20,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مستواه
+Dialogue: 0,0:00:53.20,0:00:53.85,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أدري إنك
+Dialogue: 0,0:00:53.85,0:00:54.24,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}تابعت
+Dialogue: 0,0:00:54.24,0:00:54.80,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}كريستيانو{\c&HFFFFFF&}
+Dialogue: 0,0:00:54.80,0:00:55.40,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}وتابعت {\c&H0AD6FF&}ميسي{\c&HFFFFFF&}
+Dialogue: 0,0:00:55.40,0:00:55.92,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}لكن إذا
+Dialogue: 0,0:00:55.92,0:00:56.70,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}تابعت {\c&H0AD6FF&}زيدان{\c&HFFFFFF&}
+Dialogue: 0,0:00:56.70,0:00:57.45,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}فانت جداً
+Dialogue: 0,0:00:57.45,0:00:57.87,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}محظوظ
+Dialogue: 0,0:00:57.87,0:00:58.12,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}احنا
+Dialogue: 0,0:00:58.08,0:00:58.63,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مش محظوظين
+Dialogue: 0,0:00:58.63,0:00:58.95,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}للأسف
+Dialogue: 0,0:00:58.95,0:00:59.64,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أنا مواليد
+Dialogue: 0,0:00:59.64,0:01:00.38,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&HFF904A&}2002{\c&HFFFFFF&}
+Dialogue: 0,0:01:00.38,0:01:00.63,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أبداً
+Dialogue: 0,0:01:00.60,0:01:01.10,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}مش محظوظ
+Dialogue: 0,0:01:01.10,0:01:01.78,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}لكن كنت
+Dialogue: 0,0:01:01.78,0:01:02.64,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}أتمنى بصراحة
+Dialogue: 0,0:01:02.64,0:01:03.23,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}إني أتابع
+Dialogue: 0,0:01:03.23,0:01:04.31,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}{\c&H0AD6FF&}زين{\c&HFFFFFF&} {\c&H0AD6FF&}الدين{\c&HFFFFFF&} {\c&H0AD6FF&}زيدان{\c&HFFFFFF&}
+Dialogue: 0,0:01:04.31,0:01:04.64,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}في يوم
+Dialogue: 0,0:01:04.64,0:01:05.33,Cap,,0,0,0,,{\fscx78\fscy78\t(0,70,\fscx110\fscy110)\t(70,140,\fscx100\fscy100)}من الأيام
