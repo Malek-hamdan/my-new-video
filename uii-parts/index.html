@@ -1085,6 +1085,14 @@
     delete editTimers[id];
     list.splice(idx, 1);
     deleteDoc("parts", row.id);
+    // the part's transactions go with it
+    var gone = [];
+    Object.keys(allTx).forEach(function (k) {
+      for (var i = allTx[k].length - 1; i >= 0; i--) {
+        if (allTx[k][i].partId === row.id) gone.push(allTx[k].splice(i, 1)[0].id);
+      }
+    });
+    gone.forEach(function (txId) { deleteDoc("transactions", txId); });
     renderRows();
   }
 
