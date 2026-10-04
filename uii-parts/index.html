@@ -236,6 +236,63 @@
   tbody tr.flash { animation: flash 1.6s ease; }
   @keyframes flash { 0%, 40% { background: rgba(255,214,102,0.22); } 100% { background: transparent; } }
 
+  /* Closed (past) months */
+  .lock-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,196,87,0.4);
+    border-radius: var(--radius);
+    background: rgba(255,196,87,0.08);
+    color: #ffe3a8;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .lock-bar[hidden] { display: none; }
+  .lock-bar.open { border-color: rgba(127,214,164,0.4); background: rgba(127,214,164,0.08); color: #c6f1d8; }
+  body.locked .add-group, body.locked .panel-foot, body.locked .del, body.locked .copy-banner { display: none; }
+  body.locked .cell, body.locked .cur { opacity: 0.85; }
+
+  /* Same reference twice on one machine */
+  .cell.dup { border-color: rgba(255,107,107,0.7) !important; background: var(--danger-soft) !important; }
+  .meta .warn { color: var(--danger); font-weight: 600; }
+
+  /* Confirm dialog */
+  .confirm { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5,7,12,0.7); }
+  .confirm[hidden] { display: none; }
+  .confirm-card { width: 100%; max-width: 440px; padding: 22px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: #141925; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .confirm-card strong { display: block; font-size: 18px; margin-bottom: 8px; color: #ffe3a8; }
+  .confirm-card p { margin: 0 0 18px; color: var(--text); line-height: 1.55; }
+  .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+  /* Summary tab */
+  .summary { padding: 18px; }
+  .summary[hidden] { display: none; }
+  body.sum-view table, body.sum-view #empty, body.sum-view .tx-filter, body.sum-view .add-group, body.sum-view .panel-foot { display: none !important; }
+  .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .sum-card { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,0.02); }
+  .sum-card.all { border-color: rgba(91,157,255,0.4); background: rgba(91,157,255,0.06); }
+  .sum-card h3 { margin: 0 0 10px; font-size: 15px; }
+  .sum-line { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; font-variant-numeric: tabular-nums; }
+  .sum-line .k { color: var(--muted); font-size: 13px; }
+  .sum-line .v { font-weight: 700; text-align: right; }
+  .sum-line .v.in { color: #7fd6a4; }
+  .sum-line .v.out { color: var(--danger); }
+  .sum-cmp { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+  .sum-cmp b { color: var(--text); }
+  .insights { margin-top: 18px; }
+  .insights h3 { margin: 0 0 10px; font-size: 15px; }
+  .insight { display: flex; gap: 10px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--border); border-left-width: 4px; border-radius: 10px; background: rgba(255,255,255,0.02); line-height: 1.5; }
+  .insight.warn { border-left-color: #ffc457; }
+  .insight.bad { border-left-color: var(--danger); }
+  .insight.good { border-left-color: #7fd6a4; }
+  .insight.info { border-left-color: var(--accent); }
+  .insight .fix { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
   /* Copy parts into an empty month */
   .copy-banner {
     display: flex;
@@ -543,7 +600,7 @@
     .panel-head { padding: 14px; }
     .add-group .btn { padding: 8px 10px; font-size: 14px; }
     .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; }
-    .tab.tx { grid-column: 1 / -1; }
+    .tab.tx { grid-column: span 2; }
     .tab-sep { display: none; }
     .tab { padding: 9px 4px; gap: 5px; font-size: 14px; min-width: 0; }
     .tab .count { min-width: 18px; padding: 1px 5px; font-size: 11px; }
@@ -641,6 +698,11 @@
     <button class="btn btn-primary" id="copyBtn" type="button"></button>
   </div>
 
+  <div class="lock-bar" id="lockBar" hidden>
+    <span id="lockText"></span>
+    <button class="btn" id="lockBtn" type="button"></button>
+  </div>
+
   <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
 
   <section class="panel" role="tabpanel" id="panel" aria-labelledby="">
@@ -662,6 +724,8 @@
     </div>
 
     <div class="tx-filter" id="txFilter" role="group" aria-label="Show transactions for"></div>
+
+    <div class="summary" id="summary" hidden></div>
 
     <table>
       <thead id="thead">
@@ -697,6 +761,17 @@
   </section>
 
   <div class="status" id="status" aria-live="polite"></div>
+
+  <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-card">
+      <strong id="confirmTitle">Big change in quantity</strong>
+      <p id="confirmText"></p>
+      <div class="confirm-actions">
+        <button class="btn" id="confirmNo" type="button">No, undo it</button>
+        <button class="btn btn-primary" id="confirmYes" type="button">Yes, record it</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 
@@ -734,7 +809,8 @@
   var CUR_SIGN = { USD: "$", EUR: "\u20AC" };
   var CUR_KEY = "uii-spare-parts-currency";
   var TX = "Transaction";
-  var TABS = MACHINES.concat([TX]);
+  var SUM = "Summary";
+  var TABS = MACHINES.concat([TX, SUM]);
 
   // data[machine] = [{id, machine, name, reference, quantity, loggedQty, date, created}]
   // loggedQty is the stock level the last transaction left the part at.
@@ -755,6 +831,11 @@
   var active = MACHINES[0];
   var db = null;          // shared store when running as a published artifact
   var readOnly = false;
+  // Months before the current one are closed (view only) until unlocked
+  var CURRENT_MONTH = monthOf(null, Date.now());
+  var unlocked = {};
+  function isLocked() { return month < CURRENT_MONTH && !unlocked[month]; }
+  function ro() { return readOnly || isLocked(); }
 
   function emptyData() {
     var d = {};
@@ -926,7 +1007,7 @@
     var el = document.activeElement;
     if (el && el.getAttribute && el.getAttribute("data-field") === "quantity") {
       var r = findRow(el.getAttribute("data-row"));
-      if (r) commitQuantity(r);
+      if (r && !pendingConfirm) commitQuantity(r, true);
     }
     Object.keys(editTimers).forEach(function (id) {
       clearTimeout(editTimers[id]);
@@ -947,10 +1028,45 @@
   }
 
   // ---- Transactions: a finished quantity edit logs the difference ----
-  function commitQuantity(row) {
+  var confirmEl = document.getElementById("confirm");
+  var pendingConfirm = null;
+  function isBigChange(before, after) {
+    var ch = Math.abs(after - before);
+    return ch >= 50 || (before >= 2 && after >= before * 5);
+  }
+  function askBigChange(row, before, after) {
+    var ch = after - before;
+    document.getElementById("confirmText").textContent =
+      row.machine + " \u00B7 " + (row.name || "this part") + ": " + before + " \u2192 " + after +
+      ". This records " + (ch > 0 ? "In +" : "Out \u2212") + Math.abs(ch) + ". Is that right, or was it a typo?";
+    pendingConfirm = row;
+    confirmEl.hidden = false;
+    document.getElementById("confirmNo").focus();
+  }
+  function closeConfirm(yes) {
+    var row = pendingConfirm;
+    pendingConfirm = null;
+    confirmEl.hidden = true;
+    if (!row) return;
+    if (yes) { commitQuantity(row, true); return; }
+    // put the quantity back to what was recorded
+    row.quantity = row.loggedQty;
+    var el = document.getElementById("f-" + row.id + "-quantity");
+    if (el) { el.value = row.quantity; el.focus(); }
+    clearTimeout(editTimers[row.id]);
+    delete editTimers[row.id];
+    writeRow(row);
+    updateTotal(row);
+  }
+  document.getElementById("confirmYes").addEventListener("click", function () { closeConfirm(true); });
+  document.getElementById("confirmNo").addEventListener("click", function () { closeConfirm(false); });
+  confirmEl.addEventListener("keydown", function (e) { if (e.key === "Escape") closeConfirm(false); });
+
+  function commitQuantity(row, confirmed) {
     var before = parseInt(row.loggedQty, 10) || 0;
     var after = parseInt(row.quantity, 10) || 0;
     if (before === after) return;
+    if (!row.baseline && !confirmed && isBigChange(before, after)) { askBigChange(row, before, after); return; }
     if (row.baseline) {
       // starting stock for a part already on the shelf: no transaction
       row.baseline = false;
@@ -1047,6 +1163,7 @@
   function selectMonth(k) {
     if (k === month) return;
     flushWrites();
+    delete unlocked[month];
     month = k;
     viewYear = parseInt(k.slice(0, 4), 10);
     try { localStorage.setItem(MONTH_KEY, k); } catch (e) {}
@@ -1069,7 +1186,7 @@
       }
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "tab" + (m === TX ? " tx" : "");
+      b.className = "tab" + (m === TX || m === SUM ? " tx" : "");
       b.id = "tab-" + m;
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", m === active ? "true" : "false");
@@ -1078,6 +1195,7 @@
       b.innerHTML = '<span></span><span class="count"></span>';
       b.firstChild.textContent = m;
       b.lastChild.textContent = tabCount(m);
+      if (m === SUM) b.lastChild.remove();
       b.addEventListener("click", function () { switchTo(m); });
       tabsEl.appendChild(b);
     });
@@ -1101,7 +1219,7 @@
   }
 
   function tabCount(m) {
-    return m === TX ? txList.length : data[m].length;
+    return m === TX ? txList.length : m === SUM ? "" : data[m].length;
   }
 
   // The nearest earlier month that has parts, for filling an empty month
@@ -1119,7 +1237,7 @@
   var copyBanner = document.getElementById("copyBanner");
   function updateCopyBanner() {
     var src = monthIsEmpty() ? copySource() : null;
-    copyBanner.hidden = !src || readOnly;
+    copyBanner.hidden = !src || ro();
     if (!src) return;
     var n = 0;
     MACHINES.forEach(function (m) { n += allParts[src][m].filter(hasContent).length; });
@@ -1130,7 +1248,7 @@
   }
   document.getElementById("copyBtn").addEventListener("click", function () {
     var src = copyBanner.getAttribute("data-src");
-    if (readOnly || !src || !allParts[src] || !monthIsEmpty()) return;
+    if (ro() || !src || !allParts[src] || !monthIsEmpty()) return;
     flushWrites();
     var t = Date.now();
     MACHINES.forEach(function (m) {
@@ -1250,6 +1368,29 @@
     if (e.key === "Enter") { var first = resultsEl.querySelector(".result"); if (first) first.click(); }
   });
 
+  // Same reference used by more than one part on the open machine
+  function duplicateIds() {
+    var seen = {}, dup = {};
+    if (!data[active]) return dup;
+    data[active].forEach(function (r) {
+      var k = norm(r.reference);
+      if (!k) return;
+      if (seen[k]) { dup[seen[k]] = 1; dup[r.id] = 1; } else seen[k] = r.id;
+    });
+    return dup;
+  }
+  function markDuplicates() {
+    if (active === TX || active === SUM) return 0;
+    var dup = duplicateIds();
+    data[active].forEach(function (r) {
+      var el = document.getElementById("f-" + r.id + "-reference");
+      if (!el) return;
+      el.classList.toggle("dup", !!dup[r.id]);
+      el.title = dup[r.id] ? "Another part on " + active + " has the same reference" : "";
+    });
+    return Object.keys(dup).length;
+  }
+
   function updateCounts() {
     renderMonths();
     updateCopyBanner();
@@ -1258,9 +1399,16 @@
       var c = document.querySelector("#tab-" + m + " .count");
       if (c) c.textContent = tabCount(m);
     });
-    if (active === TX) return;
+    if (active === TX || active === SUM) return;
     var n = data[active].length;
     metaEl.textContent = monthLabel(month) + " \u00B7 " + n + (n === 1 ? " part" : " parts");
+    var d = markDuplicates();
+    if (d) {
+      var w = document.createElement("span");
+      w.className = "warn";
+      w.textContent = " \u00B7 \u26A0 " + d + " parts share a reference";
+      metaEl.appendChild(w);
+    }
     emptyEl.hidden = n !== 0;
   }
 
@@ -1368,7 +1516,7 @@
       din.value = txDate(t);
       din.title = "Recorded " + fmtTime(t.ts).replace("  ", " at ");
       din.setAttribute("aria-label", "Transaction date");
-      din.readOnly = readOnly;
+      din.readOnly = ro();
       din.addEventListener("change", function () {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(din.value)) { din.value = txDate(t); return; }
         t.date = din.value;
@@ -1408,8 +1556,140 @@
     updateCounts();
   }
 
+  // ---- Summary: what came in and went out this month, compared with last month ----
+  function partIn(k, id) {
+    var p = allParts[k];
+    if (!p) return null;
+    for (var i = 0; i < MACHINES.length; i++) {
+      for (var j = 0; j < p[MACHINES[i]].length; j++) if (p[MACHINES[i]][j].id === id) return p[MACHINES[i]][j];
+    }
+    return null;
+  }
+  function addMoney(bag, cur, n) { bag[cur] = (bag[cur] || 0) + n; }
+  function moneyBag(bag) {
+    var parts = [];
+    ["USD", "EUR", ""].forEach(function (c) { if (bag[c]) parts.push(money(Math.round(bag[c] * 100) / 100, c)); });
+    return parts.join(" + ") || "—";
+  }
+  function monthStats(k) {
+    var st = { all: { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0 } };
+    MACHINES.forEach(function (m) { st[m] = { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0, used: {} }; });
+    (allTx[k] || []).forEach(function (t) {
+      var s = st[t.machine];
+      if (!s) return;
+      var part = partIn(k, t.partId), p = part ? unitPrice(part) : null, cur = part ? part.currency : "";
+      var q = Math.abs(t.change);
+      [s, st.all].forEach(function (x) {
+        x.n++;
+        if (t.change > 0) { x.inQty += q; if (p !== null) addMoney(x.inVal, cur, q * p); }
+        else { x.outQty += q; if (p !== null) addMoney(x.outVal, cur, q * p); }
+      });
+      if (t.change < 0) {
+        var key = t.partId;
+        s.used[key] = s.used[key] || { name: part && part.name ? part.name : t.name, machine: t.machine, qty: 0, val: 0, cur: cur, priced: p !== null };
+        s.used[key].qty += q;
+        if (p !== null) s.used[key].val += q * p;
+      }
+    });
+    return st;
+  }
+  function pct(now, before) { return Math.round((now - before) / before * 100); }
+
+  function renderSummary() {
+    var box = document.getElementById("summary");
+    titleEl.textContent = SUM;
+    var idx = MONTHS.indexOf(month);
+    var prevKey = idx > 0 ? MONTHS[idx - 1] : null;
+    var cur = monthStats(month);
+    var prev = prevKey ? monthStats(prevKey) : null;
+    var hasPrev = prev && prev.all.n > 0;
+    metaEl.textContent = monthLabel(month) + " · " + cur.all.n + (cur.all.n === 1 ? " transaction" : " transactions");
+    box.innerHTML = "";
+
+    var grid = document.createElement("div");
+    grid.className = "sum-grid";
+    ["all"].concat(MACHINES).forEach(function (m) {
+      var s = cur[m];
+      var card = document.createElement("div");
+      card.className = "sum-card" + (m === "all" ? " all" : "");
+      var h = document.createElement("h3");
+      h.textContent = m === "all" ? "All machines" : m;
+      card.appendChild(h);
+      [["In", "+" + s.inQty + " pcs", "in"], ["In value", moneyBag(s.inVal), "in"], ["Out (used)", "−" + s.outQty + " pcs", "out"], ["Out value", moneyBag(s.outVal), "out"]].forEach(function (l) {
+        var line = document.createElement("div");
+        line.className = "sum-line";
+        line.innerHTML = '<span class="k"></span><span class="v ' + l[2] + '"></span>';
+        line.firstChild.textContent = l[0];
+        line.lastChild.textContent = l[1];
+        card.appendChild(line);
+      });
+      var cmp = document.createElement("div");
+      cmp.className = "sum-cmp";
+      if (hasPrev && prev[m].outQty > 0) {
+        var d = pct(s.outQty, prev[m].outQty);
+        cmp.innerHTML = "Used vs " + monthLabel(prevKey).split(" ")[0] + ": <b></b>";
+        cmp.lastChild.textContent = (d > 0 ? "+" : "") + d + "% (" + s.outQty + " vs " + prev[m].outQty + ")";
+      } else if (hasPrev) {
+        cmp.textContent = "Nothing used in " + monthLabel(prevKey) + " to compare";
+      } else {
+        cmp.textContent = "No earlier month to compare yet";
+      }
+      card.appendChild(cmp);
+      grid.appendChild(card);
+    });
+    box.appendChild(grid);
+
+    // Plain-language findings, each with what to do about it
+    var notes = [];
+    function note(kind, text, fix) { notes.push([kind, text, fix]); }
+    if (!cur.all.n) note("info", "No parts came in or went out in " + monthLabel(month) + " yet.", "Changes to quantities on the machine tabs show up here.");
+    MACHINES.forEach(function (m) {
+      var s = cur[m], p = prev ? prev[m] : null;
+      if (hasPrev && p.outQty > 0 && s.outQty >= p.outQty * 1.3 && s.outQty - p.outQty >= 3) {
+        note("warn", m + " used " + pct(s.outQty, p.outQty) + "% more parts than in " + monthLabel(prevKey) + " (" + s.outQty + " vs " + p.outQty + ").",
+          "Check " + m + " for a fault that wears parts faster, and order its parts earlier than usual.");
+      } else if (hasPrev && p.outQty >= 3 && s.outQty <= p.outQty * 0.7) {
+        note("good", m + " used " + Math.abs(pct(s.outQty, p.outQty)) + "% fewer parts than in " + monthLabel(prevKey) + " (" + s.outQty + " vs " + p.outQty + ").", "No action needed.");
+      }
+      if (s.outQty > s.inQty && s.outQty > 0) {
+        note("warn", m + ": more parts went out (" + s.outQty + ") than came in (" + s.inQty + "), so its stock is going down.", "Plan the next order for " + m + ".");
+      }
+      var zero = (data[m] || []).filter(function (r) { return hasContent(r) && r.quantity === "0"; });
+      if (zero.length) {
+        note("bad", m + ": " + zero.length + (zero.length === 1 ? " part is" : " parts are") + " at 0 — " +
+          zero.slice(0, 5).map(function (r) { return (r.name || "(no name)") + (r.reference ? " (" + r.reference + ")" : ""); }).join(", ") + (zero.length > 5 ? "…" : "") + ".",
+          "Order " + (zero.length === 1 ? "it" : "them") + " before " + m + " needs " + (zero.length === 1 ? "it" : "them") + ".");
+      }
+    });
+    var top = null;
+    MACHINES.forEach(function (m) {
+      Object.keys(cur[m].used).forEach(function (k) { var u = cur[m].used[k]; if (!top || u.qty > top.qty) top = u; });
+    });
+    if (top) note("info", "Most used part this month: " + (top.name || "(no name)") + " on " + top.machine + " — " + top.qty + " pcs" + (top.priced ? ", " + money(Math.round(top.val * 100) / 100, top.cur) : "") + ".",
+      "Keep enough of it in stock.");
+    if (cur.all.n && !hasPrev) note("info", "Nothing to compare with yet" + (prevKey ? ": " + monthLabel(prevKey) + " has no transactions." : "."), "From next month you will see if usage is going up or down.");
+
+    var ins = document.createElement("div");
+    ins.className = "insights";
+    ins.innerHTML = "<h3>What this means</h3>";
+    notes.forEach(function (n) {
+      var d = document.createElement("div");
+      d.className = "insight " + n[0];
+      var t = document.createElement("div");
+      t.textContent = n[1];
+      var f = document.createElement("span");
+      f.className = "fix";
+      f.textContent = n[2];
+      t.appendChild(f);
+      d.appendChild(t);
+      ins.appendChild(d);
+    });
+    box.appendChild(ins);
+    updateCounts();
+  }
+
   function deleteTx(id) {
-    if (readOnly) return;
+    if (ro()) return;
     var idx = txList.findIndex(function (t) { return t.id === id; });
     if (idx === -1) return;
     txList.splice(idx, 1);
@@ -1467,7 +1747,7 @@
     sel.className = "cur" + (row.currency ? "" : " unset");
     sel.id = "f-" + row.id + "-currency";
     sel.setAttribute("aria-label", "Currency");
-    sel.disabled = readOnly;
+    sel.disabled = ro();
     sel.innerHTML = '<option value="">Cur.</option>' + CURRENCIES.map(function (c) { return '<option value="' + c + '">' + c + "</option>"; }).join("");
     sel.value = row.currency;
     sel.addEventListener("change", function () {
@@ -1506,7 +1786,7 @@
     input.autocomplete = "off";
     input.spellcheck = false;
     input.dir = "auto";
-    input.readOnly = readOnly;
+    input.readOnly = ro();
     if (field === "quantity") input.inputMode = "numeric";
     if (field === "price") input.inputMode = "decimal";
     if (field === "date") input.classList.toggle("blank", !input.value);
@@ -1516,6 +1796,7 @@
       var cur = findRow(row.id) || row;
       cur[field] = input.value;
       if (field === "quantity" || field === "price") updateTotal(cur);
+      if (field === "reference") updateCounts();
       if (field === "date") input.classList.toggle("blank", !input.value);
       scheduleWrite(cur);
     });
@@ -1531,9 +1812,31 @@
     return td;
   }
 
+  var lockBar = document.getElementById("lockBar");
+  function updateLockBar() {
+    var past = month < CURRENT_MONTH;
+    lockBar.hidden = !past || readOnly;
+    document.body.classList.toggle("locked", isLocked());
+    if (!past) return;
+    var open = !!unlocked[month];
+    lockBar.classList.toggle("open", open);
+    document.getElementById("lockText").textContent = open
+      ? "\uD83D\uDD13 " + monthLabel(month) + " is open for editing. Lock it again when you are done."
+      : "\uD83D\uDD12 " + monthLabel(month) + " is closed. You can view it, but changes are off.";
+    document.getElementById("lockBtn").textContent = open ? "Lock again" : "Unlock to edit";
+  }
+  document.getElementById("lockBtn").addEventListener("click", function () {
+    if (unlocked[month]) delete unlocked[month]; else unlocked[month] = true;
+    renderRows();
+  });
+
   function renderRows(focusId) {
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
+    updateLockBar();
     document.body.classList.toggle("tx-view", active === TX);
+    document.body.classList.toggle("sum-view", active === SUM);
+    document.getElementById("summary").hidden = active !== SUM;
+    if (active === SUM) { renderSummary(); return; }
     if (active === TX) { renderTransactions(); return; }
     document.getElementById("thead").innerHTML = MACHINE_HEAD;
     emptyEl.querySelector("strong").textContent = "No parts yet";
@@ -1588,7 +1891,7 @@
   // received = a part that just arrived: its first quantity is logged as In.
   // Otherwise the first quantity is starting stock and is not logged.
   function addRow(received) {
-    if (readOnly || active === TX) return;
+    if (ro() || active === TX) return;
     var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency() }, active);
     data[active].push(row);
     writeRow(row);
@@ -1598,7 +1901,7 @@
   function deleteRow(id) {
     var list = data[active];
     var idx = list.findIndex(function (r) { return r.id === id; });
-    if (idx === -1 || readOnly) return;
+    if (idx === -1 || ro()) return;
     var row = list[idx];
     clearTimeout(editTimers[id]);
     delete editTimers[id];
@@ -1651,6 +1954,7 @@
     renderMonths();
 
     if (active === TX) { data = next; renderTransactions(); return; }
+    if (active === SUM) { data = next; renderSummary(); updateCounts(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
     var after = next[active].map(function (r) { return r.id; }).join(",");
     data = next;
@@ -1687,7 +1991,7 @@
     if (!allTx[month]) allTx[month] = [];
     txList = allTx[month];
     renderMonths();
-    if (active === TX) renderTransactions(); else updateCounts();
+    if (active === TX) renderTransactions(); else if (active === SUM) { renderSummary(); updateCounts(); } else updateCounts();
   }
 
   // ---- Excel export: builds a real .xlsx (zip of XML parts) for the open month ----
