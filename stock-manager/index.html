@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Manager</title>
+<style>
+:root{
+  --bg:#f4f6f9;--card:#fff;--ink:#1d2330;--muted:#667085;--line:#e3e7ee;
+  --pri:#2457d6;--pri-ink:#fff;--pri-soft:#e8eefc;
+  --red:#c62828;--red-bg:#fdecec;--yel:#8a6200;--yel-bg:#fff6d6;--grn:#1b7f3b;--grn-bg:#e6f5ea;
+  --radius:10px;--shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.hwrap{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.brand{font-weight:700;font-size:18px}
+.brand small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+nav{max-width:1200px;margin:0 auto;padding:0 16px;display:flex;gap:4px;overflow-x:auto}
+nav button{border:0;background:none;padding:10px 14px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;color:var(--muted);font-weight:600}
+nav button.on{color:var(--pri);border-bottom-color:var(--pri)}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.btn{border:1px solid var(--line);background:var(--card);padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:#c5ccd8}
+.btn.primary{background:var(--pri);color:var(--pri-ink);border-color:var(--pri)}
+.btn.danger{color:var(--red);border-color:#f0c4c4}
+.btn.danger.solid{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.sm{padding:3px 8px;font-size:12px;font-weight:600}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+.stat{cursor:pointer}
+.stat .n{font-size:28px;font-weight:700}
+.stat .l{color:var(--muted);font-size:13px}
+.stat.red{border-color:#f0c4c4;background:var(--red-bg)}.stat.red .n{color:var(--red)}
+.stat.yel{border-color:#f1dd9a;background:var(--yel-bg)}.stat.yel .n{color:var(--yel)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.panel h3{margin:0;padding:12px 14px;font-size:15px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.panel .pbody{padding:12px 14px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:flex-end}
+.filters label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);gap:3px}
+.filters input,.filters select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;min-width:120px}
+.filters .grow{flex:1 1 200px}.filters .grow input{width:100%}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{background:#f8f9fb;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.act{white-space:nowrap;text-align:right}
+tr.red td{background:var(--red-bg)}
+tr.yel td{background:var(--yel-bg)}
+tr.dim td{color:var(--muted)}
+.empty{padding:22px;text-align:center;color:var(--muted)}
+.link{color:var(--pri);cursor:pointer;font-weight:600;background:none;border:0;padding:0;text-align:left}
+.link:hover{text-decoration:underline}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;background:#eef0f4;color:#4a5262}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.yel{background:var(--yel-bg);color:var(--yel)}
+.badge.grn{background:var(--grn-bg);color:var(--grn)}
+.badge.blu{background:var(--pri-soft);color:var(--pri)}
+.muted{color:var(--muted)}
+.code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(15,20,30,.45);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;z-index:50}
+.overlay[hidden]{display:none}
+#confirmBox{z-index:60}
+.modal{background:var(--card);border-radius:12px;width:100%;max-width:640px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.modal.wide{max-width:1000px}
+.mhead{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.mhead h2{margin:0;font-size:17px}
+.x{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted)}
+.mbody{padding:16px}
+.form .fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.form label.full{grid-column:1/-1}
+.form input,.form select,.form textarea{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-weight:400}
+.form input:focus,.form select:focus,.form textarea:focus,.filters input:focus,.filters select:focus{outline:2px solid var(--pri-soft);border-color:var(--pri)}
+.form .hint{font-weight:400;font-size:12px;color:var(--muted)}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content}
+.seg label{flex-direction:row;align-items:center;padding:7px 14px;cursor:pointer;gap:6px;font-weight:600}
+.seg input{margin:0}
+.ferr{color:var(--red);background:var(--red-bg);border-radius:8px;padding:8px 10px;margin-top:12px;display:none;white-space:pre-line}
+.ferr.show{display:block}
+.info{background:var(--pri-soft);color:#1d3f8f;border-radius:8px;padding:8px 10px;margin-top:12px;font-size:13px}
+.factions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kv div{background:#f8f9fb;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:6px;align-items:center;width:calc(100% - 32px);max-width:520px;pointer-events:none}
+.t{background:#1d2330;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);width:100%}
+.t.err{background:var(--red)}.t.ok{background:var(--grn)}
+.banner{background:var(--red-bg);color:var(--red);border:1px solid #f0c4c4;padding:10px 14px;border-radius:8px;margin-bottom:12px}
+.datagrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.datagrid .card h4{margin:0 0 6px}
+.datagrid .card p{margin:0 0 10px;color:var(--muted);font-size:13px}
+.datagrid .row{display:flex;flex-wrap:wrap;gap:8px}
+section[hidden]{display:none}
+@media (max-width:760px){
+  .grid2,.form .fg{grid-template-columns:1fr}
+  .hwrap{padding:10px 12px}
+  main{padding:12px}
+  .filters input,.filters select{min-width:0;width:100%}
+  .filters label{flex:1 1 140px}
+  .stat .n{font-size:24px}
+  .overlay{padding:8px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="hwrap">
+    <div class="brand">Stock Manager<small>Parts · Batches · Movements — saved in this browser</small></div>
+    <div class="quick">
+      <button class="btn" data-act="part-new">+ Part</button>
+      <button class="btn" data-act="batch-new">+ Batch</button>
+      <button class="btn primary" data-act="move-new">Stock In / Out</button>
+    </div>
+  </div>
+  <nav id="tabs">
+    <button data-tab="dash" class="on">Dashboard</button>
+    <button data-tab="parts">Parts</button>
+    <button data-tab="batches">Batches</button>
+    <button data-tab="moves">Movements</button>
+    <button data-tab="data">Export / Backup</button>
+  </nav>
+</header>
+
+<main>
+  <div id="banner"></div>
+
+  <section id="tab-dash">
+    <div class="cards" id="dashCards"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Parts below minimum</h3><div class="tbl" id="dashLow"></div></div>
+      <div class="panel"><h3>Batches expiring within 30 days</h3><div class="tbl" id="dashSoon"></div></div>
+    </div>
+    <div class="panel"><h3>Expired batches still in stock</h3><div class="tbl" id="dashExpired"></div></div>
+    <div class="panel"><h3>Last 10 movements <button class="btn sm" data-goto="moves">View all</button></h3><div class="tbl" id="dashMoves"></div></div>
+  </section>
+
+  <section id="tab-parts" hidden>
+    <div class="panel">
+      <div class="filters">
+        <label class="grow">Search name, code or batch no.<input id="pQ" type="search" placeholder="e.g. filter, HF-1001"></label>
+        <label>Category<select id="pCat"></select></label>
+        <label>Status<select id="pSt">
+          <option value="">All</option><option value="low">Below minimum</option><option value="expired">Has expired batch</option>
+          <option value="soon">Expiring ≤ 30 days</option><option value="ok">OK</option></select></label>
+        <button class="btn" data-act="clear-filters" data-scope="p">Clear</button>
+      </div>
+      <div class="tbl" id="partsTbl"></div>
+    </div>
+  </section>
+
+  <section id="tab-batches" hidden>
+    <div class="panel">
+      <div class="filters">
+        <label class="grow">Search part, code, batch no. or supplier<input id="bQ" type="search" placeholder="e.g. OIL-2025"></label>
+        <label>Category<select id="bCat"></select></label>
+        <label>Status<select id="bSt">
+          <option value="">All</option><option value="expired">Expired</option><option value="soon">Expiring ≤ 30 days</option>
+          <option value="ok">OK</option><option value="empty">Empty (qty 0)</option></select></label>
+        <label>Received from<input id="bFrom" type="date"></label>
+        <label>Received to<input id="bTo" type="date"></label>
+        <button class="btn" data-act="clear-filters" data-scope="b">Clear</button>
+      </div>
+      <div class="tbl" id="batchesTbl"></div>
+    </div>
+  </section>
+
+  <section id="tab-moves" hidden>
+    <div class="panel">
+      <div class="filters">
+        <label class="grow">Search part, code, batch no., recipient, note<input id="mQ" type="search"></label>
+        <label>Category<select id="mCat"></select></label>
+        <label>Type<select id="mType"><option value="">All</option><option value="IN">In</option><option value="OUT">Out</option></select></label>
+        <label>Date from<input id="mFrom" type="date"></label>
+        <label>Date to<input id="mTo" type="date"></label>
+        <button class="btn" data-act="clear-filters" data-scope="m">Clear</button>
+      </div>
+      <div class="tbl" id="movesTbl"></div>
+    </div>
+  </section>
+
+  <section id="tab-data" hidden>
+    <div class="datagrid">
+      <div class="card">
+        <h4>Export to Excel</h4>
+        <p>One workbook with three sheets: Parts, Batches, Movements.</p>
+        <div class="row"><button class="btn primary" data-act="export-xls">Download .xls</button></div>
+      </div>
+      <div class="card">
+        <h4>Export to CSV</h4>
+        <p>UTF-8 CSV files that open directly in Excel or Google Sheets.</p>
+        <div class="row">
+          <button class="btn" data-act="export-csv" data-set="parts">Parts</button>
+          <button class="btn" data-act="export-csv" data-set="batches">Batches</button>
+          <button class="btn" data-act="export-csv" data-set="movements">Movements</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Backup (JSON)</h4>
+        <p>Full backup of all data. Keep it somewhere safe.</p>
+        <div class="row"><button class="btn primary" data-act="backup">Download backup</button></div>
+      </div>
+      <div class="card">
+        <h4>Restore from backup</h4>
+        <p>Replaces ALL current data. The file is checked before anything is changed.</p>
+        <div class="row">
+          <input type="file" id="importFile" accept=".json,application/json" hidden>
+          <button class="btn" data-act="import">Choose JSON file…</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Reset</h4>
+        <p>Reload the demo data, or start with an empty stock.</p>
+        <div class="row">
+          <button class="btn danger" data-act="reset-demo">Load demo data</button>
+          <button class="btn danger" data-act="wipe">Delete all data</button>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Storage</h4>
+        <p id="storageInfo"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="mhead"><h2 id="mTitle"></h2><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="mbody" id="mBody"></div>
+  </div>
+</div>
+
+<div id="confirmBox" class="overlay" hidden>
+  <div class="modal" role="alertdialog" aria-modal="true" style="max-width:440px;margin-top:10vh">
+    <div class="mhead"><h2 id="cTitle">Please confirm</h2></div>
+    <div class="mbody">
+      <div id="cMsg" style="white-space:pre-line"></div>
+      <div class="factions">
+        <button class="btn" id="cNo">Cancel</button>
+        <button class="btn danger solid" id="cYes">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<datalist id="dlUnit"><option value="pcs"><option value="kg"><option value="g"><option value="L"><option value="m"><option value="box"><option value="set"><option value="pair"><option value="roll"></datalist>
+<datalist id="dlCat"></datalist>
+
+<script>
+'use strict';
+/* ================= Utilities ================= */
+const KEY = 'stockManager.data.v1';
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+const pad = n => String(n).padStart(2, '0');
+const fmtDate = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const today = () => fmtDate(new Date());
+function addDays(s, n) { const [y, m, d] = s.split('-').map(Number); return fmtDate(new Date(y, m - 1, d + n)); }
+function daysBetween(a, b) { const [y1,m1,d1]=a.split('-').map(Number), [y2,m2,d2]=b.split('-').map(Number); return Math.round((Date.UTC(y2,m2-1,d2) - Date.UTC(y1,m1-1,d1)) / 86400000); }
+function isDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number); const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+const r3 = n => Math.round(n * 1000) / 1000;
+const fmt = n => (Number.isFinite(n) ? r3(n).toLocaleString('en-US', {maximumFractionDigits: 3}) : '');
+const money = n => (n === null || n === undefined || n === '' ? '' : Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+const str = v => typeof v === 'string' && v.trim() !== '';
+/* Quantity parser: positive/zero number with up to 3 decimals, no signs, no letters. */
+function parseNum(v) { v = String(v ?? '').trim(); return /^\d+(\.\d{1,3})?$/.test(v) ? Number(v) : NaN; }
+let lastTs = 0;
+const stamp = () => (lastTs = Math.max(Date.now(), lastTs + 1));
+
+/* ================= Data & storage ================= */
+let db = {parts: [], batches: [], movements: []};
+let C = {bq: new Map(), pq: new Map()};   // computed quantities
+let storageOK = true;
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); storageOK = true; return true; }
+  catch (e) { storageOK = false; return false; }
+}
+
+function normalize(d) {
+  const s = v => (v === undefined || v === null ? '' : String(v).trim());
+  const n = v => (v === '' || v === null || v === undefined ? NaN : Number(v));
+  return {
+    parts: (d.parts || []).map(p => ({id: s(p.id), name: s(p.name), code: s(p.code), category: s(p.category), unit: s(p.unit),
+      location: s(p.location), minQty: n(p.minQty ?? 0)})),
+    batches: (d.batches || []).map((b, i) => ({id: s(b.id), partId: s(b.partId), batchNo: s(b.batchNo), receivedDate: s(b.receivedDate),
+      expiryDate: s(b.expiryDate), supplier: s(b.supplier),
+      unitPrice: (b.unitPrice === '' || b.unitPrice === null || b.unitPrice === undefined) ? null : Number(b.unitPrice),
+      createdAt: Number(b.createdAt) || i + 1})),
+    movements: (d.movements || []).map((m, i) => ({id: s(m.id), type: s(m.type).toUpperCase(), partId: s(m.partId), batchId: s(m.batchId),
+      date: s(m.date), qty: n(m.qty), recipient: s(m.recipient), note: s(m.note), createdAt: Number(m.createdAt) || i + 1}))
+  };
+}
+
+const moveOrder = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 :
+  (a.type !== b.type ? (a.type === 'IN' ? -1 : 1) : a.createdAt - b.createdAt);
+
+/* Full integrity check. Used after every change (rollback on failure) and before importing a backup. */
+function validateDb(d) {
+  const E = [];
+  if (!d || typeof d !== 'object') return ['Data is not a valid object.'];
+  for (const k of ['parts', 'batches', 'movements']) if (!Array.isArray(d[k])) return [`Missing "${k}" list.`];
+  const parts = new Map(), codes = new Set();
+  d.parts.forEach((p, i) => {
+    const w = `Part ${p.code || '#' + (i + 1)}`;
+    if (!str(p.id)) E.push(`${w}: missing id.`); else if (parts.has(p.id)) E.push(`${w}: duplicate id.`); else parts.set(p.id, p);
+    if (!str(p.name)) E.push(`${w}: name is required.`);
+    if (!str(p.code)) E.push(`Part #${i + 1}: code is required.`);
+    else { const c = p.code.toLowerCase(); if (codes.has(c)) E.push(`Duplicate part code "${p.code}".`); codes.add(c); }
+    if (!str(p.category)) E.push(`${w}: category is required.`);
+    if (!str(p.unit)) E.push(`${w}: unit is required.`);
+    if (!(Number.isFinite(p.minQty) && p.minQty >= 0)) E.push(`${w}: minimum quantity must be 0 or more.`);
+  });
+  const batches = new Map(), bnos = new Set();
+  d.batches.forEach((b, i) => {
+    const w = `Batch ${b.batchNo || '#' + (i + 1)}`;
+    if (!str(b.id)) E.push(`${w}: missing id.`); else if (batches.has(b.id)) E.push(`${w}: duplicate id.`); else batches.set(b.id, b);
+    if (!parts.has(b.partId)) E.push(`${w}: belongs to an unknown part.`);
+    if (!str(b.batchNo)) E.push(`Batch #${i + 1}: batch number is required.`);
+    else { const k = b.partId + '|' + b.batchNo.toLowerCase(); if (bnos.has(k)) E.push(`Duplicate batch number "${b.batchNo}" for the same part.`); bnos.add(k); }
+    if (!isDate(b.receivedDate)) E.push(`${w}: received date must be YYYY-MM-DD.`);
+    if (b.expiryDate !== '' && !isDate(b.expiryDate)) E.push(`${w}: expiry date must be YYYY-MM-DD or empty.`);
+    if (isDate(b.expiryDate) && isDate(b.receivedDate) && b.expiryDate < b.receivedDate) E.push(`${w}: expiry date is before received date.`);
+    if (!str(b.supplier)) E.push(`${w}: supplier is required.`);
+    if (b.unitPrice !== null && !(Number.isFinite(b.unitPrice) && b.unitPrice >= 0)) E.push(`${w}: unit price must be 0 or more, or empty.`);
+  });
+  const ids = new Set(), perBatch = new Map();
+  d.movements.forEach((m, i) => {
+    const w = `Movement #${i + 1}`;
+    if (!str(m.id)) E.push(`${w}: missing id.`); else if (ids.has(m.id)) E.push(`${w}: duplicate id.`); else ids.add(m.id);
+    if (m.type !== 'IN' && m.type !== 'OUT') E.push(`${w}: type must be IN or OUT.`);
+    const b = batches.get(m.batchId);
+    if (!b) E.push(`${w}: refers to an unknown batch.`); else if (b.partId !== m.partId) E.push(`${w}: part does not match its batch.`);
+    if (!(Number.isFinite(m.qty) && m.qty > 0)) E.push(`${w}: quantity must be greater than zero.`);
+    if (!isDate(m.date)) E.push(`${w}: date must be YYYY-MM-DD.`);
+    if (b) { if (!perBatch.has(b.id)) perBatch.set(b.id, []); perBatch.get(b.id).push(m); }
+  });
+  if (E.length) return E;
+  // Balance must never go below zero at any point in time (movements in date order).
+  for (const [bid, list] of perBatch) {
+    let bal = 0; const b = batches.get(bid), p = parts.get(b.partId);
+    for (const m of [...list].sort(moveOrder)) {
+      bal = r3(bal + (m.type === 'IN' ? m.qty : -m.qty));
+      if (bal < 0) { E.push(`Not enough stock: batch "${b.batchNo}" (${p.code}) would go to ${fmt(bal)} on ${m.date}.`); break; }
+    }
+  }
+  return E;
+}
+
+/* Apply a change atomically: run it, verify integrity, save. Any failure restores the previous state. */
+function commit(fn) {
+  const snap = JSON.stringify(db);
+  try { fn(); } catch (e) { db = JSON.parse(snap); throw e; }
+  const errs = validateDb(db);
+  if (errs.length) { db = JSON.parse(snap); throw new Error(errs[0]); }
+  if (!save()) { db = JSON.parse(snap); throw new Error('Could not save to browser storage (storage full or blocked). Nothing was changed.'); }
+  render();
+}
+
+function calc() {
+  const bq = new Map(), pq = new Map();
+  db.batches.forEach(b => bq.set(b.id, 0));
+  db.movements.forEach(m => bq.set(m.batchId, r3((bq.get(m.batchId) || 0) + (m.type === 'IN' ? m.qty : -m.qty))));
+  db.parts.forEach(p => pq.set(p.id, 0));
+  db.batches.forEach(b => pq.set(b.partId, r3((pq.get(b.partId) || 0) + bq.get(b.id))));
+  C = {bq, pq};
+}
+
+const getPart = id => db.parts.find(p => p.id === id);
+const getBatch = id => db.batches.find(b => b.id === id);
+const partBatches = pid => db.batches.filter(b => b.partId === pid).sort((a, b) => a.receivedDate.localeCompare(b.receivedDate) || a.createdAt - b.createdAt);
+
+function batchStatus(b) {
+  const q = C.bq.get(b.id) || 0, t = today();
+  if (q <= 0) return 'empty';
+  if (b.expiryDate && b.expiryDate < t) return 'expired';
+  if (b.expiryDate && b.expiryDate <= addDays(t, 30)) return 'soon';
+  return 'ok';
+}
+function partFlags(p) {
+  const bs = db.batches.filter(b => b.partId === p.id).map(batchStatus);
+  return {low: (C.pq.get(p.id) || 0) < p.minQty, expired: bs.includes('expired'), soon: bs.includes('soon')};
+}
+const partRowCls = f => (f.low || f.expired ? 'red' : f.soon ? 'yel' : '');
+const batchRowCls = s => (s === 'expired' ? 'red' : s === 'soon' ? 'yel' : s === 'empty' ? 'dim' : '');
+function partBadges(p) {
+  const f = partFlags(p), out = [];
+  if (f.low) out.push('<span class="badge red">Below min</span>');
+  if (f.expired) out.push('<span class="badge red">Expired batch</span>');
+  if (f.soon) out.push('<span class="badge yel">Expiring soon</span>');
+  return out.join(' ') || '<span class="badge grn">OK</span>';
+}
+function batchBadge(b) {
+  const s = batchStatus(b);
+  if (s === 'expired') return '<span class="badge red">Expired</span>';
+  if (s === 'soon') return `<span class="badge yel">Expires in ${daysBetween(today(), b.expiryDate)}d</span>`;
+  if (s === 'empty') return '<span class="badge">Empty</span>';
+  return '<span class="badge grn">OK</span>';
+}
+const typeBadge = t => (t === 'IN' ? '<span class="badge grn">IN</span>' : '<span class="badge blu">OUT</span>');
+
+/* ================= Demo data (first run) ================= */
+function seedData() {
+  const t = today(), D = n => addDays(t, n); let ts = Date.now() - 1e6; const T = () => ts++;
+  const P = (name, code, category, unit, location, minQty) => ({id: uid(), name, code, category, unit, location, minQty});
+  const parts = [
+    P('Hydraulic Oil Filter', 'HF-1001', 'Filters', 'pcs', 'Rack A-01', 10),
+    P('V-Belt B-52', 'VB-0052', 'Belts', 'pcs', 'Rack B-03', 8),
+    P('Engine Oil 15W-40', 'OIL-1540', 'Lubricants', 'L', 'Oil Room T-1', 200),
+    P('Ball Bearing 6205-2RS', 'BRG-6205', 'Bearings', 'pcs', 'Rack C-02', 20),
+    P('Diesel Fuel Filter', 'FF-5507', 'Filters', 'pcs', 'Rack A-02', 6)
+  ];
+  const [p1, p2, p3, p4, p5] = parts;
+  const B = (p, batchNo, qty, rec, exp, supplier, unitPrice) => ({id: uid(), partId: p.id, batchNo, receivedDate: D(rec), expiryDate: exp === null ? '' : D(exp), supplier, unitPrice, createdAt: T(), _q: qty});
+  const batches = [
+    B(p1, 'HF-2025-01', 12, -200, null, 'Atlas Filters Co.', 18.5),
+    B(p1, 'HF-2026-02', 20, -40, null, 'Atlas Filters Co.', 19),
+    B(p2, 'VB-2026-07', 15, -90, null, 'Gates Distributors', 7.25),
+    B(p3, 'OIL-2025-03', 400, -300, -5, 'Shell Lubricants', 3.4),
+    B(p3, 'OIL-2026-09', 600, -60, 20, 'Shell Lubricants', 3.55),
+    B(p4, 'BRG-2026-05', 30, -120, null, 'SKF Supply', 4.8),
+    B(p5, 'FF-2026-04', 10, -150, 300, 'Fleetguard Parts', 12),
+    B(p5, 'FF-2026-08', 6, -30, 25, 'Fleetguard Parts', 12.4)
+  ];
+  const movements = batches.map(b => ({id: uid(), type: 'IN', partId: b.partId, batchId: b.id, date: b.receivedDate, qty: b._q, recipient: '', note: 'Initial receipt (batch created)', createdAt: b.createdAt}));
+  batches.forEach(b => delete b._q);
+  const O = (b, qty, d, recipient, note) => movements.push({id: uid(), type: 'OUT', partId: b.partId, batchId: b.id, date: D(d), qty, recipient, note, createdAt: T()});
+  O(batches[0], 8, -150, 'Ahmed K.', 'Excavator EX-03 service');
+  O(batches[3], 150, -100, 'Workshop', 'Generator G-2 oil change');
+  O(batches[2], 9, -20, 'Maintenance team', 'Conveyor line 2 belts');
+  O(batches[4], 300, -10, 'Fleet garage', 'Truck fleet oil service');
+  O(batches[5], 14, -7, 'Line 1 mechanic', 'Pump bearing replacement');
+  O(batches[6], 7, -3, 'Samir T.', 'Generator fuel filters');
+  return {parts, batches, movements};
+}
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch (e) { storageOK = false; }
+  if (raw !== null) {
+    try {
+      const d = normalize(JSON.parse(raw)); const errs = validateDb(d);
+      if (errs.length) throw new Error(errs[0]);
+      db = d;
+    } catch (e) {
+      try { localStorage.setItem(KEY + '.corrupt.' + Date.now(), raw); } catch (_) {}
+      db = seedData(); save();
+      setTimeout(() => toast('Saved data was damaged (' + e.message + '). A copy was kept in storage and demo data was loaded.', 'err', 9000), 300);
+    }
+  } else {
+    db = seedData(); save();
+  }
+  lastTs = Math.max(0, ...db.movements.map(m => m.createdAt), ...db.batches.map(b => b.createdAt));
+}
+
+/* ================= UI helpers ================= */
+function toast(msg, kind = '', ms = 3500) {
+  const el = document.createElement('div'); el.className = 't ' + kind; el.textContent = msg;
+  $('#toast').appendChild(el); setTimeout(() => el.remove(), ms);
+}
+
+function openModal(title, html, onMount, wide = false) {
+  $('#mTitle').textContent = title; $('#mBody').innerHTML = html;
+  $('#modal .modal').classList.toggle('wide', wide);
+  $('#modal').hidden = false; document.body.style.overflow = 'hidden';
+  if (onMount) onMount($('#mBody'));
+  const first = $('#mBody').querySelector('input:not([type=hidden]):not([type=radio]),select,textarea');
+  if (first && window.matchMedia('(min-width:761px)').matches) first.focus();
+}
+function closeModal() { $('#modal').hidden = true; $('#mBody').innerHTML = ''; document.body.style.overflow = ''; }
+let confirmResolve = null;
+function confirmBox(msg, yes = 'Delete', title = 'Please confirm') {
+  $('#cTitle').textContent = title; $('#cMsg').textContent = msg; $('#cYes').textContent = yes;
+  $('#confirmBox').hidden = false; $('#cNo').focus();
+  return new Promise(res => { confirmResolve = res; });
+}
+function endConfirm(v) { $('#confirmBox').hidden = true; if (confirmResolve) { const r = confirmResolve; confirmResolve = null; r(v); } }
+$('#cYes').onclick = () => endConfirm(true);
+$('#cNo').onclick = () => endConfirm(false);
+function showErr(form, msg) { const e = form.querySelector('.ferr'); e.textContent = msg; e.classList.add('show'); e.scrollIntoView({block: 'nearest'}); }
+const formFoot = (label = 'Save') => `<div class="ferr"></div><div class="factions"><button type="button" class="btn" data-close>Cancel</button><button type="submit" class="btn primary">${label}</button></div>`;
+const val = s => ($(s) ? $(s).value.trim() : '');
+function table(head, rows, emptyMsg = 'Nothing to show.') {
+  if (!rows.length) return `<div class="empty">${emptyMsg}</div>`;
+  return `<table><thead><tr>${head.map(h => `<th${h.startsWith('#') ? ' class="num"' : ''}>${esc(h.replace(/^#/, ''))}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
+}
+function categories() { return [...new Set(db.parts.map(p => p.category))].sort((a, b) => a.localeCompare(b)); }
+function fillCatSelect(sel) {
+  const el = $(sel), cur = el.value;
+  el.innerHTML = '<option value="">All</option>' + categories().map(c => `<option${c === cur ? ' selected' : ''}>${esc(c)}</option>`).join('');
+}
+const partLink = p => `<button class="link" data-act="part-view" data-id="${p.id}">${esc(p.name)}</button><div class="muted code">${esc(p.code)}</div>`;
+
+/* ================= Rendering ================= */
+let tab = 'dash';
+function render() {
+  calc();
+  $('#dlCat').innerHTML = categories().map(c => `<option value="${esc(c)}">`).join('');
+  $('#banner').innerHTML = storageOK ? '' : '<div class="banner"><b>Warning:</b> browser storage is not available (private mode or blocked). Changes will be lost when the page is closed. Download a backup.</div>';
+  ({dash: renderDash, parts: renderParts, batches: renderBatches, moves: renderMoves, data: renderData})[tab]();
+}
+
+function moveRows(list, withActions) {
+  return list.map(m => {
+    const p = getPart(m.partId), b = getBatch(m.batchId);
+    return `<tr><td class="code">${esc(m.date)}</td><td>${typeBadge(m.type)}</td><td>${partLink(p)}</td><td class="code">${esc(b.batchNo)}</td>
+      <td class="num">${m.type === 'OUT' ? '−' : '+'}${fmt(m.qty)} ${esc(p.unit)}</td><td>${esc(m.recipient) || '<span class="muted">—</span>'}</td><td>${esc(m.note)}</td>
+      ${withActions ? `<td class="act"><button class="btn sm" data-act="move-edit" data-id="${m.id}">Edit</button> <button class="btn sm danger" data-act="move-del" data-id="${m.id}">Delete</button></td>` : ''}</tr>`;
+  });
+}
+const sortedMovesDesc = list => [...list].sort((a, b) => moveOrder(b, a));
+
+function renderDash() {
+  const t = today(), low = db.parts.filter(p => (C.pq.get(p.id) || 0) < p.minQty);
+  const soon = db.batches.filter(b => batchStatus(b) === 'soon').sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+  const expired = db.batches.filter(b => batchStatus(b) === 'expired').sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
+  const value = db.batches.reduce((s, b) => s + (b.unitPrice !== null ? (C.bq.get(b.id) || 0) * b.unitPrice : 0), 0);
+  $('#dashCards').innerHTML = `
+    <div class="card stat" data-goto="parts"><div class="n">${db.parts.length}</div><div class="l">Total parts</div></div>
+    <div class="card stat ${low.length ? 'red' : ''}" data-goto="parts" data-filter="pSt=low"><div class="n">${low.length}</div><div class="l">Parts below minimum</div></div>
+    <div class="card stat ${soon.length ? 'yel' : ''}" data-goto="batches" data-filter="bSt=soon"><div class="n">${soon.length}</div><div class="l">Batches expiring ≤ 30 days</div></div>
+    <div class="card stat ${expired.length ? 'red' : ''}" data-goto="batches" data-filter="bSt=expired"><div class="n">${expired.length}</div><div class="l">Expired batches in stock</div></div>
+    <div class="card stat" data-goto="batches"><div class="n">${money(value)}</div><div class="l">Stock value (priced batches)</div></div>`;
+  $('#dashLow').innerHTML = table(['Part', 'Location', '#Balance', '#Min'], low.map(p =>
+    `<tr class="red"><td>${partLink(p)}</td><td>${esc(p.location)}</td><td class="num">${fmt(C.pq.get(p.id))} ${esc(p.unit)}</td><td class="num">${fmt(p.minQty)}</td></tr>`), 'All parts are at or above minimum.');
+  const brow = b => { const p = getPart(b.partId); return `<tr class="${batchRowCls(batchStatus(b))}"><td>${partLink(p)}</td><td class="code">${esc(b.batchNo)}</td><td class="code">${esc(b.expiryDate)}</td><td>${batchBadge(b)}</td><td class="num">${fmt(C.bq.get(b.id))} ${esc(p.unit)}</td></tr>`; };
+  $('#dashSoon').innerHTML = table(['Part', 'Batch', 'Expiry', 'Status', '#Qty'], soon.map(brow), 'No batches expire in the next 30 days.');
+  $('#dashExpired').innerHTML = table(['Part', 'Batch', 'Expiry', 'Status', '#Qty'], expired.map(brow), 'No expired stock.');
+  $('#dashMoves').innerHTML = table(['Date', 'Type', 'Part', 'Batch', '#Qty', 'Recipient', 'Note'], moveRows(sortedMovesDesc(db.movements).slice(0, 10), false), 'No movements yet.');
+}
+
+function renderParts() {
+  fillCatSelect('#pCat');
+  const q = val('#pQ').toLowerCase(), cat = val('#pCat'), st = val('#pSt');
+  const rows = db.parts.filter(p => {
+    if (cat && p.category !== cat) return false;
+    if (q) { const bn = db.batches.filter(b => b.partId === p.id).map(b => b.batchNo).join(' '); if (!(p.name + ' ' + p.code + ' ' + bn).toLowerCase().includes(q)) return false; }
+    const f = partFlags(p);
+    if (st === 'low' && !f.low) return false;
+    if (st === 'expired' && !f.expired) return false;
+    if (st === 'soon' && !f.soon) return false;
+    if (st === 'ok' && (f.low || f.expired || f.soon)) return false;
+    return true;
+  }).sort((a, b) => a.code.localeCompare(b.code));
+  $('#partsTbl').innerHTML = table(['Part', 'Category', 'Location', '#Balance', '#Min', '#Batches', 'Status', ''], rows.map(p =>
+    `<tr class="${partRowCls(partFlags(p))}"><td>${partLink(p)}</td><td>${esc(p.category)}</td><td>${esc(p.location) || '<span class="muted">—</span>'}</td>
+     <td class="num"><b>${fmt(C.pq.get(p.id))}</b> ${esc(p.unit)}</td><td class="num">${fmt(p.minQty)}</td><td class="num">${db.batches.filter(b => b.partId === p.id).length}</td>
+     <td>${partBadges(p)}</td><td class="act"><button class="btn sm" data-act="part-view" data-id="${p.id}">History</button> <button class="btn sm" data-act="part-edit" data-id="${p.id}">Edit</button> <button class="btn sm danger" data-act="part-del" data-id="${p.id}">Delete</button></td></tr>`),
+    db.parts.length ? 'No parts match the filters.' : 'No parts yet. Click “+ Part” to add one.');
+}
+
+function renderBatches() {
+  fillCatSelect('#bCat');
+  const q = val('#bQ').toLowerCase(), cat = val('#bCat'), st = val('#bSt'), from = val('#bFrom'), to = val('#bTo');
+  const rows = db.batches.filter(b => {
+    const p = getPart(b.partId);
+    if (cat && p.category !== cat) return false;
+    if (q && !(p.name + ' ' + p.code + ' ' + b.batchNo + ' ' + b.supplier).toLowerCase().includes(q)) return false;
+    if (st && batchStatus(b) !== st) return false;
+    if (from && b.receivedDate < from) return false;
+    if (to && b.receivedDate > to) return false;
+    return true;
+  }).sort((a, b) => b.receivedDate.localeCompare(a.receivedDate) || b.createdAt - a.createdAt);
+  $('#batchesTbl').innerHTML = table(['Part', 'Batch no.', 'Received', 'Expiry', 'Supplier', '#Unit price', '#Qty', 'Status', ''], rows.map(b => {
+    const p = getPart(b.partId);
+    return `<tr class="${batchRowCls(batchStatus(b))}"><td>${partLink(p)}</td><td class="code">${esc(b.batchNo)}</td><td class="code">${esc(b.receivedDate)}</td>
+      <td class="code">${esc(b.expiryDate) || '<span class="muted">—</span>'}</td><td>${esc(b.supplier)}</td><td class="num">${money(b.unitPrice) || '<span class="muted">—</span>'}</td>
+      <td class="num"><b>${fmt(C.bq.get(b.id))}</b> ${esc(p.unit)}</td><td>${batchBadge(b)}</td>
+      <td class="act"><button class="btn sm" data-act="batch-edit" data-id="${b.id}">Edit</button> <button class="btn sm danger" data-act="batch-del" data-id="${b.id}">Delete</button></td></tr>`;
+  }), db.batches.length ? 'No batches match the filters.' : 'No batches yet.');
+}
+
+function renderMoves() {
+  fillCatSelect('#mCat');
+  const q = val('#mQ').toLowerCase(), cat = val('#mCat'), type = val('#mType'), from = val('#mFrom'), to = val('#mTo');
+  const list = db.movements.filter(m => {
+    const p = getPart(m.partId), b = getBatch(m.batchId);
+    if (cat && p.category !== cat) return false;
+    if (type && m.type !== type) return false;
+    if (from && m.date < from) return false;
+    if (to && m.date > to) return false;
+    if (q && !(p.name + ' ' + p.code + ' ' + b.batchNo + ' ' + m.recipient + ' ' + m.note).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $('#movesTbl').innerHTML = table(['Date', 'Type', 'Part', 'Batch', '#Qty', 'Recipient', 'Note', ''], moveRows(sortedMovesDesc(list), true),
+    db.movements.length ? 'No movements match the filters.' : 'No movements yet.');
+}
+
+function renderData() {
+  let bytes = 0; try { bytes = (localStorage.getItem(KEY) || '').length * 2; } catch (e) {}
+  $('#storageInfo').innerHTML = `${db.parts.length} parts · ${db.batches.length} batches · ${db.movements.length} movements<br>About ${(bytes / 1024).toFixed(1)} KB used in this browser.` +
+    (storageOK ? '' : '<br><b style="color:var(--red)">Storage unavailable — download a backup!</b>');
+}
+
+/* ================= Part history ================= */
+function partView(id) {
+  const p = getPart(id); if (!p) return;
+  const bs = partBatches(id);
+  const moves = db.movements.filter(m => m.partId === id).sort(moveOrder);
+  let run = 0;
+  const mrows = moves.map(m => {
+    run = r3(run + (m.type === 'IN' ? m.qty : -m.qty));
+    return `<tr><td class="code">${esc(m.date)}</td><td>${typeBadge(m.type)}</td><td class="code">${esc(getBatch(m.batchId).batchNo)}</td>
+      <td class="num">${m.type === 'OUT' ? '−' : '+'}${fmt(m.qty)}</td><td class="num"><b>${fmt(run)}</b></td><td>${esc(m.recipient) || '<span class="muted">—</span>'}</td><td>${esc(m.note)}</td>
+      <td class="act"><button class="btn sm" data-act="move-edit" data-id="${m.id}">Edit</button> <button class="btn sm danger" data-act="move-del" data-id="${m.id}">Delete</button></td></tr>`;
+  });
+  const f = partFlags(p);
+  openModal(`${p.name} — ${p.code}`, `
+    <div class="kv">
+      <div><b>Balance</b><span style="font-size:18px;font-weight:700;color:${f.low ? 'var(--red)' : 'inherit'}">${fmt(C.pq.get(id))} ${esc(p.unit)}</span></div>
+      <div><b>Minimum</b>${fmt(p.minQty)} ${esc(p.unit)}</div>
+      <div><b>Category</b>${esc(p.category)}</div>
+      <div><b>Location</b>${esc(p.location) || '—'}</div>
+      <div><b>Status</b>${partBadges(p)}</div>
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" data-act="move-new" data-part="${id}">Stock In / Out</button>
+      <button class="btn" data-act="batch-new" data-part="${id}">+ Batch</button>
+      <button class="btn" data-act="part-edit" data-id="${id}">Edit part</button>
+      <button class="btn danger" data-act="part-del" data-id="${id}">Delete part</button>
+    </div>
+    <div class="panel"><h3>Batches (${bs.length})</h3><div class="tbl">${table(['Batch no.', 'Received', 'Expiry', 'Supplier', '#Unit price', '#Qty', 'Status', ''], bs.map(b =>
+      `<tr class="${batchRowCls(batchStatus(b))}"><td class="code">${esc(b.batchNo)}</td><td class="code">${esc(b.receivedDate)}</td><td class="code">${esc(b.expiryDate) || '—'}</td>
+       <td>${esc(b.supplier)}</td><td class="num">${money(b.unitPrice) || '—'}</td><td class="num"><b>${fmt(C.bq.get(b.id))}</b></td><td>${batchBadge(b)}</td>
+       <td class="act"><button class="btn sm" data-act="batch-edit" data-id="${b.id}">Edit</button> <button class="btn sm danger" data-act="batch-del" data-id="${b.id}">Delete</button></td></tr>`), 'No batches yet.')}</div></div>
+    <div class="panel" style="margin-bottom:0"><h3>Movements (${moves.length}) — oldest first</h3><div class="tbl">${table(['Date', 'Type', 'Batch', '#Qty', '#Balance', 'Recipient', 'Note', ''], mrows, 'No movements yet.')}</div></div>`,
+    null, true);
+}
+
+/* ================= Part form ================= */
+function partForm(id) {
+  const p = id ? getPart(id) : null;
+  openModal(p ? 'Edit part' : 'New part', `<form class="form" novalidate>
+    <div class="fg">
+      <label>Part name *<input name="name" maxlength="120" value="${esc(p?.name)}"></label>
+      <label>Part code / number *<input name="code" maxlength="60" value="${esc(p?.code)}"></label>
+      <label>Category *<input name="category" list="dlCat" maxlength="60" value="${esc(p?.category)}"></label>
+      <label>Unit *<input name="unit" list="dlUnit" maxlength="20" value="${esc(p?.unit ?? 'pcs')}"></label>
+      <label>Storage location<input name="location" maxlength="60" value="${esc(p?.location)}"></label>
+      <label>Minimum quantity *<input name="minQty" inputmode="decimal" value="${p ? p.minQty : 0}"><span class="hint">Alert when balance is below this.</span></label>
+    </div>
+    ${p ? '' : '<div class="info">The balance is calculated automatically from the part’s batches. Add a batch after saving.</div>'}
+    ${formFoot()}</form>`, body => {
+    const f = body.querySelector('form');
+    f.onsubmit = e => {
+      e.preventDefault();
+      const v = k => f.elements[k].value.trim();
+      const data = {name: v('name'), code: v('code'), category: v('category'), unit: v('unit'), location: v('location'), minQty: parseNum(v('minQty'))};
+      if (!data.name || !data.code || !data.category || !data.unit) return showErr(f, 'Please fill in name, code, category and unit.');
+      if (!Number.isFinite(data.minQty)) return showErr(f, 'Minimum quantity must be a number of 0 or more (max 3 decimals).');
+      if (db.parts.some(x => x.id !== id && x.code.toLowerCase() === data.code.toLowerCase())) return showErr(f, `Part code "${data.code}" already exists.`);
+      try {
+        let newId = id;
+        commit(() => { if (p) Object.assign(getPart(id), data); else { newId = uid(); db.parts.push({id: newId, ...data}); } });
+        toast(p ? 'Part updated.' : 'Part added.', 'ok');
+        if (p) closeModal(); else confirmBox(`Part "${data.name}" was added with balance 0.\nAdd its first batch now?`, 'Add batch', 'Part saved').then(ok => ok ? batchForm(null, newId) : closeModal());
+      } catch (err) { showErr(f, err.message); }
+    };
+  });
+}
+
+/* ================= Batch form ================= */
+function partOptions(selected) {
+  return [...db.parts].sort((a, b) => a.name.localeCompare(b.name)).map(p => `<option value="${p.id}"${p.id === selected ? ' selected' : ''}>${esc(p.name)} (${esc(p.code)})</option>`).join('');
+}
+function batchForm(id, partId) {
+  const b = id ? getBatch(id) : null;
+  if (!b && !db.parts.length) { toast('Add a part first.', 'err'); return; }
+  openModal(b ? 'Edit batch' : 'New batch (stock receipt)', `<form class="form" novalidate>
+    <div class="fg">
+      <label class="full">Part *${b ? `<input value="${esc(getPart(b.partId).name)} (${esc(getPart(b.partId).code)})" disabled>` : `<select name="partId">${partOptions(partId)}</select>`}</label>
+      <label>Batch number *<input name="batchNo" maxlength="60" value="${esc(b?.batchNo)}"></label>
+      ${b ? `<label>Current quantity<input value="${fmt(C.bq.get(b.id))} ${esc(getPart(b.partId).unit)}" disabled><span class="hint">Change via Stock In / Out.</span></label>`
+          : `<label>Quantity received *<input name="qty" inputmode="decimal" placeholder="e.g. 25"></label>`}
+      <label>Received date *<input name="receivedDate" type="date" value="${esc(b?.receivedDate ?? today())}"></label>
+      <label>Expiry date<input name="expiryDate" type="date" value="${esc(b?.expiryDate)}"><span class="hint">Optional</span></label>
+      <label>Supplier *<input name="supplier" maxlength="100" value="${esc(b?.supplier)}"></label>
+      <label>Unit price<input name="unitPrice" inputmode="decimal" value="${b && b.unitPrice !== null ? b.unitPrice : ''}"><span class="hint">Optional</span></label>
+    </div>
+    ${formFoot()}</form>`, body => {
+    const f = body.querySelector('form');
+    f.onsubmit = e => {
+      e.preventDefault();
+      const v = k => (f.elements[k] ? f.elements[k].value.trim() : '');
+      const pid = b ? b.partId : v('partId');
+      const data = {batchNo: v('batchNo'), receivedDate: v('receivedDate'), expiryDate: v('expiryDate'), supplier: v('supplier')};
+      const priceRaw = v('unitPrice'); const price = priceRaw === '' ? null : parseNum(priceRaw);
+      if (!getPart(pid)) return showErr(f, 'Choose a part.');
+      if (!data.batchNo) return showErr(f, 'Batch number is required.');
+      if (db.batches.some(x => x.id !== id && x.partId === pid && x.batchNo.toLowerCase() === data.batchNo.toLowerCase())) return showErr(f, `Batch number "${data.batchNo}" already exists for this part.`);
+      let qty = null;
+      if (!b) { qty = parseNum(v('qty')); if (!(qty > 0)) return showErr(f, 'Quantity must be a number greater than zero (max 3 decimals).'); }
+      if (!isDate(data.receivedDate)) return showErr(f, 'Received date must be a valid date (YYYY-MM-DD).');
+      if (data.expiryDate && !isDate(data.expiryDate)) return showErr(f, 'Expiry date must be a valid date (YYYY-MM-DD) or empty.');
+      if (data.expiryDate && data.expiryDate < data.receivedDate) return showErr(f, 'Expiry date cannot be before the received date.');
+      if (!data.supplier) return showErr(f, 'Supplier is required.');
+      if (price !== null && !Number.isFinite(price)) return showErr(f, 'Unit price must be a number of 0 or more, or empty.');
+      try {
+        commit(() => {
+          if (b) Object.assign(getBatch(id), data, {unitPrice: price});
+          else {
+            const nb = {id: uid(), partId: pid, ...data, unitPrice: price, createdAt: stamp()};
+            db.batches.push(nb);
+            db.movements.push({id: uid(), type: 'IN', partId: pid, batchId: nb.id, date: data.receivedDate, qty, recipient: '', note: 'Initial receipt (batch created)', createdAt: stamp()});
+          }
+        });
+        toast(b ? 'Batch updated.' : 'Batch added and stock received.', 'ok');
+        partView(pid);
+      } catch (err) { showErr(f, err.message); }
+    };
+  });
+}
+
+/* ================= Movement form ================= */
+function moveForm(partId) {
+  if (!db.parts.length) { toast('Add a part first.', 'err'); return; }
+  const pid0 = partId || [...db.parts].sort((a, b) => a.name.localeCompare(b.name))[0].id;
+  openModal('Stock movement', `<form class="form" novalidate>
+    <div class="fg">
+      <label class="full">Type<div class="seg"><label><input type="radio" name="type" value="OUT" checked> Out (issue)</label><label><input type="radio" name="type" value="IN"> In (receive)</label></div></label>
+      <label class="full">Part *<select name="partId">${partOptions(pid0)}</select></label>
+      <label class="full">Batch *<select name="batchId"></select><span class="hint" id="bHint"></span></label>
+      <label>Quantity *<input name="qty" inputmode="decimal" placeholder="e.g. 5"></label>
+      <label>Date *<input name="date" type="date" value="${today()}"></label>
+      <label><span id="recLbl">Recipient *</span><input name="recipient" maxlength="100"></label>
+      <label>Note<input name="note" maxlength="200"></label>
+    </div>
+    <div class="info" id="avail"></div>
+    ${formFoot('Save movement')}</form>`, body => {
+    const f = body.querySelector('form'), el = f.elements;
+    const type = () => f.querySelector('[name=type]:checked').value;
+    const refresh = () => {
+      const pid = el.partId.value, p = getPart(pid), bs = partBatches(pid), t = type();
+      const total = C.pq.get(pid) || 0;
+      if (t === 'OUT') {
+        const avail = bs.filter(b => (C.bq.get(b.id) || 0) > 0);
+        el.batchId.innerHTML = avail.length ? `<option value="FIFO">Auto — FIFO (oldest batch first)</option>` + avail.map(b =>
+          `<option value="${b.id}">${esc(b.batchNo)} — ${fmt(C.bq.get(b.id))} ${esc(p.unit)} available · received ${b.receivedDate}${batchStatus(b) === 'expired' ? ' · EXPIRED' : ''}</option>`).join('') : '<option value="">No stock available</option>';
+        $('#recLbl').textContent = 'Recipient *';
+      } else {
+        el.batchId.innerHTML = bs.length ? bs.map(b => `<option value="${b.id}">${esc(b.batchNo)} — current ${fmt(C.bq.get(b.id))} ${esc(p.unit)} · received ${b.receivedDate}</option>`).join('') : '<option value="">No batches — create a batch first</option>';
+        $('#recLbl').textContent = 'Received by / from';
+      }
+      $('#bHint').innerHTML = t === 'IN' ? 'To receive a brand-new batch use <button type="button" class="link" data-act="batch-new" data-part="' + pid + '">+ New batch</button>.' : 'FIFO takes from the oldest received batch first and may split across batches.';
+      $('#avail').textContent = `Current balance of ${p.name}: ${fmt(total)} ${p.unit} (minimum ${fmt(p.minQty)}).`;
+      f.querySelector('[type=submit]').disabled = !el.batchId.value;
+    };
+    f.querySelectorAll('[name=type]').forEach(r => r.onchange = refresh);
+    el.partId.onchange = refresh;
+    refresh();
+    f.onsubmit = e => {
+      e.preventDefault();
+      const t = type(), pid = el.partId.value, p = getPart(pid), bid = el.batchId.value;
+      const qty = parseNum(el.qty.value), date = el.date.value.trim(), recipient = el.recipient.value.trim(), note = el.note.value.trim();
+      if (!bid) return showErr(f, t === 'OUT' ? 'This part has no stock available.' : 'This part has no batches. Create a batch first.');
+      if (!(qty > 0)) return showErr(f, 'Quantity must be a number greater than zero (max 3 decimals).');
+      if (!isDate(date)) return showErr(f, 'Date must be a valid date (YYYY-MM-DD).');
+      if (t === 'OUT' && !recipient) return showErr(f, 'Recipient name is required for stock out.');
+      const mk = (b, q) => ({id: uid(), type: t, partId: pid, batchId: b.id, date, qty: q, recipient, note, createdAt: stamp()});
+      try {
+        let msg;
+        if (t === 'IN') {
+          const b = getBatch(bid);
+          commit(() => db.movements.push(mk(b, qty)));
+          msg = `Received ${fmt(qty)} ${p.unit} into batch ${b.batchNo}.`;
+        } else if (bid === 'FIFO') {
+          const avail = partBatches(pid).filter(b => (C.bq.get(b.id) || 0) > 0), total = r3(avail.reduce((s, b) => s + C.bq.get(b.id), 0));
+          if (qty > total) return showErr(f, `Not enough stock. Requested ${fmt(qty)} ${p.unit}, available ${fmt(total)} ${p.unit}.`);
+          let left = qty; const plan = [];
+          for (const b of avail) { if (left <= 0) break; const take = r3(Math.min(left, C.bq.get(b.id))); plan.push([b, take]); left = r3(left - take); }
+          commit(() => plan.forEach(([b, q]) => db.movements.push(mk(b, q))));
+          msg = 'Issued (FIFO): ' + plan.map(([b, q]) => `${b.batchNo} × ${fmt(q)}`).join(', ');
+        } else {
+          const b = getBatch(bid), have = C.bq.get(bid) || 0;
+          if (qty > have) return showErr(f, `Not enough stock in batch ${b.batchNo}. Requested ${fmt(qty)}, available ${fmt(have)} ${p.unit}.`);
+          commit(() => db.movements.push(mk(b, qty)));
+          msg = `Issued ${fmt(qty)} ${p.unit} from batch ${b.batchNo}.`;
+        }
+        toast(msg, 'ok', 5000); closeModal();
+      } catch (err) { showErr(f, err.message); }
+    };
+  });
+}
+
+function moveEditForm(id) {
+  const m = db.movements.find(x => x.id === id); if (!m) return;
+  const p = getPart(m.partId), b = getBatch(m.batchId);
+  openModal('Edit movement', `<form class="form" novalidate>
+    <div class="fg">
+      <label>Type<input value="${m.type === 'IN' ? 'In (receive)' : 'Out (issue)'}" disabled></label>
+      <label>Part / batch<input value="${esc(p.code)} / ${esc(b.batchNo)}" disabled></label>
+      <label>Quantity *<input name="qty" inputmode="decimal" value="${m.qty}"></label>
+      <label>Date *<input name="date" type="date" value="${esc(m.date)}"></label>
+      <label>${m.type === 'OUT' ? 'Recipient *' : 'Received by / from'}<input name="recipient" maxlength="100" value="${esc(m.recipient)}"></label>
+      <label>Note<input name="note" maxlength="200" value="${esc(m.note)}"></label>
+    </div>
+    <div class="info">Batch ${esc(b.batchNo)} currently holds ${fmt(C.bq.get(b.id))} ${esc(p.unit)}. Changes that would make any balance negative are rejected.</div>
+    ${formFoot()}</form>`, body => {
+    const f = body.querySelector('form');
+    f.onsubmit = e => {
+      e.preventDefault();
+      const qty = parseNum(f.elements.qty.value), date = f.elements.date.value.trim(), recipient = f.elements.recipient.value.trim(), note = f.elements.note.value.trim();
+      if (!(qty > 0)) return showErr(f, 'Quantity must be a number greater than zero (max 3 decimals).');
+      if (!isDate(date)) return showErr(f, 'Date must be a valid date (YYYY-MM-DD).');
+      if (m.type === 'OUT' && !recipient) return showErr(f, 'Recipient name is required for stock out.');
+      try { commit(() => Object.assign(db.movements.find(x => x.id === id), {qty, date, recipient, note})); toast('Movement updated.', 'ok'); closeModal(); }
+      catch (err) { showErr(f, err.message); }
+    };
+  });
+}
+
+/* ================= Deletes ================= */
+async function delPart(id) {
+  const p = getPart(id); const nb = db.batches.filter(b => b.partId === id).length, nm = db.movements.filter(m => m.partId === id).length;
+  if (!await confirmBox(`Delete part "${p.name}" (${p.code})?\n\nThis also deletes ${nb} batch(es) and ${nm} movement(s). This cannot be undone.`)) return;
+  try { commit(() => { db.parts = db.parts.filter(x => x.id !== id); db.batches = db.batches.filter(b => b.partId !== id); db.movements = db.movements.filter(m => m.partId !== id); }); closeModal(); toast('Part deleted.', 'ok'); }
+  catch (err) { toast(err.message, 'err', 6000); }
+}
+async function delBatch(id) {
+  const b = getBatch(id), p = getPart(b.partId), nm = db.movements.filter(m => m.batchId === id).length;
+  if (!await confirmBox(`Delete batch "${b.batchNo}" of ${p.name}?\n\nIts current quantity (${fmt(C.bq.get(id))} ${p.unit}) and ${nm} movement(s) will be removed. This cannot be undone.`)) return;
+  try { commit(() => { db.batches = db.batches.filter(x => x.id !== id); db.movements = db.movements.filter(m => m.batchId !== id); }); toast('Batch deleted.', 'ok'); if (!$('#modal').hidden) partView(p.id); }
+  catch (err) { toast(err.message, 'err', 6000); }
+}
+async function delMove(id) {
+  const m = db.movements.find(x => x.id === id), p = getPart(m.partId), b = getBatch(m.batchId);
+  if (!await confirmBox(`Delete this ${m.type} movement?\n\n${m.date} · ${p.code} · batch ${b.batchNo} · ${fmt(m.qty)} ${p.unit}\n\nThe batch balance will be recalculated.`)) return;
+  try { commit(() => { db.movements = db.movements.filter(x => x.id !== id); }); toast('Movement deleted.', 'ok'); if (!$('#modal').hidden) partView(p.id); }
+  catch (err) { toast('Cannot delete: ' + err.message, 'err', 7000); }
+}
+
+/* ================= Export / backup ================= */
+function download(name, content, mime) {
+  const blob = new Blob([content], {type: mime}), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function exportSets() {
+  calc();
+  const status = b => ({expired: 'Expired', soon: 'Expiring <=30d', empty: 'Empty', ok: 'OK'})[batchStatus(b)];
+  return {
+    parts: [['Code', 'Name', 'Category', 'Unit', 'Location', 'Min qty', 'Balance', 'Below min'],
+      ...db.parts.map(p => [p.code, p.name, p.category, p.unit, p.location, p.minQty, C.pq.get(p.id), C.pq.get(p.id) < p.minQty ? 'YES' : 'NO'])],
+    batches: [['Part code', 'Part name', 'Batch no', 'Received', 'Expiry', 'Supplier', 'Unit price', 'Current qty', 'Status'],
+      ...db.batches.map(b => { const p = getPart(b.partId); return [p.code, p.name, b.batchNo, b.receivedDate, b.expiryDate, b.supplier, b.unitPrice ?? '', C.bq.get(b.id), status(b)]; })],
+    movements: [['Date', 'Type', 'Part code', 'Part name', 'Batch no', 'Quantity', 'Unit', 'Recipient', 'Note'],
+      ...[...db.movements].sort(moveOrder).map(m => { const p = getPart(m.partId); return [m.date, m.type, p.code, p.name, getBatch(m.batchId).batchNo, m.qty, p.unit, m.recipient, m.note]; })]
+  };
+}
+function toCSV(rows) {
+  return '﻿' + rows.map(r => r.map(v => {
+    let s = String(v ?? '');
+    if (typeof v === 'string' && /^[=+\-@\t]/.test(s)) s = "'" + s;   // prevent formula injection
+    return '"' + s.replace(/"/g, '""') + '"';
+  }).join(',')).join('\r\n');
+}
+function toXLS(sets) {
+  const x = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const cell = (v, h) => `<Cell${h ? ' ss:StyleID="h"' : ''}><Data ss:Type="${typeof v === 'number' && !h ? 'Number' : 'String'}">${x(v)}</Data></Cell>`;
+  const sheet = (name, rows) => `<Worksheet ss:Name="${name}"><Table>${rows.map((r, i) => `<Row>${r.map(v => cell(v, i === 0)).join('')}</Row>`).join('')}</Table></Worksheet>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+    `<Styles><Style ss:ID="h"><Font ss:Bold="1"/><Interior ss:Color="#E8EEFC" ss:Pattern="Solid"/></Style></Styles>` +
+    sheet('Parts', sets.parts) + sheet('Batches', sets.batches) + sheet('Movements', sets.movements) + `</Workbook>`;
+}
+function backup() {
+  download(`stock-backup-${today()}.json`, JSON.stringify({app: 'stock-manager', version: 1, exportedAt: new Date().toISOString(), data: db}, null, 2), 'application/json');
+  toast('Backup downloaded.', 'ok');
+}
+function importFile(file) {
+  const r = new FileReader();
+  r.onload = async () => {
+    let d;
+    try { const j = JSON.parse(r.result); d = normalize(j.data ? j.data : j); }
+    catch (e) { toast('This is not a valid JSON file.', 'err', 6000); return; }
+    const errs = validateDb(d);
+    if (errs.length) { openModal('Import rejected', `<p>The backup was <b>not</b> imported because it contains ${errs.length} problem(s):</p><ul>${errs.slice(0, 15).map(e => `<li>${esc(e)}</li>`).join('')}</ul><div class="factions"><button class="btn" data-close>Close</button></div>`); return; }
+    if (!await confirmBox(`Replace ALL current data with this backup?\n\nBackup: ${d.parts.length} parts, ${d.batches.length} batches, ${d.movements.length} movements.\nCurrent: ${db.parts.length} parts, ${db.batches.length} batches, ${db.movements.length} movements.`, 'Replace data')) return;
+    try { commit(() => { db = d; }); lastTs = Math.max(lastTs, ...d.movements.map(m => m.createdAt), ...d.batches.map(b => b.createdAt)); toast('Backup imported.', 'ok'); }
+    catch (err) { toast('Import failed: ' + err.message, 'err', 7000); }
+  };
+  r.readAsText(file);
+}
+
+/* ================= Events ================= */
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('main > section').forEach(s => s.hidden = s.id !== 'tab-' + t);
+  render(); window.scrollTo(0, 0);
+}
+$('#tabs').onclick = e => { const b = e.target.closest('button[data-tab]'); if (b) setTab(b.dataset.tab); };
+
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-close]')) { closeModal(); return; }
+  const g = e.target.closest('[data-goto]');
+  if (g) {
+    if (g.dataset.filter) {
+      const [k, v] = g.dataset.filter.split('=');
+      ['pQ', 'pCat', 'pSt', 'bQ', 'bCat', 'bSt', 'bFrom', 'bTo'].forEach(i => { $('#' + i).value = ''; });
+      setTab(g.dataset.goto); $('#' + k).value = v; render();
+    } else setTab(g.dataset.goto);
+    return;
+  }
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const id = a.dataset.id;
+  switch (a.dataset.act) {
+    case 'part-new': partForm(); break;
+    case 'part-edit': partForm(id); break;
+    case 'part-view': partView(id); break;
+    case 'part-del': delPart(id); break;
+    case 'batch-new': batchForm(null, a.dataset.part); break;
+    case 'batch-edit': batchForm(id); break;
+    case 'batch-del': delBatch(id); break;
+    case 'move-new': moveForm(a.dataset.part); break;
+    case 'move-edit': moveEditForm(id); break;
+    case 'move-del': delMove(id); break;
+    case 'export-csv': { const s = a.dataset.set; download(`stock-${s}-${today()}.csv`, toCSV(exportSets()[s]), 'text/csv;charset=utf-8'); break; }
+    case 'export-xls': download(`stock-export-${today()}.xls`, toXLS(exportSets()), 'application/vnd.ms-excel'); break;
+    case 'backup': backup(); break;
+    case 'import': $('#importFile').click(); break;
+    case 'reset-demo':
+      confirmBox('Replace ALL current data with the demo data?\n\nTip: download a backup first.', 'Load demo').then(ok => { if (!ok) return; try { commit(() => { db = seedData(); }); toast('Demo data loaded.', 'ok'); } catch (err) { toast(err.message, 'err'); } });
+      break;
+    case 'wipe':
+      confirmBox('Delete ALL parts, batches and movements?\n\nThis cannot be undone. Download a backup first if you may need the data.').then(ok => { if (!ok) return; try { commit(() => { db = {parts: [], batches: [], movements: []}; }); toast('All data deleted.', 'ok'); } catch (err) { toast(err.message, 'err'); } });
+      break;
+    case 'clear-filters':
+      document.querySelectorAll(`[id^="${a.dataset.scope}"]`).forEach(i => { if (i.matches('input,select')) i.value = ''; }); render(); break;
+  }
+});
+$('#importFile').onchange = e => { const f = e.target.files[0]; if (f) importFile(f); e.target.value = ''; };
+['pQ', 'pCat', 'pSt', 'bQ', 'bCat', 'bSt', 'bFrom', 'bTo', 'mQ', 'mCat', 'mType', 'mFrom', 'mTo'].forEach(i => $('#' + i).addEventListener('input', render));
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('#confirmBox').hidden) endConfirm(false); else if (!$('#modal').hidden) closeModal();
+});
+// Keep several open tabs in sync.
+window.addEventListener('storage', e => { if (e.key === KEY && e.newValue) { try { const d = normalize(JSON.parse(e.newValue)); if (!validateDb(d).length) { db = d; render(); } } catch (_) {} } });
+
+load();
+render();
+</script>
+</body>
+</html>
