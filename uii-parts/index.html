@@ -94,6 +94,40 @@
     text-transform: uppercase;
   }
 
+  /* Monthly sheets */
+  .months-wrap {
+    margin-bottom: 12px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .months { display: flex; align-items: center; gap: 6px; padding-bottom: 4px; width: max-content; }
+  .year {
+    padding: 0 4px 0 2px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .year + .month { margin-left: 0; }
+  .month + .year { margin-left: 10px; padding-left: 12px; border-left: 1px solid var(--border-strong); }
+  .month {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+  .month:hover { color: var(--text); border-color: var(--border-strong); }
+  .month[aria-current="true"] { color: #06101f; background: var(--accent); border-color: var(--accent); }
+  .month .dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; vertical-align: middle; }
+
   /* Tabs */
   .tabs {
     display: flex;
@@ -395,6 +429,10 @@
     <p class="subtitle">Machine Spare Parts Register</p>
   </header>
 
+  <div class="months-wrap">
+    <nav class="months" id="months" aria-label="Monthly sheets"></nav>
+  </div>
+
   <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
 
   <section class="panel" role="tabpanel" id="panel" aria-labelledby="">
@@ -458,15 +496,45 @@
   var STORAGE_KEY = "uii-spare-parts-v1";
   var TX_KEY = "uii-spare-parts-tx-v1";
   var TAB_KEY = "uii-spare-parts-active-tab";
+  var MONTH_KEY = "uii-spare-parts-month";
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  // One sheet per month, September 2026 to December 2027
+  var MONTHS = [];
+  (function () {
+    for (var y = 2026, mo = 9; y < 2028; mo++) {
+      if (mo > 12) { mo = 1; y++; if (y === 2028) break; }
+      MONTHS.push(y + "-" + (mo < 10 ? "0" : "") + mo);
+    }
+  })();
+  function monthLabel(key) { return MONTH_NAMES[parseInt(key.slice(5), 10) - 1] + " " + key.slice(0, 4); }
+  // Month a record belongs to; older records without one use the month they were created in
+  function monthOf(v, ts) {
+    if (MONTHS.indexOf(v) !== -1) return v;
+    var d = new Date(ts || Date.now());
+    var k = d.getFullYear() + "-" + (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1);
+    if (MONTHS.indexOf(k) !== -1) return k;
+    return k < MONTHS[0] ? MONTHS[0] : MONTHS[MONTHS.length - 1];
+  }
   var FIELDS = ["name", "reference", "quantity", "date"];
   var TX = "Transaction";
   var TABS = MACHINES.concat([TX]);
 
   // data[machine] = [{id, machine, name, reference, quantity, loggedQty, date, created}]
   // loggedQty is the stock level the last transaction left the part at.
+  // allParts[month][machine] = rows; allTx[month] = transactions.
+  // data and txList are the open month's sheet.
+  var allParts = {};
+  var allTx = {};
+  var month = monthOf(null, Date.now());
   var data = emptyData();
-  // txList = [{id, partId, machine, name, reference, change, after, ts}], newest first
+  // txList = [{id, partId, month, machine, name, reference, change, after, ts}], newest first
   var txList = [];
+  function openSheet() {
+    if (!allParts[month]) allParts[month] = emptyData();
+    if (!allTx[month]) allTx[month] = [];
+    data = allParts[month];
+    txList = allTx[month];
+  }
   var active = MACHINES[0];
   var db = null;          // shared store when running as a published artifact
   var readOnly = false;
@@ -485,6 +553,7 @@
     var qty = String(r.quantity || "");
     return {
       id: String(r.id),
+      month: monthOf(r.month, r.created),
       machine: machine,
       name: String(r.name || ""),
       reference: String(r.reference || ""),
@@ -501,6 +570,7 @@
     return {
       id: String(id || t.id),
       partId: String(t.partId || ""),
+      month: monthOf(t.month, t.ts),
       machine: String(t.machine || ""),
       name: String(t.name || ""),
       reference: String(t.reference || ""),
@@ -511,13 +581,13 @@
   }
 
   function rowBody(r) {
-    return { machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, created: r.created };
+    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
   }
-  function sortTx() {
-    txList.sort(function (a, b) { return b.ts - a.ts || (a.id < b.id ? 1 : -1); });
+  function sortTx(list) {
+    list.sort(function (a, b) { return b.ts - a.ts || (a.id < b.id ? 1 : -1); });
   }
 
   // ---- Status line ----
@@ -534,34 +604,49 @@
 
   // ---- Local storage (used when the shared store is unavailable) ----
   function loadLocal() {
-    data = emptyData();
-    txList = [];
+    allParts = {};
+    allTx = {};
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
+        // v2 keeps a flat list with each row's month; v1 grouped rows by machine
+        var rows = Array.isArray(parsed.parts) ? parsed.parts : [];
         MACHINES.forEach(function (m) {
-          if (Array.isArray(parsed[m])) {
-            data[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, created: r.created }, m); });
-          }
+          if (Array.isArray(parsed[m])) parsed[m].forEach(function (r) { r.machine = m; rows.push(r); });
+        });
+        rows.forEach(function (r) {
+          if (MACHINES.indexOf(r.machine) === -1) return;
+          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, created: r.created }, r.machine);
+          if (!allParts[row.month]) allParts[row.month] = emptyData();
+          allParts[row.month][row.machine].push(row);
         });
       }
       var rawTx = localStorage.getItem(TX_KEY);
       if (rawTx) {
         var arr = JSON.parse(rawTx);
-        if (Array.isArray(arr)) txList = arr.map(function (t) { return cleanTx(t); });
+        if (Array.isArray(arr)) arr.forEach(function (t) {
+          var tx = cleanTx(t);
+          (allTx[tx.month] = allTx[tx.month] || []).push(tx);
+        });
       }
     } catch (e) {}
-    sortTx();
+    Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
+    openSheet();
   }
   function saveLocal() {
     try {
-      var out = {};
-      MACHINES.forEach(function (m) {
-        out[m] = data[m].map(function (r) { var b = rowBody(r); b.id = r.id; return b; });
+      var parts = [], txs = [];
+      Object.keys(allParts).forEach(function (k) {
+        MACHINES.forEach(function (m) {
+          allParts[k][m].forEach(function (r) { var b = rowBody(r); b.id = r.id; parts.push(b); });
+        });
       });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
-      localStorage.setItem(TX_KEY, JSON.stringify(txList.map(function (t) { var b = txBody(t); b.id = t.id; return b; })));
+      Object.keys(allTx).forEach(function (k) {
+        allTx[k].forEach(function (t) { var b = txBody(t); b.id = t.id; txs.push(b); });
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ parts: parts }));
+      localStorage.setItem(TX_KEY, JSON.stringify(txs));
       setStatus("Saved", "saved");
     } catch (e) {
       setStatus("Not saved: this browser is blocking storage.", "error");
@@ -644,7 +729,7 @@
       return;
     }
     var tx = cleanTx({
-      partId: row.id, machine: row.machine, name: row.name, reference: row.reference,
+      partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
       change: after - before, after: after, ts: Date.now()
     }, uid());
     row.loggedQty = row.quantity;
@@ -665,6 +750,54 @@
   var metaEl = document.getElementById("panelMeta");
 
   var TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
+
+  var monthsEl = document.getElementById("months");
+  function monthHasData(k) {
+    var p = allParts[k];
+    var n = allTx[k] ? allTx[k].length : 0;
+    if (p) MACHINES.forEach(function (m) { n += p[m].length; });
+    return n > 0;
+  }
+  function renderMonths() {
+    monthsEl.innerHTML = "";
+    var year = "";
+    MONTHS.forEach(function (k) {
+      if (k.slice(0, 4) !== year) {
+        year = k.slice(0, 4);
+        var y = document.createElement("span");
+        y.className = "year";
+        y.textContent = year;
+        monthsEl.appendChild(y);
+      }
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "month";
+      b.id = "month-" + k;
+      b.title = monthLabel(k);
+      b.textContent = MONTH_NAMES[parseInt(k.slice(5), 10) - 1].slice(0, 3);
+      if (monthHasData(k)) {
+        var dot = document.createElement("span");
+        dot.className = "dot";
+        dot.setAttribute("aria-label", "has entries");
+        b.appendChild(dot);
+      }
+      if (k === month) b.setAttribute("aria-current", "true");
+      b.addEventListener("click", function () { selectMonth(k); });
+      monthsEl.appendChild(b);
+    });
+  }
+  function selectMonth(k) {
+    if (k === month) return;
+    flushWrites();
+    month = k;
+    try { localStorage.setItem(MONTH_KEY, k); } catch (e) {}
+    openSheet();
+    renderMonths();
+    renderTabs();
+    renderRows();
+    var b = document.getElementById("month-" + k);
+    if (b && b.scrollIntoView) b.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
 
   function renderTabs() {
     tabsEl.innerHTML = "";
@@ -713,13 +846,14 @@
   }
 
   function updateCounts() {
+    renderMonths();
     TABS.forEach(function (m) {
       var c = document.querySelector("#tab-" + m + " .count");
       if (c) c.textContent = tabCount(m);
     });
     if (active === TX) return;
     var n = data[active].length;
-    metaEl.textContent = n + (n === 1 ? " part" : " parts");
+    metaEl.textContent = monthLabel(month) + " \u00B7 " + n + (n === 1 ? " part" : " parts");
     emptyEl.hidden = n !== 0;
   }
 
@@ -815,7 +949,7 @@
       rowsEl.appendChild(tr);
     });
     var n = txList.length;
-    metaEl.textContent = n + (n === 1 ? " entry" : " entries") + " · " + inSum + " in · " + outSum + " out";
+    metaEl.textContent = monthLabel(month) + " \u00B7 " + n + (n === 1 ? " entry" : " entries") + " · " + inSum + " in · " + outSum + " out";
     emptyEl.querySelector("strong").textContent = "No transactions yet";
     emptyEl.querySelector("span").textContent = "Set or change a part’s quantity on a machine tab and the difference is recorded here.";
     emptyEl.hidden = n !== 0;
@@ -919,7 +1053,7 @@
   // Otherwise the first quantity is starting stock and is not logged.
   function addRow(received) {
     if (readOnly || active === TX) return;
-    var row = clean({ id: uid(), created: Date.now(), loggedQty: "", baseline: !received }, active);
+    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received }, active);
     data[active].push(row);
     writeRow(row);
     renderRows(row.id);
@@ -953,16 +1087,24 @@
 
   // ---- Apply snapshots from the shared store without disturbing typing ----
   function applyParts(snap) {
-    var next = emptyData();
+    var nextAll = {};
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, name: v.name, reference: v.reference, quantity: v.quantity, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, created: v.created }, v.machine);
+      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
-      next[v.machine].push(local || row);
+      if (local) row = local;
+      if (!nextAll[row.month]) nextAll[row.month] = emptyData();
+      nextAll[row.month][row.machine].push(row);
     });
-    MACHINES.forEach(function (m) { next[m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
+    Object.keys(nextAll).forEach(function (k) {
+      MACHINES.forEach(function (m) { nextAll[k][m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
+    });
+    allParts = nextAll;
+    var next = allParts[month] || emptyData();
+    allParts[month] = next;
+    renderMonths();
 
     if (active === TX) { data = next; renderTransactions(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
@@ -990,8 +1132,15 @@
   }
 
   function applyTx(snap) {
-    txList = snap.docs.map(function (d) { return cleanTx(d.data() || {}, d.id); });
-    sortTx();
+    allTx = {};
+    snap.docs.forEach(function (d) {
+      var tx = cleanTx(d.data() || {}, d.id);
+      (allTx[tx.month] = allTx[tx.month] || []).push(tx);
+    });
+    Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
+    if (!allTx[month]) allTx[month] = [];
+    txList = allTx[month];
+    renderMonths();
     if (active === TX) renderTransactions(); else updateCounts();
   }
 
@@ -1020,10 +1169,14 @@
   try {
     var savedTab = localStorage.getItem(TAB_KEY);
     if (TABS.indexOf(savedTab) !== -1) active = savedTab;
+    var savedMonth = localStorage.getItem(MONTH_KEY);
+    if (MONTHS.indexOf(savedMonth) !== -1) month = savedMonth;
   } catch (e) {}
+  openSheet();
 
   var useClaude = window.claude && typeof window.claude.use === "function";
   if (!useClaude) loadLocal();
+  renderMonths();
   renderTabs();
   renderRows();
 
@@ -1033,6 +1186,7 @@
       if (!store) {
         // No shared store in this view: keep entries in this browser
         loadLocal();
+        renderMonths();
         renderTabs();
         renderRows();
         setStatus("Saving in this browser only.", "");
