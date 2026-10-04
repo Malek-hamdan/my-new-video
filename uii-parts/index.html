@@ -207,15 +207,22 @@
   th.col-qty { width: 12%; }
   th.col-ref { width: 24%; }
   th.col-date { width: 14%; }
-  body.tx-view th.col-date { width: 12%; }
-  body.tx-view th.col-ref { width: 20%; }
-  body.tx-view th.col-qty { width: 10%; }
   .cell.date { min-height: 39px; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
   .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
-  th.col-mach { width: 10%; }
-  th.col-used { width: 11%; }
+  th.col-mach { width: 9%; }
+  body.tx-view th.col-ref { width: 16%; }
+  th.col-when { width: 15%; }
+  th.col-type { width: 8%; }
+  th.col-change { width: 9%; }
+  th.col-after { width: 9%; }
+  .tx-text.when { font-variant-numeric: tabular-nums; white-space: pre; }
+  .tx-text.pos { color: #7fd6a4; }
+  .tx-text.neg { color: var(--danger); }
+  .tx-text.after { font-variant-numeric: tabular-nums; }
+  .chip.chip-in { background: rgba(127,214,164,0.12); border-color: rgba(127,214,164,0.35); color: #a9e8c4; }
+  .chip.chip-out { background: var(--danger-soft); border-color: rgba(255,107,107,0.35); color: #ffb3b3; }
   .tx-text { display: block; padding: 8px 10px; min-height: 39px; overflow-wrap: anywhere; }
   .tx-text.muted { color: var(--muted); }
   .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -228,11 +235,11 @@
     color: #cfe0ff;
     font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
   }
   .tab.tx { color: #b9c6dc; }
   .tab-sep { flex: 0 0 1px; align-self: stretch; margin: 6px 2px; background: var(--border-strong); }
   body.tx-view #addTop, body.tx-view .panel-foot { display: none; }
-  body.tx-view .cell { border-color: var(--border-strong); background: rgba(255,255,255,0.03); }
 
   tbody tr { transition: background 0.15s ease; }
   tbody tr + tr td { border-top: 1px solid var(--border); }
@@ -435,13 +442,17 @@
 
   var MACHINES = ["BLM", "BCW3", "Bonal", "Sollas"];
   var STORAGE_KEY = "uii-spare-parts-v1";
+  var TX_KEY = "uii-spare-parts-tx-v1";
   var TAB_KEY = "uii-spare-parts-active-tab";
   var FIELDS = ["name", "reference", "quantity", "date"];
   var TX = "Transaction";
   var TABS = MACHINES.concat([TX]);
 
-  // data[machine] = [{id, name, reference, quantity, created}]
+  // data[machine] = [{id, machine, name, reference, quantity, loggedQty, date, created}]
+  // loggedQty is the stock level the last transaction left the part at.
   var data = emptyData();
+  // txList = [{id, partId, machine, name, reference, change, after, ts}], newest first
+  var txList = [];
   var active = MACHINES[0];
   var db = null;          // shared store when running as a published artifact
   var readOnly = false;
@@ -457,16 +468,41 @@
   }
 
   function clean(r, machine) {
+    var qty = String(r.quantity || "");
     return {
       id: String(r.id),
       machine: machine,
       name: String(r.name || ""),
       reference: String(r.reference || ""),
-      quantity: String(r.quantity || ""),
-      used: String(r.used || ""),
+      quantity: qty,
+      // parts saved before transactions existed start from their current stock
+      loggedQty: r.loggedQty == null ? qty : String(r.loggedQty),
       date: String(r.date || ""),
       created: Number(r.created) || 0
     };
+  }
+
+  function cleanTx(t, id) {
+    return {
+      id: String(id || t.id),
+      partId: String(t.partId || ""),
+      machine: String(t.machine || ""),
+      name: String(t.name || ""),
+      reference: String(t.reference || ""),
+      change: Number(t.change) || 0,
+      after: Number(t.after) || 0,
+      ts: Number(t.ts) || 0
+    };
+  }
+
+  function rowBody(r) {
+    return { machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, created: r.created };
+  }
+  function txBody(t) {
+    return { partId: t.partId, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
+  }
+  function sortTx() {
+    txList.sort(function (a, b) { return b.ts - a.ts || (a.id < b.id ? 1 : -1); });
   }
 
   // ---- Status line ----
@@ -483,34 +519,41 @@
 
   // ---- Local storage (used when the shared store is unavailable) ----
   function loadLocal() {
-    var d = emptyData();
+    data = emptyData();
+    txList = [];
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
         MACHINES.forEach(function (m) {
           if (Array.isArray(parsed[m])) {
-            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, quantity: r.quantity, used: r.used, date: r.date, created: r.created }, m); });
+            data[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, created: r.created }, m); });
           }
         });
       }
+      var rawTx = localStorage.getItem(TX_KEY);
+      if (rawTx) {
+        var arr = JSON.parse(rawTx);
+        if (Array.isArray(arr)) txList = arr.map(function (t) { return cleanTx(t); });
+      }
     } catch (e) {}
-    return d;
+    sortTx();
   }
   function saveLocal() {
     try {
       var out = {};
       MACHINES.forEach(function (m) {
-        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, quantity: r.quantity, used: r.used, date: r.date, created: r.created }; });
+        out[m] = data[m].map(function (r) { var b = rowBody(r); b.id = r.id; return b; });
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+      localStorage.setItem(TX_KEY, JSON.stringify(txList.map(function (t) { var b = txBody(t); b.id = t.id; return b; })));
       setStatus("Saved", "saved");
     } catch (e) {
       setStatus("Not saved: this browser is blocking storage.", "error");
     }
   }
 
-  // ---- Shared store writes: one at a time per row ----
+  // ---- Shared store writes: one at a time per document ----
   var queues = {};
   function enqueue(id, fn) {
     var prev = queues[id] || Promise.resolve();
@@ -530,24 +573,29 @@
       setStatus("Not saved. Check your connection and try again.", "error");
     }
   }
-  function writeRow(row) {
+  function saveDoc(coll, id, body) {
     if (!db) { saveLocal(); return; }
-    var body = { machine: row.machine, name: row.name, reference: row.reference, quantity: row.quantity, used: row.used, date: row.date, created: row.created };
-    enqueue(row.id, function () { return db.collection("parts").doc(row.id).set(body); })
+    enqueue(coll + "/" + id, function () { return db.collection(coll).doc(id).set(body); })
       .then(function () { setStatus("Saved", "saved"); }, onWriteError);
   }
-  function removeRow(row) {
+  function deleteDoc(coll, id) {
     if (!db) { saveLocal(); return; }
-    enqueue(row.id, function () { return db.collection("parts").doc(row.id).delete(); })
+    enqueue(coll + "/" + id, function () { return db.collection(coll).doc(id).delete(); })
       .then(function () { setStatus("Deleted", "saved"); }, onWriteError);
   }
+  function writeRow(row) { saveDoc("parts", row.id, rowBody(row)); }
 
   var editTimers = {};
   function scheduleWrite(row) {
     clearTimeout(editTimers[row.id]);
-    editTimers[row.id] = setTimeout(function () { delete editTimers[row.id]; writeRow(row); }, 400);
+    editTimers[row.id] = setTimeout(function () { delete editTimers[row.id]; writeRow(findRow(row.id) || row); }, 400);
   }
   function flushWrites() {
+    var el = document.activeElement;
+    if (el && el.getAttribute && el.getAttribute("data-field") === "quantity") {
+      var r = findRow(el.getAttribute("data-row"));
+      if (r) commitQuantity(r);
+    }
     Object.keys(editTimers).forEach(function (id) {
       clearTimeout(editTimers[id]);
       delete editTimers[id];
@@ -564,6 +612,24 @@
       for (var j = 0; j < list.length; j++) if (list[j].id === id) return list[j];
     }
     return null;
+  }
+
+  // ---- Transactions: a finished quantity edit logs the difference ----
+  function commitQuantity(row) {
+    var before = parseInt(row.loggedQty, 10) || 0;
+    var after = parseInt(row.quantity, 10) || 0;
+    if (before === after) return;
+    var tx = cleanTx({
+      partId: row.id, machine: row.machine, name: row.name, reference: row.reference,
+      change: after - before, after: after, ts: Date.now()
+    }, uid());
+    row.loggedQty = row.quantity;
+    clearTimeout(editTimers[row.id]);
+    delete editTimers[row.id];
+    txList.unshift(tx);
+    writeRow(row);
+    saveDoc("transactions", tx.id, txBody(tx));
+    updateCounts();
   }
 
   // ---- DOM ----
@@ -618,27 +684,8 @@
     renderRows();
   }
 
-  function hasEntry(r) {
-    return (r.name + r.reference + r.quantity).trim() !== "";
-  }
-
-  // Every filled-in part on every machine, newest first
-  function transactions() {
-    var out = [];
-    MACHINES.forEach(function (m) { data[m].forEach(function (r) { if (hasEntry(r)) out.push(r); }); });
-    out.sort(function (a, b) {
-      if (a.date !== b.date) {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
-        return a.date < b.date ? 1 : -1;
-      }
-      return b.created - a.created;
-    });
-    return out;
-  }
-
   function tabCount(m) {
-    return m === TX ? transactions().length : data[m].length;
+    return m === TX ? txList.length : data[m].length;
   }
 
   function updateCounts() {
@@ -653,7 +700,13 @@
   }
 
   var MACHINE_HEAD = document.getElementById("thead").innerHTML;
-  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-date">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-qty">Quantity</th><th class="col-used">Used</th></tr>';
+  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-when">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-type">Type</th><th class="col-change">Quantity</th><th class="col-after">Stock after</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtTime(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "  " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
 
   function txCell(label, text, cls) {
     var td = document.createElement("td");
@@ -666,95 +719,6 @@
     return td;
   }
 
-  function txMeta(list) {
-    var pieces = 0;
-    list.forEach(function (r) { pieces += parseInt(r.used, 10) || 0; });
-    metaEl.textContent = list.length + (list.length === 1 ? " entry" : " entries") + " · " + pieces + (pieces === 1 ? " piece used" : " pieces used");
-  }
-
-  var txIds = "";
-  function renderTransactions() {
-    var list = transactions();
-    txIds = list.map(function (r) { return r.id; }).join(",");
-    document.getElementById("thead").innerHTML = TX_HEAD;
-    titleEl.textContent = TX;
-    rowsEl.innerHTML = "";
-    list.forEach(function (r, i) {
-      var tr = document.createElement("tr");
-      var num = document.createElement("td");
-      num.className = "col-num";
-      num.textContent = i + 1;
-      tr.appendChild(num);
-      tr.appendChild(txCell("Date", r.date));
-      var mtd = document.createElement("td");
-      mtd.setAttribute("data-label", "Machine");
-      mtd.innerHTML = '<span class="tx-text"><span class="chip"></span></span>';
-      mtd.querySelector(".chip").textContent = r.machine;
-      tr.appendChild(mtd);
-      tr.appendChild(txCell("Name", r.name));
-      tr.appendChild(txCell("Reference", r.reference));
-      var q = txCell("Quantity", r.quantity, "qty");
-      q.firstChild.id = "t-" + r.id + "-quantity";
-      tr.appendChild(q);
-      tr.appendChild(makeCell(r, "used", "Used"));
-      rowsEl.appendChild(tr);
-    });
-    txMeta(list);
-    emptyEl.querySelector("strong").textContent = "No transactions yet";
-    emptyEl.querySelector("span").textContent = "Parts you add on any machine tab show up here, ready for the quantity used.";
-    emptyEl.hidden = list.length !== 0;
-    updateCounts();
-  }
-
-  // Same rows as on screen: update values without touching the field being typed in
-  function refreshTransactions() {
-    var list = transactions();
-    if (list.map(function (r) { return r.id; }).join(",") !== txIds) {
-      var focused = document.activeElement;
-      var keep = focused && focused.id && focused.classList.contains("cell") ? focused.id : null;
-      renderTransactions();
-      if (keep) { var el = document.getElementById(keep); if (el) el.focus(); }
-      return;
-    }
-    list.forEach(function (r) {
-      var q = document.getElementById("t-" + r.id + "-quantity");
-      if (q) { q.textContent = r.quantity || "—"; q.classList.toggle("muted", !r.quantity); }
-      var u = document.getElementById("f-" + r.id + "-used");
-      if (u && u !== document.activeElement && u.value !== r.used) u.value = r.used;
-    });
-    txMeta(list);
-    updateCounts();
-  }
-
-  function makeCell(row, field, label) {
-    var td = document.createElement("td");
-    td.setAttribute("data-label", label);
-    var input = document.createElement("input");
-    input.className = "cell" + (field === "quantity" || field === "used" ? " qty" : "") + (field === "date" ? " date" : "");
-    input.type = field === "date" ? "date" : "text";
-    input.id = "f-" + row.id + "-" + field;
-    input.value = row[field];
-    input.placeholder = label;
-    input.setAttribute("aria-label", label);
-    input.setAttribute("data-field", field);
-    input.autocomplete = "off";
-    input.spellcheck = false;
-    input.dir = "auto";
-    input.readOnly = readOnly;
-    if (field === "quantity" || field === "used") input.inputMode = "numeric";
-    if (field === "date") input.classList.toggle("blank", !input.value);
-    input.addEventListener("input", function () {
-      if ((field === "quantity" || field === "used") && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
-      row[field] = input.value;
-      updateCounts();
-      if (active === TX) txMeta(transactions());
-      if (field === "date") input.classList.toggle("blank", !input.value);
-      scheduleWrite(row);
-    });
-    td.appendChild(input);
-    return td;
-  }
-
   function disarmAll(except) {
     rowsEl.querySelectorAll(".del.armed").forEach(function (b) {
       if (b === except) return;
@@ -764,13 +728,129 @@
     });
   }
 
+  // Trash button; asks "Delete?" first when `needsConfirm` says so
+  function deleteButton(label, needsConfirm, onDelete) {
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "del";
+    del.title = "Delete";
+    del.setAttribute("data-label", label);
+    del.setAttribute("aria-label", label);
+    del.innerHTML = TRASH;
+    del.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (needsConfirm() && !del.classList.contains("armed")) {
+        disarmAll(del);
+        del.classList.add("armed");
+        del.textContent = "Delete?";
+        del.setAttribute("aria-label", "Confirm: " + label);
+        return;
+      }
+      onDelete();
+    });
+    return del;
+  }
+
+  function renderTransactions() {
+    document.getElementById("thead").innerHTML = TX_HEAD;
+    titleEl.textContent = TX;
+    rowsEl.innerHTML = "";
+    var inSum = 0, outSum = 0;
+    txList.forEach(function (t, i) {
+      // show the part's current name and reference while it still exists
+      var part = findRow(t.partId);
+      var name = part && part.name ? part.name : t.name;
+      var ref = part && part.reference ? part.reference : t.reference;
+      var isIn = t.change > 0;
+      if (isIn) inSum += t.change; else outSum -= t.change;
+
+      var tr = document.createElement("tr");
+      var num = document.createElement("td");
+      num.className = "col-num";
+      num.textContent = i + 1;
+      tr.appendChild(num);
+      tr.appendChild(txCell("Date", fmtTime(t.ts), "when"));
+      var mtd = document.createElement("td");
+      mtd.setAttribute("data-label", "Machine");
+      mtd.innerHTML = '<span class="tx-text"><span class="chip"></span></span>';
+      mtd.querySelector(".chip").textContent = t.machine;
+      tr.appendChild(mtd);
+      tr.appendChild(txCell("Name", name));
+      tr.appendChild(txCell("Reference", ref));
+      var ttd = document.createElement("td");
+      ttd.setAttribute("data-label", "Type");
+      ttd.innerHTML = '<span class="tx-text"><span class="chip ' + (isIn ? "chip-in" : "chip-out") + '">' + (isIn ? "In" : "Out") + "</span></span>";
+      tr.appendChild(ttd);
+      tr.appendChild(txCell("Quantity", (isIn ? "+" : "−") + Math.abs(t.change), "qty " + (isIn ? "pos" : "neg")));
+      tr.appendChild(txCell("Stock after", String(t.after), "after"));
+
+      var act = document.createElement("td");
+      act.className = "col-act";
+      act.appendChild(deleteButton("Delete transaction " + (i + 1), function () { return true; }, function () { deleteTx(t.id); }));
+      tr.appendChild(act);
+      rowsEl.appendChild(tr);
+    });
+    var n = txList.length;
+    metaEl.textContent = n + (n === 1 ? " entry" : " entries") + " · " + inSum + " in · " + outSum + " out";
+    emptyEl.querySelector("strong").textContent = "No transactions yet";
+    emptyEl.querySelector("span").textContent = "Set or change a part’s quantity on a machine tab and the difference is recorded here.";
+    emptyEl.hidden = n !== 0;
+    updateCounts();
+  }
+
+  function deleteTx(id) {
+    if (readOnly) return;
+    var idx = txList.findIndex(function (t) { return t.id === id; });
+    if (idx === -1) return;
+    txList.splice(idx, 1);
+    deleteDoc("transactions", id);
+    renderTransactions();
+  }
+
+  function makeCell(row, field, label) {
+    var td = document.createElement("td");
+    td.setAttribute("data-label", label);
+    var input = document.createElement("input");
+    input.className = "cell" + (field === "quantity" ? " qty" : "") + (field === "date" ? " date" : "");
+    input.type = field === "date" ? "date" : "text";
+    input.id = "f-" + row.id + "-" + field;
+    input.value = row[field];
+    input.placeholder = label;
+    input.setAttribute("aria-label", label);
+    input.setAttribute("data-field", field);
+    input.setAttribute("data-row", row.id);
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.dir = "auto";
+    input.readOnly = readOnly;
+    if (field === "quantity") input.inputMode = "numeric";
+    if (field === "date") input.classList.toggle("blank", !input.value);
+    input.addEventListener("input", function () {
+      if (field === "quantity" && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
+      var cur = findRow(row.id) || row;
+      cur[field] = input.value;
+      if (field === "date") input.classList.toggle("blank", !input.value);
+      scheduleWrite(cur);
+    });
+    if (field === "quantity") {
+      // fires when the edit is finished (leaving the field or pressing Enter)
+      input.addEventListener("change", function () {
+        var cur = findRow(row.id) || row;
+        cur.quantity = input.value;
+        commitQuantity(cur);
+      });
+    }
+    td.appendChild(input);
+    return td;
+  }
+
   function renderRows(focusId) {
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
     document.body.classList.toggle("tx-view", active === TX);
     if (active === TX) { renderTransactions(); return; }
     document.getElementById("thead").innerHTML = MACHINE_HEAD;
     emptyEl.querySelector("strong").textContent = "No parts yet";
-    emptyEl.querySelector("span").textContent = "Use \u201CAdd row\u201D to start this machine\u2019s list.";
+    emptyEl.querySelector("span").textContent = "Use “Add row” to start this machine’s list.";
     titleEl.textContent = active;
     rowsEl.innerHTML = "";
     data[active].forEach(function (row, i) {
@@ -789,26 +869,10 @@
 
       var act = document.createElement("td");
       act.className = "col-act";
-      var del = document.createElement("button");
-      del.type = "button";
-      del.className = "del";
-      del.title = "Delete row";
-      del.setAttribute("data-label", "Delete row " + (i + 1));
-      del.setAttribute("aria-label", "Delete row " + (i + 1));
-      del.innerHTML = TRASH;
-      del.addEventListener("click", function (e) {
-        e.stopPropagation();
-        var hasContent = (row.name + row.reference + row.quantity + row.used + row.date).trim() !== "";
-        if (hasContent && !del.classList.contains("armed")) {
-          disarmAll(del);
-          del.classList.add("armed");
-          del.textContent = "Delete?";
-          del.setAttribute("aria-label", "Confirm delete row " + (i + 1));
-          return;
-        }
-        deleteRow(row.id);
-      });
-      act.appendChild(del);
+      act.appendChild(deleteButton("Delete row " + (i + 1), function () {
+        var cur = findRow(row.id) || row;
+        return (cur.name + cur.reference + cur.quantity + cur.date).trim() !== "";
+      }, function () { deleteRow(row.id); }));
       tr.appendChild(act);
 
       rowsEl.appendChild(tr);
@@ -829,7 +893,7 @@
 
   function addRow() {
     if (readOnly || active === TX) return;
-    var row = clean({ id: uid(), created: Date.now() }, active);
+    var row = clean({ id: uid(), created: Date.now(), loggedQty: "" }, active);
     data[active].push(row);
     writeRow(row);
     renderRows(row.id);
@@ -843,7 +907,7 @@
     clearTimeout(editTimers[id]);
     delete editTimers[id];
     list.splice(idx, 1);
-    removeRow(row);
+    deleteDoc("parts", row.id);
     renderRows();
   }
 
@@ -859,20 +923,20 @@
     if (next) next.focus(); else e.target.blur();
   });
 
-  // ---- Apply a snapshot from the shared store without disturbing typing ----
-  function applySnapshot(snap) {
+  // ---- Apply snapshots from the shared store without disturbing typing ----
+  function applyParts(snap) {
     var next = emptyData();
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, name: v.name, reference: v.reference, quantity: v.quantity, used: v.used, date: v.date, created: v.created }, v.machine);
+      var row = clean({ id: d.id, name: v.name, reference: v.reference, quantity: v.quantity, loggedQty: v.loggedQty, date: v.date, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       next[v.machine].push(local || row);
     });
     MACHINES.forEach(function (m) { next[m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
 
-    if (active === TX) { data = next; refreshTransactions(); return; }
+    if (active === TX) { data = next; renderTransactions(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
     var after = next[active].map(function (r) { return r.id; }).join(",");
     data = next;
@@ -887,12 +951,20 @@
       data[active].forEach(function (row) {
         FIELDS.forEach(function (f) {
           var el = document.getElementById("f-" + row.id + "-" + f);
-          if (el && el !== document.activeElement && el.value !== row[f]) { el.value = row[f]; if (f === "date") el.classList.toggle("blank", !el.value); }
+          if (el && el !== document.activeElement && el.value !== row[f]) {
+            el.value = row[f];
+            if (f === "date") el.classList.toggle("blank", !el.value);
+          }
         });
       });
-      updateCounts();
     }
     updateCounts();
+  }
+
+  function applyTx(snap) {
+    txList = snap.docs.map(function (d) { return cleanTx(d.data() || {}, d.id); });
+    sortTx();
+    if (active === TX) renderTransactions(); else updateCounts();
   }
 
   // ---- Glow follows pointer (rAF-throttled) ----
@@ -923,7 +995,7 @@
   } catch (e) {}
 
   var useClaude = window.claude && typeof window.claude.use === "function";
-  if (!useClaude) data = loadLocal();
+  if (!useClaude) loadLocal();
   renderTabs();
   renderRows();
 
@@ -932,7 +1004,7 @@
     window.claude.use("db").then(function (store) {
       if (!store) {
         // No shared store in this view: keep entries in this browser
-        data = loadLocal();
+        loadLocal();
         renderTabs();
         renderRows();
         setStatus("Saving in this browser only.", "");
@@ -940,9 +1012,9 @@
       }
       db = store;
       setStatus("");
-      db.collection("parts").onSnapshot(applySnapshot, function () {
-        setStatus("Lost connection to saved data. Reload the page.", "error");
-      });
+      var lost = function () { setStatus("Lost connection to saved data. Reload the page.", "error"); };
+      db.collection("parts").onSnapshot(applyParts, lost);
+      db.collection("transactions").onSnapshot(applyTx, lost);
     });
   }
 })();
