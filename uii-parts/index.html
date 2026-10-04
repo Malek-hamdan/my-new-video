@@ -267,6 +267,11 @@
   .confirm-card { width: 100%; max-width: 440px; padding: 22px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: #141925; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
   .confirm-card strong { display: block; font-size: 18px; margin-bottom: 8px; color: #ffe3a8; }
   .confirm-card p { margin: 0 0 18px; color: var(--text); line-height: 1.55; }
+  .cell.pass { margin-bottom: 8px; padding: 12px; border-color: var(--border-strong); font-size: 20px; letter-spacing: 0.3em; text-align: center; }
+  .pass-err { margin-bottom: 12px; color: var(--danger); font-size: 13px; font-weight: 600; }
+  .pass-err[hidden] { display: none; }
+  .shake { animation: shake 0.35s ease; }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
   .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 
   /* Summary tab */
@@ -420,10 +425,16 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-qty { width: 10%; }
-  th.col-price { width: 16%; }
-  th.col-total { width: 12%; }
-  th.col-ref { width: 16%; }
+  th.col-qty { width: 9%; }
+  th.col-min { width: 12%; }
+  .min-wrap { display: flex; gap: 6px; align-items: center; }
+  .min-wrap .cell { min-width: 44px; flex: 1; }
+  .order-tag { display: none; flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: var(--danger-soft); border: 1px solid rgba(255,107,107,0.45); color: #ffb3b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  tr.low .order-tag { display: inline-block; }
+  tr.low .cell.qty[data-field="quantity"] { border-color: rgba(255,107,107,0.7); background: var(--danger-soft); color: #ffd0d0; font-weight: 700; }
+  th.col-price { width: 14%; }
+  th.col-total { width: 11%; }
+  th.col-ref { width: 14%; }
   .price-wrap { display: flex; gap: 6px; align-items: center; }
   .price-wrap .cell { min-width: 0; flex: 1; }
   .cur {
@@ -442,7 +453,7 @@
   .cur.unset { color: var(--muted); }
   .total-text { display: block; padding: 8px 10px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .total-text.muted { color: var(--muted); font-weight: 400; }
-  th.col-date { width: 14%; }
+  th.col-date { width: 12%; }
   .cell.date { min-height: 39px; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
   .cell.date.blank { color: var(--muted); }
@@ -734,6 +745,7 @@
           <th>Name</th>
           <th class="col-ref">Reference</th>
           <th class="col-qty">Quantity</th>
+          <th class="col-min" title="Minimum stock: the row turns red when Quantity drops below it">Min</th>
           <th class="col-price">Unit price</th>
           <th class="col-total">Total price</th>
           <th class="col-date">Date</th>
@@ -761,6 +773,19 @@
   </section>
 
   <div class="status" id="status" aria-live="polite"></div>
+
+  <div class="confirm" id="unlockDlg" hidden role="dialog" aria-modal="true" aria-labelledby="unlockTitle">
+    <form class="confirm-card" id="unlockForm">
+      <strong id="unlockTitle">Unlock month</strong>
+      <p id="unlockText"></p>
+      <input class="cell pass" id="unlockPass" type="password" inputmode="numeric" autocomplete="off" aria-label="Unlock code" placeholder="Code">
+      <div class="pass-err" id="unlockErr" hidden>Wrong code. Try again.</div>
+      <div class="confirm-actions">
+        <button class="btn" id="unlockCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit">Unlock</button>
+      </div>
+    </form>
+  </div>
 
   <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="confirm-card">
@@ -804,7 +829,7 @@
     if (MONTHS.indexOf(k) !== -1) return k;
     return k < MONTHS[0] ? MONTHS[0] : MONTHS[MONTHS.length - 1];
   }
-  var FIELDS = ["name", "reference", "quantity", "price", "currency", "date"];
+  var FIELDS = ["name", "reference", "quantity", "min", "price", "currency", "date"];
   var CURRENCIES = ["USD", "EUR"];
   var CUR_SIGN = { USD: "$", EUR: "\u20AC" };
   var CUR_KEY = "uii-spare-parts-currency";
@@ -856,6 +881,7 @@
       name: String(r.name || ""),
       reference: String(r.reference || ""),
       quantity: qty,
+      min: /^\d+$/.test(r.min) ? String(r.min) : "",
       price: String(r.price || ""),
       currency: CURRENCIES.indexOf(r.currency) !== -1 ? r.currency : "",
       // parts saved before transactions existed start from their current stock
@@ -884,7 +910,7 @@
   }
 
   function rowBody(r) {
-    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
+    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
     return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, date: t.date, ts: t.ts };
@@ -930,7 +956,7 @@
         });
         rows.forEach(function (r) {
           if (MACHINES.indexOf(r.machine) === -1) return;
-          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
+          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
           if (!allParts[row.month]) allParts[row.month] = emptyData();
           allParts[row.month][row.machine].push(row);
         });
@@ -1254,7 +1280,7 @@
     MACHINES.forEach(function (m) {
       allParts[src][m].filter(hasContent).forEach(function (r) {
         // the copied quantity is this month's starting stock, so it is already "logged"
-        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency,
+        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency,
           loggedQty: r.quantity, date: "", baseline: false, arrival: false, created: t++ }, m);
         data[m].push(row);
         writeRow(row);
@@ -1654,7 +1680,13 @@
       if (s.outQty > s.inQty && s.outQty > 0) {
         note("warn", m + ": more parts went out (" + s.outQty + ") than came in (" + s.inQty + "), so its stock is going down.", "Plan the next order for " + m + ".");
       }
-      var zero = (data[m] || []).filter(function (r) { return hasContent(r) && r.quantity === "0"; });
+      var low = (data[m] || []).filter(function (r) { return hasContent(r) && isLow(r); });
+      if (low.length) {
+        note("bad", m + ": " + low.length + (low.length === 1 ? " part is" : " parts are") + " below the minimum \u2014 " +
+          low.slice(0, 6).map(function (r) { return (r.name || "(no name)") + " " + r.quantity + "/" + r.min; }).join(", ") + (low.length > 6 ? "\u2026" : "") + ".",
+          "Order " + (low.length === 1 ? "it" : "them") + " now.");
+      }
+      var zero = (data[m] || []).filter(function (r) { return hasContent(r) && r.quantity === "0" && !isLow(r); });
       if (zero.length) {
         note("bad", m + ": " + zero.length + (zero.length === 1 ? " part is" : " parts are") + " at 0 — " +
           zero.slice(0, 5).map(function (r) { return (r.name || "(no name)") + (r.reference ? " (" + r.reference + ")" : ""); }).join(", ") + (zero.length > 5 ? "…" : "") + ".",
@@ -1728,7 +1760,18 @@
     var txt = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return currency ? CUR_SIGN[currency] + txt : txt;
   }
+  // Below its minimum: quantity and min are both set and quantity < min
+  function isLow(r) { return /^\d+$/.test(r.quantity) && /^\d+$/.test(r.min) && parseInt(r.quantity, 10) < parseInt(r.min, 10); }
+  function updateLow(r) {
+    var tr = rowsEl.querySelector('tr[data-id="' + r.id + '"]');
+    if (!tr) return;
+    var low = isLow(r);
+    tr.classList.toggle("low", low);
+    var q = document.getElementById("f-" + r.id + "-quantity");
+    if (q) q.title = low ? "Below the minimum of " + r.min + ". Order more." : "";
+  }
   function updateTotal(r) {
+    updateLow(r);
     var el = document.getElementById("t-" + r.id + "-total");
     if (!el) return;
     var t = totalOf(r);
@@ -1775,7 +1818,7 @@
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var input = document.createElement("input");
-    input.className = "cell" + (field === "quantity" || field === "price" ? " qty" : "") + (field === "date" ? " date" : "");
+    input.className = "cell" + (field === "quantity" || field === "price" || field === "min" ? " qty" : "") + (field === "date" ? " date" : "");
     input.type = field === "date" ? "date" : "text";
     input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
@@ -1787,15 +1830,15 @@
     input.spellcheck = false;
     input.dir = "auto";
     input.readOnly = ro();
-    if (field === "quantity") input.inputMode = "numeric";
+    if (field === "quantity" || field === "min") input.inputMode = "numeric";
     if (field === "price") input.inputMode = "decimal";
     if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
-      if (field === "quantity" && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
+      if ((field === "quantity" || field === "min") && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
       if (field === "price" && /[^\d.,]/.test(input.value)) input.value = input.value.replace(/[^\d.,]/g, "");
       var cur = findRow(row.id) || row;
       cur[field] = input.value;
-      if (field === "quantity" || field === "price") updateTotal(cur);
+      if (field === "quantity" || field === "price" || field === "min") updateTotal(cur);
       if (field === "reference") updateCounts();
       if (field === "date") input.classList.toggle("blank", !input.value);
       scheduleWrite(cur);
@@ -1825,10 +1868,46 @@
       : "\uD83D\uDD12 " + monthLabel(month) + " is closed. You can view it, but changes are off.";
     document.getElementById("lockBtn").textContent = open ? "Lock again" : "Unlock to edit";
   }
+  // Unlocking a closed month asks for the code. It only stops edits by
+  // accident: anyone who can read the page source could get around it.
+  var UNLOCK_HASH = 0x66d60d02;
+  function codeHash(v) {
+    var str = "uii-lock:" + v, h = 0x811c9dc5;
+    var bytes = new TextEncoder().encode(str);
+    for (var i = 0; i < bytes.length; i++) { h ^= bytes[i]; h = Math.imul(h, 0x01000193) >>> 0; }
+    return h >>> 0;
+  }
+  var unlockDlg = document.getElementById("unlockDlg");
+  var unlockPass = document.getElementById("unlockPass");
+  var unlockErr = document.getElementById("unlockErr");
+  function closeUnlock() { unlockDlg.hidden = true; unlockPass.value = ""; unlockErr.hidden = true; }
   document.getElementById("lockBtn").addEventListener("click", function () {
-    if (unlocked[month]) delete unlocked[month]; else unlocked[month] = true;
-    renderRows();
+    if (unlocked[month]) { delete unlocked[month]; renderRows(); return; }
+    document.getElementById("unlockText").textContent = "Enter the code to edit " + monthLabel(month) + ".";
+    unlockErr.hidden = true;
+    unlockPass.value = "";
+    unlockDlg.hidden = false;
+    unlockPass.focus();
   });
+  document.getElementById("unlockForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (codeHash(unlockPass.value.trim()) === UNLOCK_HASH) {
+      unlocked[month] = true;
+      closeUnlock();
+      renderRows();
+      setStatus(monthLabel(month) + " unlocked", "saved");
+      return;
+    }
+    unlockErr.hidden = false;
+    unlockPass.value = "";
+    var card = unlockDlg.querySelector(".confirm-card");
+    card.classList.remove("shake");
+    void card.offsetWidth;
+    card.classList.add("shake");
+    unlockPass.focus();
+  });
+  document.getElementById("unlockCancel").addEventListener("click", closeUnlock);
+  unlockDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") closeUnlock(); });
 
   function renderRows(focusId) {
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
@@ -1859,6 +1938,16 @@
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
       tr.appendChild(makeCell(row, "quantity", "Quantity"));
+      var minTd = makeCell(row, "min", "Min");
+      var minIn = minTd.firstChild, wrapMin = document.createElement("div");
+      wrapMin.className = "min-wrap";
+      minTd.replaceChild(wrapMin, minIn);
+      wrapMin.appendChild(minIn);
+      var tag = document.createElement("span");
+      tag.className = "order-tag";
+      tag.textContent = "Order";
+      wrapMin.appendChild(tag);
+      tr.appendChild(minTd);
       tr.appendChild(makePriceCell(row));
       tr.appendChild(makeTotalCell(row));
       tr.appendChild(makeCell(row, "date", "Date"));
@@ -1938,7 +2027,7 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, price: v.price, currency: v.currency, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
+      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, min: v.min, price: v.price, currency: v.currency, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       if (local) row = local;
@@ -2117,7 +2206,9 @@
       var list = data[m].filter(hasContent);
       var rows = list.map(function (r, i) {
         return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: z("bold", i) }, { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) },
+          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) }, { v: numOrText(r.min), s: z("center", i) },
+          { v: isLow(r) ? "Order" : "", s: isLow(r) ? "typeOut" : z("center", i) },
+          { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) },
           { v: totalOf(r) === null ? "" : totalOf(r), s: z("moneyBold", i) },
           { v: r.date, s: z("center", i) }];
       });
@@ -2125,7 +2216,7 @@
       return { name: m, xml: sheetXml({
         title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
         tab: "1F3864", rows: rows, totals: totals,
-        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 12 }, { name: "Unit price", width: 14 }, { name: "Currency", width: 11 }, { name: "Total price", width: 16 }, { name: "Date", width: 15 }]
+        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 12 }, { name: "Min", width: 9 }, { name: "Status", width: 11 }, { name: "Unit price", width: 14 }, { name: "Currency", width: 11 }, { name: "Total price", width: 16 }, { name: "Date", width: 15 }]
       }) };
     }
 
