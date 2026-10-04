@@ -1386,18 +1386,26 @@
   function numOrText(v) { return /^\d+$/.test(v) ? parseInt(v, 10) : v; }
 
   function buildWorkbook() {
-    var sheets = MACHINES.map(function (m) {
+    function txRow(t, withMachine) {
+      var part = findRow(t.partId);
+      var row = [fmtTime(t.ts)];
+      if (withMachine) row.push(t.machine);
+      return row.concat([part && part.name ? part.name : t.name, part && part.reference ? part.reference : t.reference,
+        t.change > 0 ? "In" : "Out", t.change, t.after]);
+    }
+    // Each machine gets its parts sheet followed by its own transaction sheet
+    var sheets = [];
+    MACHINES.forEach(function (m) {
       var rows = [["Name", "Reference", "Quantity", "Date"]];
       data[m].forEach(function (r) { rows.push([r.name, r.reference, numOrText(r.quantity), r.date]); });
-      return { name: m, xml: sheetXml(rows, [40, 24, 12, 14]) };
+      sheets.push({ name: m, xml: sheetXml(rows, [40, 24, 12, 14]) });
+      var tx = [["Date", "Name", "Reference", "Type", "Quantity", "Stock after"]];
+      txList.forEach(function (t) { if (t.machine === m) tx.push(txRow(t, false)); });
+      sheets.push({ name: m + " " + TX, xml: sheetXml(tx, [18, 40, 24, 8, 10, 12]) });
     });
-    var tx = [["Date", "Machine", "Name", "Reference", "Type", "Quantity", "Stock after"]];
-    txList.forEach(function (t) {
-      var part = findRow(t.partId);
-      tx.push([fmtTime(t.ts), t.machine, part && part.name ? part.name : t.name, part && part.reference ? part.reference : t.reference,
-        t.change > 0 ? "In" : "Out", t.change, t.after]);
-    });
-    sheets.push({ name: TX, xml: sheetXml(tx, [18, 10, 40, 24, 8, 10, 12]) });
+    var all = [["Date", "Machine", "Name", "Reference", "Type", "Quantity", "Stock after"]];
+    txList.forEach(function (t) { all.push(txRow(t, true)); });
+    sheets.push({ name: "All " + TX + "s", xml: sheetXml(all, [18, 10, 40, 24, 8, 10, 12]) });
 
     var files = [];
     files.push(["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
