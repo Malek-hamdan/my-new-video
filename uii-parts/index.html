@@ -67,7 +67,7 @@
   .wrap {
     position: relative;
     z-index: 1;
-    max-width: 1240px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 40px 16px 64px;
   }
@@ -453,16 +453,17 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-qty { width: 9%; }
-  th.col-min { width: 12%; }
+  th.col-qty { width: 6%; }
+  th.col-min { width: 8%; }
   .min-wrap { display: flex; gap: 6px; align-items: center; }
   .min-wrap .cell { min-width: 44px; flex: 1; }
   .order-tag { display: none; flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: var(--danger-soft); border: 1px solid rgba(255,107,107,0.45); color: #ffb3b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
   tr.low .order-tag { display: inline-block; }
   tr.low .cell.qty[data-field="quantity"] { border-color: rgba(255,107,107,0.7); background: var(--danger-soft); color: #ffd0d0; font-weight: 700; }
-  th.col-price { width: 14%; }
-  th.col-total { width: 11%; }
-  th.col-ref { width: 14%; }
+  th.col-price { width: 12%; }
+  th.col-total { width: 9%; }
+  th.col-ref { width: 22%; }
+  th.col-name { width: 26%; }
   .price-wrap { display: flex; gap: 6px; align-items: center; }
   .price-wrap .cell { min-width: 0; flex: 1; }
   .cur {
@@ -481,8 +482,9 @@
   .cur.unset { color: var(--muted); }
   .total-text { display: block; padding: 8px 10px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .total-text.muted { color: var(--muted); font-weight: 400; }
-  th.col-date { width: 12%; }
+  th.col-date { width: 10%; }
   .cell.date { min-height: 39px; }
+  textarea.cell.wrap { display: block; min-height: 39px; resize: none; overflow: hidden; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
   .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
@@ -548,7 +550,7 @@
   tbody tr.arrival .cell { border-color: rgba(127,214,164,0.25); }
   .btn.btn-arrival { background: rgba(127,214,164,0.16); border-color: rgba(127,214,164,0.55); color: #c6f1d8; }
   .btn.btn-arrival:hover { background: rgba(127,214,164,0.26); border-color: #7fd6a4; box-shadow: 0 0 0 3px rgba(127,214,164,0.1); }
-  tbody td { padding: 6px 18px; vertical-align: middle; }
+  tbody td { padding: 6px 10px; vertical-align: middle; }
   td.col-num { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 
   .cell {
@@ -794,7 +796,7 @@
       <thead id="thead">
         <tr>
           <th class="col-num">#</th>
-          <th>Name</th>
+          <th class="col-name">Name</th>
           <th class="col-ref">Reference</th>
           <th class="col-qty">Quantity</th>
           <th class="col-min" title="Minimum stock: the row turns red when Quantity drops below it">Min</th>
@@ -1891,12 +1893,24 @@
     return td;
   }
 
+  // Grow a wrapping text box to show all of its text
+  function fitHeight(el) {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + 2 + "px";
+  }
+  var fitTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(function () { rowsEl.querySelectorAll("textarea.wrap").forEach(fitHeight); }, 150);
+  });
+
   function makeCell(row, field, label) {
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
-    var input = document.createElement("input");
-    input.className = "cell" + (field === "quantity" || field === "price" || field === "min" ? " qty" : "") + (field === "date" ? " date" : "");
-    input.type = field === "date" ? "date" : "text";
+    var multi = field === "name" || field === "reference";
+    var input = document.createElement(multi ? "textarea" : "input");
+    input.className = "cell" + (field === "quantity" || field === "price" || field === "min" ? " qty" : "") + (field === "date" ? " date" : "") + (multi ? " wrap" : "");
+    if (multi) input.rows = 1; else input.type = field === "date" ? "date" : "text";
     input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
     input.placeholder = label;
@@ -1918,6 +1932,7 @@
       if (field === "quantity" || field === "price" || field === "min") updateTotal(cur);
       if (field === "reference") updateCounts();
       if (field === "date") input.classList.toggle("blank", !input.value);
+      if (multi) { if (/\n/.test(input.value)) input.value = input.value.replace(/\n/g, " "); fitHeight(input); cur[field] = input.value; }
       scheduleWrite(cur);
     });
     if (field === "quantity") {
@@ -2049,6 +2064,7 @@
       tr.appendChild(act);
 
       rowsEl.appendChild(tr);
+      tr.querySelectorAll("textarea.wrap").forEach(fitHeight);
       updateTotal(row);
 
       if (row.id === focusId) {
@@ -2148,6 +2164,7 @@
           var el = document.getElementById("f-" + row.id + "-" + f);
           if (el && el !== document.activeElement && el.value !== row[f]) {
             el.value = row[f];
+            if (el.tagName === "TEXTAREA") fitHeight(el);
             if (f === "date") el.classList.toggle("blank", !el.value);
             if (f === "currency") el.classList.toggle("unset", !el.value);
           }
