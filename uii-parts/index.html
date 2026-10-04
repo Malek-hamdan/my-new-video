@@ -163,6 +163,79 @@
   .month[aria-current="true"] { color: #06101f; background: var(--accent); border-color: var(--accent); }
   .month .dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; vertical-align: middle; }
 
+  /* Search */
+  .search-wrap { margin-bottom: 12px; }
+  .search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .search-box:focus-within { border-color: rgba(91,157,255,0.6); box-shadow: 0 0 0 3px rgba(91,157,255,0.12); }
+  .search-box svg { width: 18px; height: 18px; flex: 0 0 auto; color: var(--muted); }
+  .search-box input {
+    flex: 1;
+    min-width: 0;
+    padding: 13px 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 16px;
+  }
+  .search-box input:focus { outline: none; }
+  .search-box input::placeholder { color: rgba(138,147,166,0.7); }
+  .results {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .results[hidden] { display: none; }
+  .results-head { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  .results-head strong { color: var(--text); }
+  .results-none { padding: 18px 16px; }
+  .results-none strong { display: block; color: var(--danger); font-size: 15px; margin-bottom: 2px; }
+  .results-none span { color: var(--muted); font-size: 13px; }
+  .result {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)) auto;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .result:first-of-type { border-top: 0; }
+  .result:hover, .result:focus-visible { background: rgba(91,157,255,0.08); outline: none; }
+  .result .r-name { font-weight: 600; overflow-wrap: anywhere; }
+  .result .r-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .result .r-ref { overflow-wrap: anywhere; }
+  .result .r-k { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .result .r-v { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .result .r-go { color: var(--accent); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .result mark { background: rgba(255,214,102,0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .chip.chip-month { background: rgba(255,255,255,0.06); border-color: var(--border-strong); color: var(--text); }
+  @media (max-width: 760px) {
+    .result { grid-template-columns: 1fr 1fr; }
+    .result > :first-child { grid-column: 1 / -1; }
+    .result .r-go { grid-column: 1 / -1; }
+  }
+  tbody tr.flash { animation: flash 1.6s ease; }
+  @keyframes flash { 0%, 40% { background: rgba(255,214,102,0.22); } 100% { background: transparent; } }
+
   /* Copy parts into an empty month */
   .copy-banner {
     display: flex;
@@ -550,6 +623,14 @@
 
   <div class="months-wrap">
     <nav class="months" id="months" aria-label="Monthly sheets"></nav>
+  </div>
+
+  <div class="search-wrap">
+    <label class="search-box" for="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="search" type="search" placeholder="Search by reference or name, across all machines and months" autocomplete="off" spellcheck="false" dir="auto">
+    </label>
+    <div class="results" id="results" hidden></div>
   </div>
 
   <div class="copy-banner" id="copyBanner" hidden>
@@ -1066,9 +1147,113 @@
     setStatus("Copied from " + monthLabel(src), "saved");
   });
 
+  // ---- Search across every machine and month ----
+  var searchEl = document.getElementById("search");
+  var resultsEl = document.getElementById("results");
+  function norm(v) { return String(v).toLowerCase().replace(/[\s\-_./]/g, ""); }
+  function highlight(text, q) {
+    var frag = document.createDocumentFragment();
+    var i = String(text).toLowerCase().indexOf(q.toLowerCase());
+    if (!q || i === -1) { frag.appendChild(document.createTextNode(text)); return frag; }
+    frag.appendChild(document.createTextNode(text.slice(0, i)));
+    var m = document.createElement("mark");
+    m.textContent = text.slice(i, i + q.length);
+    frag.appendChild(m);
+    frag.appendChild(document.createTextNode(text.slice(i + q.length)));
+    return frag;
+  }
+  function kv(label, value) {
+    var d = document.createElement("div");
+    var k = document.createElement("span"); k.className = "r-k"; k.textContent = label;
+    var v = document.createElement("span"); v.className = "r-v"; v.textContent = value || "\u2014";
+    d.appendChild(k); d.appendChild(v);
+    return d;
+  }
+  function renderSearch() {
+    var raw = searchEl.value.trim();
+    if (!raw) { resultsEl.hidden = true; resultsEl.innerHTML = ""; return; }
+    var q = norm(raw);
+    var hits = [];
+    MONTHS.forEach(function (k) {
+      var p = allParts[k];
+      if (!p) return;
+      MACHINES.forEach(function (m) {
+        p[m].forEach(function (r) {
+          if (!hasContent(r)) return;
+          if (norm(r.reference).indexOf(q) !== -1 || norm(r.name).indexOf(q) !== -1) hits.push(r);
+        });
+      });
+    });
+    // the open month first, then the most recent months
+    hits.sort(function (a, b) {
+      if ((a.month === month) !== (b.month === month)) return a.month === month ? -1 : 1;
+      return a.month < b.month ? 1 : a.month > b.month ? -1 : MACHINES.indexOf(a.machine) - MACHINES.indexOf(b.machine);
+    });
+    resultsEl.innerHTML = "";
+    resultsEl.hidden = false;
+    if (!hits.length) {
+      resultsEl.innerHTML = '<div class="results-none"><strong></strong><span>No part with this reference or name in any machine, in any month.</span></div>';
+      resultsEl.querySelector("strong").textContent = "Not found: \u201C" + raw + "\u201D";
+      return;
+    }
+    var machinesHit = {};
+    hits.forEach(function (r) { machinesHit[r.machine] = 1; });
+    var head = document.createElement("div");
+    head.className = "results-head";
+    head.innerHTML = "<strong></strong> \u00B7 <span></span>";
+    head.firstChild.textContent = hits.length + (hits.length === 1 ? " part found" : " parts found");
+    head.lastChild.textContent = "in " + Object.keys(machinesHit).join(", ");
+    resultsEl.appendChild(head);
+    hits.slice(0, 60).forEach(function (r) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "result";
+      var first = document.createElement("div");
+      var nm = document.createElement("div"); nm.className = "r-name"; nm.dir = "auto";
+      nm.appendChild(highlight(r.name || "(no name)", raw));
+      var tags = document.createElement("div"); tags.className = "r-tags";
+      [[r.machine, "chip"], [monthLabel(r.month), "chip chip-month"]].concat(r.arrival ? [["New arrival", "chip chip-in"]] : []).forEach(function (t) {
+        var c = document.createElement("span"); c.className = t[1]; c.textContent = t[0]; tags.appendChild(c);
+      });
+      first.appendChild(nm); first.appendChild(tags);
+      b.appendChild(first);
+      var refBox = document.createElement("div");
+      var rk = document.createElement("span"); rk.className = "r-k"; rk.textContent = "Reference";
+      var rv = document.createElement("span"); rv.className = "r-v r-ref"; rv.dir = "auto";
+      rv.appendChild(highlight(r.reference || "\u2014", raw));
+      refBox.appendChild(rk); refBox.appendChild(rv);
+      b.appendChild(refBox);
+      var t = totalOf(r), p = unitPrice(r);
+      b.appendChild(kv("Quantity", r.quantity));
+      b.appendChild(kv("Unit price", p === null ? "" : money(p, r.currency)));
+      b.appendChild(kv("Total price", t === null ? "" : money(t, r.currency)));
+      b.appendChild(kv("Date", r.date));
+      var go = document.createElement("span"); go.className = "r-go"; go.textContent = "Open \u2192";
+      b.appendChild(go);
+      b.addEventListener("click", function () { openPart(r); });
+      resultsEl.appendChild(b);
+    });
+  }
+  function openPart(r) {
+    if (r.month !== month) selectMonth(r.month);
+    if (active !== r.machine) switchTo(r.machine);
+    var tr = rowsEl.querySelector('tr[data-id="' + r.id + '"]');
+    if (!tr) return;
+    tr.scrollIntoView({ block: "center", behavior: "smooth" });
+    tr.classList.remove("flash");
+    void tr.offsetWidth;
+    tr.classList.add("flash");
+  }
+  searchEl.addEventListener("input", renderSearch);
+  searchEl.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { searchEl.value = ""; renderSearch(); }
+    if (e.key === "Enter") { var first = resultsEl.querySelector(".result"); if (first) first.click(); }
+  });
+
   function updateCounts() {
     renderMonths();
     updateCopyBanner();
+    if (searchEl.value.trim()) renderSearch();
     TABS.forEach(function (m) {
       var c = document.querySelector("#tab-" + m + " .count");
       if (c) c.textContent = tabCount(m);
