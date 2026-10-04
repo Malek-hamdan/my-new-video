@@ -67,7 +67,7 @@
   .wrap {
     position: relative;
     z-index: 1;
-    max-width: 980px;
+    max-width: 1240px;
     margin: 0 auto;
     padding: 40px 16px 64px;
   }
@@ -204,15 +204,18 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-qty { width: 16%; }
+  th.col-qty { width: 12%; }
   th.col-ref { width: 24%; }
-  th.col-date { width: 19%; }
+  th.col-date { width: 14%; }
+  body.tx-view th.col-date { width: 12%; }
+  body.tx-view th.col-ref { width: 20%; }
+  body.tx-view th.col-qty { width: 10%; }
   .cell.date { min-height: 39px; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
   .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
-  th.col-mach { width: 13%; }
-  th.col-used { width: 13%; }
+  th.col-mach { width: 10%; }
+  th.col-used { width: 11%; }
   .tx-text { display: block; padding: 8px 10px; min-height: 39px; overflow-wrap: anywhere; }
   .tx-text.muted { color: var(--muted); }
   .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -656,6 +659,7 @@
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var span = document.createElement("span");
+    span.dir = "auto";
     span.className = "tx-text" + (cls ? " " + cls : "") + (text ? "" : " muted");
     span.textContent = text || "—";
     td.appendChild(span);
@@ -735,6 +739,7 @@
     input.setAttribute("data-field", field);
     input.autocomplete = "off";
     input.spellcheck = false;
+    input.dir = "auto";
     input.readOnly = readOnly;
     if (field === "quantity" || field === "used") input.inputMode = "numeric";
     if (field === "date") input.classList.toggle("blank", !input.value);
