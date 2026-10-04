@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>UII Spare Parts</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --surface: rgba(20, 24, 33, 0.86);
+    --surface-2: rgba(28, 33, 45, 0.9);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #e8ebf2;
+    --muted: #8a93a6;
+    --accent: #5b9dff;
+    --accent-soft: rgba(91, 157, 255, 0.14);
+    --danger: #ff6b6b;
+    --danger-soft: rgba(255, 107, 107, 0.12);
+    --radius: 14px;
+    --mx: 50vw;
+    --my: 30vh;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Cursor-following glow: sits behind all content, never intercepts input */
+  .glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(520px circle at var(--mx) var(--my), rgba(91, 157, 255, 0.10), transparent 60%),
+      radial-gradient(180px circle at var(--mx) var(--my), rgba(140, 190, 255, 0.07), transparent 70%);
+    transition: opacity 0.4s ease;
+  }
+
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 16px 64px;
+  }
+
+  header { margin-bottom: 28px; }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(40px, 9vw, 64px);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    background: linear-gradient(180deg, #ffffff 0%, #a9c6ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .subtitle {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    scrollbar-width: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex: 1 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+  .tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .tab[aria-selected="true"] {
+    color: var(--text);
+    background: var(--accent-soft);
+    border-color: rgba(91, 157, 255, 0.35);
+  }
+  .tab .count {
+    min-width: 22px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.07);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .tab[aria-selected="true"] .count { background: rgba(91,157,255,0.22); color: #cfe0ff; }
+
+  /* Panel */
+  .panel {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  .panel-head .meta { color: var(--muted); font-size: 13px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.15s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .btn:hover {
+    border-color: rgba(91,157,255,0.5);
+    background: rgba(91,157,255,0.12);
+    box-shadow: 0 0 0 3px rgba(91,157,255,0.08);
+    transform: translateY(-1px);
+  }
+  .btn:active { transform: translateY(0); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #06101f; }
+  .btn-primary:hover { background: #77afff; border-color: #77afff; }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    padding: 12px 18px;
+    text-align: left;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
+  th.col-price { width: 22%; }
+  th.col-ref { width: 28%; }
+  th.col-act, td.col-act { width: 56px; text-align: right; }
+
+  tbody tr { transition: background 0.15s ease; }
+  tbody tr + tr td { border-top: 1px solid var(--border); }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  tbody td { padding: 6px 18px; vertical-align: middle; }
+  td.col-num { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  .cell {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .cell::placeholder { color: rgba(138,147,166,0.45); }
+  tbody tr:hover .cell { border-color: var(--border); }
+  .cell:focus {
+    outline: none;
+    border-color: rgba(91,157,255,0.6);
+    background: rgba(91,157,255,0.06);
+  }
+  .cell.price { font-variant-numeric: tabular-nums; }
+
+  .del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  tbody tr:hover .del { opacity: 1; }
+  .del:hover, .del:focus-visible {
+    opacity: 1;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border-color: rgba(255,107,107,0.3);
+    outline: none;
+  }
+  .del svg { width: 16px; height: 16px; }
+
+  .empty {
+    padding: 48px 18px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty strong { display: block; color: var(--text); font-size: 15px; margin-bottom: 4px; }
+
+  .panel-foot {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+  }
+
+  .status {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: right;
+    min-height: 18px;
+    transition: color 0.3s ease;
+  }
+  .status.saved { color: #7fd6a4; }
+  .status.error { color: var(--danger); }
+
+  /* Mobile: rows become cards */
+  @media (max-width: 640px) {
+    .wrap { padding-top: 28px; }
+    .panel-head { padding: 14px; }
+    .panel-head .btn span { display: none; }
+    .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; }
+    .tab { padding: 9px 4px; gap: 5px; font-size: 14px; min-width: 0; }
+    .tab .count { min-width: 18px; padding: 1px 5px; font-size: 11px; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tbody tr {
+      position: relative;
+      padding: 10px 14px 12px;
+    }
+    tbody tr + tr td { border-top: 0; }
+    tbody tr + tr { border-top: 1px solid var(--border); }
+    tbody td { padding: 3px 0; }
+    td.col-num {
+      width: auto;
+      text-align: left;
+      padding: 0 0 4px;
+      font-size: 12px;
+    }
+    td.col-num::before { content: "#"; }
+    td[data-label] {
+      display: grid;
+      grid-template-columns: 82px 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+    td[data-label]::before {
+      content: attr(data-label);
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .cell { border-color: var(--border); background: rgba(255,255,255,0.02); font-size: 16px; }
+    td.col-act { position: absolute; top: 6px; right: 10px; width: auto; padding: 0; }
+    .del { opacity: 1; }
+    .panel-foot { padding: 12px 14px; }
+    .panel-foot .btn { width: 100%; justify-content: center; }
+  }
+
+  @media (hover: none) {
+    .glow { opacity: 0.7; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="glow" id="glow" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header>
+    <h1>UII</h1>
+    <p class="subtitle">Machine Spare Parts Register</p>
+  </header>
+
+  <nav class="tabs" role="tablist" id="tabs" aria-label="Machines"></nav>
+
+  <section class="panel" role="tabpanel" id="panel" aria-labelledby="">
+    <div class="panel-head">
+      <div>
+        <h2 id="panelTitle"></h2>
+        <div class="meta" id="panelMeta"></div>
+      </div>
+      <button class="btn btn-primary" id="addTop" type="button" title="Add row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Add row</span>
+      </button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="col-num">#</th>
+          <th>Name</th>
+          <th class="col-ref">Reference</th>
+          <th class="col-price">Price</th>
+          <th class="col-act"><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div class="empty" id="empty" hidden>
+      <strong>No parts yet</strong>
+      Use “Add row” to start this machine’s list.
+    </div>
+
+    <div class="panel-foot">
+      <button class="btn" id="addBottom" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add row
+      </button>
+    </div>
+  </section>
+
+  <div class="status" id="status" aria-live="polite"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MACHINES = ["BLM", "BCW3", "Bonal", "Sollas"];
+  var STORAGE_KEY = "uii-spare-parts-v1";
+  var TAB_KEY = "uii-spare-parts-active-tab";
+
+  // ---- Storage ----
+  function emptyData() {
+    var d = {};
+    MACHINES.forEach(function (m) { d[m] = []; });
+    return d;
+  }
+
+  function load() {
+    var data = emptyData();
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        MACHINES.forEach(function (m) {
+          if (Array.isArray(parsed[m])) {
+            data[m] = parsed[m].map(function (r) {
+              return {
+                id: r.id || uid(),
+                name: String(r.name || ""),
+                reference: String(r.reference || ""),
+                price: String(r.price || "")
+              };
+            });
+          }
+        });
+      }
+    } catch (e) {
+      setStatus("Could not read saved data from this browser.", "error");
+    }
+    return data;
+  }
+
+  var saveTimer = null;
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setStatus("Saved", "saved");
+    } catch (e) {
+      setStatus("Saving failed — this browser is blocking local storage.", "error");
+    }
+  }
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 250);
+  }
+  window.addEventListener("beforeunload", function () {
+    if (saveTimer) { clearTimeout(saveTimer); save(); }
+  });
+
+  var statusEl = document.getElementById("status");
+  var statusTimer = null;
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg;
+    statusEl.className = "status " + (kind || "");
+    clearTimeout(statusTimer);
+    if (kind === "saved") {
+      statusTimer = setTimeout(function () { statusEl.textContent = ""; statusEl.className = "status"; }, 1600);
+    }
+  }
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---- State ----
+  var data = load();
+  var active = MACHINES[0];
+  try {
+    var savedTab = localStorage.getItem(TAB_KEY);
+    if (MACHINES.indexOf(savedTab) !== -1) active = savedTab;
+  } catch (e) {}
+
+  // ---- DOM ----
+  var tabsEl = document.getElementById("tabs");
+  var rowsEl = document.getElementById("rows");
+  var emptyEl = document.getElementById("empty");
+  var panelEl = document.getElementById("panel");
+  var titleEl = document.getElementById("panelTitle");
+  var metaEl = document.getElementById("panelMeta");
+
+  var TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
+
+  function renderTabs() {
+    tabsEl.innerHTML = "";
+    MACHINES.forEach(function (m) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab";
+      b.id = "tab-" + m;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", m === active ? "true" : "false");
+      b.setAttribute("aria-controls", "panel");
+      b.tabIndex = m === active ? 0 : -1;
+      b.innerHTML = '<span></span><span class="count"></span>';
+      b.firstChild.textContent = m;
+      b.lastChild.textContent = data[m].length;
+      b.addEventListener("click", function () { switchTo(m); });
+      tabsEl.appendChild(b);
+    });
+  }
+
+  tabsEl.addEventListener("keydown", function (e) {
+    var i = MACHINES.indexOf(active);
+    if (e.key === "ArrowRight") i = (i + 1) % MACHINES.length;
+    else if (e.key === "ArrowLeft") i = (i - 1 + MACHINES.length) % MACHINES.length;
+    else return;
+    e.preventDefault();
+    switchTo(MACHINES[i]);
+    document.getElementById("tab-" + active).focus();
+  });
+
+  function switchTo(m) {
+    active = m;
+    try { localStorage.setItem(TAB_KEY, m); } catch (e) {}
+    renderTabs();
+    renderRows();
+  }
+
+  function updateCounts() {
+    MACHINES.forEach(function (m) {
+      var c = document.querySelector("#tab-" + m + " .count");
+      if (c) c.textContent = data[m].length;
+    });
+    var n = data[active].length;
+    metaEl.textContent = n + (n === 1 ? " part" : " parts");
+    emptyEl.hidden = n !== 0;
+  }
+
+  function makeCell(row, field, label, placeholder) {
+    var td = document.createElement("td");
+    td.setAttribute("data-label", label);
+    var input = document.createElement("input");
+    input.className = "cell" + (field === "price" ? " price" : "");
+    input.type = "text";
+    input.value = row[field];
+    input.placeholder = placeholder;
+    input.setAttribute("aria-label", label);
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    if (field === "price") input.inputMode = "decimal";
+    input.addEventListener("input", function () {
+      row[field] = input.value;
+      scheduleSave();
+    });
+    td.appendChild(input);
+    return td;
+  }
+
+  function renderRows(focusId) {
+    panelEl.setAttribute("aria-labelledby", "tab-" + active);
+    titleEl.textContent = active;
+    rowsEl.innerHTML = "";
+    data[active].forEach(function (row, i) {
+      var tr = document.createElement("tr");
+
+      var num = document.createElement("td");
+      num.className = "col-num";
+      num.textContent = i + 1;
+      tr.appendChild(num);
+
+      tr.appendChild(makeCell(row, "name", "Name", "Name"));
+      tr.appendChild(makeCell(row, "reference", "Reference", "Reference"));
+      tr.appendChild(makeCell(row, "price", "Price", "Price"));
+
+      var act = document.createElement("td");
+      act.className = "col-act";
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "del";
+      del.title = "Delete row";
+      del.setAttribute("aria-label", "Delete row " + (i + 1));
+      del.innerHTML = TRASH;
+      del.addEventListener("click", function () { deleteRow(row.id); });
+      act.appendChild(del);
+      tr.appendChild(act);
+
+      rowsEl.appendChild(tr);
+
+      if (row.id === focusId) {
+        var first = tr.querySelector(".cell");
+        setTimeout(function () {
+          first.focus();
+          tr.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }, 0);
+      }
+    });
+    updateCounts();
+  }
+
+  function addRow() {
+    var row = { id: uid(), name: "", reference: "", price: "" };
+    data[active].push(row);
+    save();
+    renderRows(row.id);
+  }
+
+  function deleteRow(id) {
+    var list = data[active];
+    var idx = list.findIndex(function (r) { return r.id === id; });
+    if (idx === -1) return;
+    var r = list[idx];
+    var hasContent = (r.name + r.reference + r.price).trim() !== "";
+    if (hasContent) {
+      var label = r.name.trim() || r.reference.trim() || ("row " + (idx + 1));
+      if (!confirm("Delete “" + label + "” from " + active + "?")) return;
+    }
+    list.splice(idx, 1);
+    save();
+    renderRows();
+  }
+
+  document.getElementById("addTop").addEventListener("click", addRow);
+  document.getElementById("addBottom").addEventListener("click", addRow);
+
+  // Enter in the last field of a row jumps to the next row's first field
+  rowsEl.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || !e.target.classList.contains("cell")) return;
+    e.preventDefault();
+    var cells = Array.prototype.slice.call(rowsEl.querySelectorAll(".cell"));
+    var next = cells[cells.indexOf(e.target) + 1];
+    if (next) next.focus(); else e.target.blur();
+  });
+
+  // ---- Glow follows pointer (rAF-throttled) ----
+  var glow = document.getElementById("glow");
+  var root = document.documentElement;
+  var px = window.innerWidth / 2, py = window.innerHeight * 0.3, pending = false;
+  function paint() {
+    root.style.setProperty("--mx", px + "px");
+    root.style.setProperty("--my", py + "px");
+    pending = false;
+  }
+  function track(x, y) {
+    px = x; py = y;
+    if (!pending) { pending = true; requestAnimationFrame(paint); }
+  }
+  window.addEventListener("pointermove", function (e) { track(e.clientX, e.clientY); }, { passive: true });
+  window.addEventListener("touchmove", function (e) {
+    var t = e.touches[0]; if (t) track(t.clientX, t.clientY);
+  }, { passive: true });
+  document.addEventListener("mouseleave", function () { glow.style.opacity = "0.4"; });
+  document.addEventListener("mouseenter", function () { glow.style.opacity = "1"; });
+  paint();
+
+  renderTabs();
+  renderRows();
+})();
+</script>
+</body>
+</html>
