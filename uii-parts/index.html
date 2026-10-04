@@ -119,8 +119,33 @@
     font-weight: 700;
     letter-spacing: 0.06em;
   }
-  .year + .month { margin-left: 0; }
-  .month + .year { margin-left: 10px; padding-left: 12px; border-left: 1px solid var(--border-strong); }
+  .year-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: 6px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+  .year-switch .year { min-width: 44px; padding: 0 2px; text-align: center; color: var(--text); font-size: 13px; }
+  .year-switch .year.has-data { color: #cfe0ff; }
+  .year-nav {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .year-nav:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+  .year-nav:disabled { opacity: 0.25; cursor: default; }
   .month {
     padding: 6px 12px;
     border: 1px solid var(--border);
@@ -533,12 +558,14 @@
   var TAB_KEY = "uii-spare-parts-active-tab";
   var MONTH_KEY = "uii-spare-parts-month";
   var MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  // One sheet per month, September 2026 to December 2027
+  // One sheet per month from September 2026. The list runs to December of the
+  // current year (at least 2027), so each new year appears on its own.
+  var FIRST_YEAR = 2026;
+  var LAST_YEAR = Math.max(2027, new Date().getFullYear());
   var MONTHS = [];
   (function () {
-    for (var y = 2026, mo = 9; y < 2028; mo++) {
-      if (mo > 12) { mo = 1; y++; if (y === 2028) break; }
-      MONTHS.push(y + "-" + (mo < 10 ? "0" : "") + mo);
+    for (var y = FIRST_YEAR; y <= LAST_YEAR; y++) {
+      for (var mo = y === FIRST_YEAR ? 9 : 1; mo <= 12; mo++) MONTHS.push(y + "-" + (mo < 10 ? "0" : "") + mo);
     }
   })();
   function monthLabel(key) { return MONTH_NAMES[parseInt(key.slice(5), 10) - 1] + " " + key.slice(0, 4); }
@@ -794,18 +821,41 @@
     if (p) MACHINES.forEach(function (m) { n += p[m].length; });
     return n > 0;
   }
+  var viewYear = 0;
+  function yearHasData(y) {
+    return MONTHS.some(function (k) { return k.slice(0, 4) === String(y) && monthHasData(k); });
+  }
   function renderMonths() {
     if (typeof updateExportLabel === "function") updateExportLabel();
+    if (!viewYear) viewYear = parseInt(month.slice(0, 4), 10);
     monthsEl.innerHTML = "";
-    var year = "";
+
+    var prev = document.createElement("button");
+    prev.type = "button";
+    prev.className = "year-nav";
+    prev.textContent = "\u2039";
+    prev.setAttribute("aria-label", "Previous year");
+    prev.disabled = viewYear <= FIRST_YEAR;
+    prev.addEventListener("click", function () { viewYear--; renderMonths(); });
+    var label = document.createElement("span");
+    label.className = "year" + (yearHasData(viewYear) ? " has-data" : "");
+    label.textContent = viewYear;
+    var next = document.createElement("button");
+    next.type = "button";
+    next.className = "year-nav";
+    next.textContent = "\u203A";
+    next.setAttribute("aria-label", "Next year");
+    next.disabled = viewYear >= LAST_YEAR;
+    next.addEventListener("click", function () { viewYear++; renderMonths(); });
+    var nav = document.createElement("span");
+    nav.className = "year-switch";
+    nav.appendChild(prev);
+    nav.appendChild(label);
+    nav.appendChild(next);
+    monthsEl.appendChild(nav);
+
     MONTHS.forEach(function (k) {
-      if (k.slice(0, 4) !== year) {
-        year = k.slice(0, 4);
-        var y = document.createElement("span");
-        y.className = "year";
-        y.textContent = year;
-        monthsEl.appendChild(y);
-      }
+      if (k.slice(0, 4) !== String(viewYear)) return;
       var b = document.createElement("button");
       b.type = "button";
       b.className = "month";
@@ -827,6 +877,7 @@
     if (k === month) return;
     flushWrites();
     month = k;
+    viewYear = parseInt(k.slice(0, 4), 10);
     try { localStorage.setItem(MONTH_KEY, k); } catch (e) {}
     openSheet();
     renderMonths();
