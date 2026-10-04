@@ -81,6 +81,29 @@
     margin-bottom: 28px;
   }
   .btn-export { border-color: rgba(127,214,164,0.4); color: #bfeccf; }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Password screen shown before anything else */
+  .gate { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg); }
+  .gate[hidden] { display: none; }
+  .gate-card { width: 100%; max-width: 340px; padding: 28px 24px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: #121722; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .gate-logo { font-size: 44px; font-weight: 800; letter-spacing: 0.08em; background: linear-gradient(180deg, #fff 0%, #a9c6ff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .gate-card p { margin: 6px 0 18px; color: var(--muted); }
+  .gate-btn { width: 100%; justify-content: center; margin-top: 4px; padding: 12px; }
+  body.gated .wrap { visibility: hidden; }
+  /* Backups dialog */
+  .confirm-card.wide { max-width: 600px; max-height: calc(100vh - 32px); overflow-y: auto; }
+  .dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .dlg-head strong { margin: 0 !important; color: var(--text) !important; }
+  .confirm-card h4 { margin: 18px 0 4px; font-size: 14px; }
+  .muted-p { margin: 0 0 10px !important; color: var(--muted) !important; font-size: 13px; line-height: 1.5; }
+  .dlg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .snap-list { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .snap { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 14px; }
+  .snap:first-child { border-top: 0; }
+  .snap small { display: block; color: var(--muted); font-size: 12px; }
+  .snap .btn { padding: 6px 10px; font-size: 13px; }
+  .snap-empty { padding: 14px 12px; color: var(--muted); font-size: 13px; }
+  .copy-banner.reminder { border-color: rgba(255,196,87,0.55); background: rgba(255,196,87,0.09); }
   .btn-export:hover { border-color: rgba(127,214,164,0.7); background: rgba(127,214,164,0.1); box-shadow: 0 0 0 3px rgba(127,214,164,0.08); }
   .btn-export:disabled { opacity: 0.6; cursor: progress; transform: none; }
 
@@ -677,17 +700,41 @@
 <div class="grid-bg" aria-hidden="true"></div>
 <div class="glow" id="glow" aria-hidden="true"></div>
 
+<div class="gate" id="gate">
+  <form class="gate-card" id="gateForm" autocomplete="off">
+    <div class="gate-logo">UII</div>
+    <p>Enter the password to open the parts register.</p>
+    <input class="cell pass" id="gatePass" type="password" inputmode="numeric" aria-label="Password" placeholder="Password">
+    <div class="pass-err" id="gateErr" hidden>Wrong password. Try again.</div>
+    <button class="btn btn-primary gate-btn" type="submit">Open</button>
+  </form>
+</div>
+
 <div class="wrap">
   <header>
     <div>
       <h1>UII</h1>
       <p class="subtitle">Machine Spare Parts Register</p>
     </div>
+    <div class="header-actions">
+    <button class="btn" id="backupBtn" type="button" title="Full backup, restore and daily copies">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z"/><path d="M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+      <span>Backups</span>
+    </button>
     <button class="btn btn-export" id="exportBtn" type="button" title="Download this month as an Excel file">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 5M15 13l-6 5"/></svg>
       <span id="exportLabel">Export to Excel</span>
     </button>
+    </div>
   </header>
+
+  <div class="copy-banner reminder" id="reminder" hidden>
+    <div>
+      <strong id="reminderTitle"></strong>
+      <span>Download a full backup so you keep a copy of everything on your device.</span>
+    </div>
+    <button class="btn btn-primary" id="reminderBtn" type="button">Download full backup</button>
+  </div>
 
   <div class="months-wrap">
     <nav class="months" id="months" aria-label="Monthly sheets"></nav>
@@ -773,6 +820,26 @@
   </section>
 
   <div class="status" id="status" aria-live="polite"></div>
+
+  <div class="confirm" id="backupDlg" hidden role="dialog" aria-modal="true" aria-labelledby="backupTitle">
+    <div class="confirm-card wide">
+      <div class="dlg-head">
+        <strong id="backupTitle">Backups</strong>
+        <button class="btn" id="backupClose" type="button">Close</button>
+      </div>
+      <h4>Full backup on your device</h4>
+      <p class="muted-p">Everything (all months, parts and transactions) in one file. Keep it on your laptop or email it to yourself.</p>
+      <p class="muted-p" id="lastBackup"></p>
+      <div class="dlg-actions">
+        <button class="btn btn-primary" id="fullBackupBtn" type="button">Download full backup</button>
+        <button class="btn" id="restoreFileBtn" type="button">Restore from file…</button>
+        <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+      </div>
+      <h4>Daily copies (last 30 days)</h4>
+      <p class="muted-p">The site saves a copy of everything once a day when you open it. Restoring puts everything back as it was that day; a copy of the current state is saved first.</p>
+      <div class="snap-list" id="snapList"></div>
+    </div>
+  </div>
 
   <div class="confirm" id="unlockDlg" hidden role="dialog" aria-modal="true" aria-labelledby="unlockTitle">
     <form class="confirm-card" id="unlockForm">
@@ -1871,8 +1938,8 @@
   // Unlocking a closed month asks for the code. It only stops edits by
   // accident: anyone who can read the page source could get around it.
   var UNLOCK_HASH = 0x66d60d02;
-  function codeHash(v) {
-    var str = "uii-lock:" + v, h = 0x811c9dc5;
+  function codeHash(v, salt) {
+    var str = (salt || "uii-lock:") + v, h = 0x811c9dc5;
     var bytes = new TextEncoder().encode(str);
     for (var i = 0; i < bytes.length; i++) { h ^= bytes[i]; h = Math.imul(h, 0x01000193) >>> 0; }
     return h >>> 0;
@@ -1880,22 +1947,33 @@
   var unlockDlg = document.getElementById("unlockDlg");
   var unlockPass = document.getElementById("unlockPass");
   var unlockErr = document.getElementById("unlockErr");
-  function closeUnlock() { unlockDlg.hidden = true; unlockPass.value = ""; unlockErr.hidden = true; }
-  document.getElementById("lockBtn").addEventListener("click", function () {
-    if (unlocked[month]) { delete unlocked[month]; renderRows(); return; }
-    document.getElementById("unlockText").textContent = "Enter the code to edit " + monthLabel(month) + ".";
+  var codeCallback = null;
+  function closeUnlock() { unlockDlg.hidden = true; unlockPass.value = ""; unlockErr.hidden = true; codeCallback = null; }
+  // Ask for the code, then run onOk
+  function askCode(text, onOk) {
+    codeCallback = onOk;
+    document.getElementById("unlockTitle").textContent = "Enter the code";
+    document.getElementById("unlockText").textContent = text;
     unlockErr.hidden = true;
     unlockPass.value = "";
     unlockDlg.hidden = false;
     unlockPass.focus();
+  }
+  document.getElementById("lockBtn").addEventListener("click", function () {
+    if (unlocked[month]) { delete unlocked[month]; renderRows(); return; }
+    askCode("Enter the code to edit " + monthLabel(month) + ".", function () {
+      unlocked[month] = true;
+      renderRows();
+      setStatus(monthLabel(month) + " unlocked", "saved");
+    });
+    document.getElementById("unlockTitle").textContent = "Unlock month";
   });
   document.getElementById("unlockForm").addEventListener("submit", function (e) {
     e.preventDefault();
     if (codeHash(unlockPass.value.trim()) === UNLOCK_HASH) {
-      unlocked[month] = true;
+      var cb = codeCallback;
       closeUnlock();
-      renderRows();
-      setStatus(monthLabel(month) + " unlocked", "saved");
+      if (cb) cb();
       return;
     }
     unlockErr.hidden = false;
@@ -2304,34 +2382,7 @@
   function exportFilename() { return "UII-" + monthLabel(month).replace(" ", "-") + ".xlsx"; }
   exportBtn.addEventListener("click", function () {
     flushWrites();
-    var bytes = buildWorkbook();
-    var filename = exportFilename();
-    var useHost = window.claude && typeof window.claude.use === "function";
-    if (!useHost) {
-      // standalone file: an ordinary browser download
-      var url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-      setStatus("Downloaded " + filename, "saved");
-      return;
-    }
-    exportBtn.disabled = true;
-    window.claude.use("downloads").then(function (dl) {
-      if (!dl) { setStatus("Excel export isn't available in this view.", "error"); return; }
-      return dl.save({ filename: filename, data: bytes }).then(function () {
-        setStatus("Downloaded " + filename, "saved");
-      }, function (e) {
-        var code = e && e.code;
-        if (code === "declined") setStatus("");
-        else if (code === "rate_limited") setStatus("A download is already waiting for your answer.", "error");
-        else setStatus("Couldn't create the Excel file. Try again.", "error");
-      });
-    }).then(function () { exportBtn.disabled = false; }, function () { exportBtn.disabled = false; });
+    saveFile(exportFilename(), buildWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export");
   });
   function updateExportLabel() {
     exportBtn.title = "Download " + monthLabel(month) + " as an Excel file";
@@ -2359,6 +2410,269 @@
   document.addEventListener("mouseenter", function () { glow.style.opacity = "1"; });
   paint();
 
+
+  // ---- Password screen: asked once per browser tab ----
+  // It keeps people who pick up the laptop out; the data itself is only as
+  // private as the Claude account and the page link.
+  var OPEN_HASH = 0xc5140063;
+  var gateEl = document.getElementById("gate");
+  var OPEN_KEY = "uii-open-ok";
+  var opened = false;
+  try { opened = sessionStorage.getItem(OPEN_KEY) === "1"; } catch (e) {}
+  if (opened) gateEl.hidden = true; else { document.body.classList.add("gated"); setTimeout(function () { document.getElementById("gatePass").focus(); }, 0); }
+  document.getElementById("gateForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var inp = document.getElementById("gatePass");
+    if (codeHash(inp.value.trim(), "uii-open:") === OPEN_HASH) {
+      try { sessionStorage.setItem(OPEN_KEY, "1"); } catch (err) {}
+      gateEl.hidden = true;
+      document.body.classList.remove("gated");
+      inp.value = "";
+      return;
+    }
+    document.getElementById("gateErr").hidden = false;
+    inp.value = "";
+    var card = gateEl.querySelector(".gate-card");
+    card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake");
+    inp.focus();
+  });
+
+  // ---- Saving a file to the viewer's device ----
+  function saveFile(filename, data, mime, btn, what) {
+    var useHost = window.claude && typeof window.claude.use === "function";
+    if (!useHost) {
+      var url = URL.createObjectURL(new Blob([data], { type: mime }));
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      setStatus("Downloaded " + filename, "saved");
+      return Promise.resolve(true);
+    }
+    if (btn) btn.disabled = true;
+    return window.claude.use("downloads").then(function (dl) {
+      if (!dl) { setStatus(what + " isn't available in this view.", "error"); return false; }
+      return dl.save({ filename: filename, data: data }).then(function () {
+        setStatus("Downloaded " + filename, "saved");
+        return true;
+      }, function (e) {
+        var code = e && e.code;
+        if (code === "declined") setStatus("");
+        else if (code === "rate_limited") setStatus("A download is already waiting for your answer.", "error");
+        else setStatus("Couldn't create the file. Try again.", "error");
+        return false;
+      });
+    }).then(function (ok) { if (btn) btn.disabled = false; return ok; }, function () { if (btn) btn.disabled = false; return false; });
+  }
+
+  // ---- Everything in one object (backup, restore, daily copies) ----
+  function serializeAll() {
+    var parts = [], txs = [];
+    Object.keys(allParts).forEach(function (k) {
+      MACHINES.forEach(function (m) { allParts[k][m].forEach(function (r) { var b = rowBody(r); b.id = r.id; parts.push(b); }); });
+    });
+    Object.keys(allTx).forEach(function (k) { allTx[k].forEach(function (t) { var b = txBody(t); b.id = t.id; txs.push(b); }); });
+    return { app: "UII parts", version: 1, savedAt: Date.now(), parts: parts, transactions: txs };
+  }
+  function hasAnyData() {
+    return Object.keys(allParts).some(function (k) { return MACHINES.some(function (m) { return allParts[k][m].length; }); });
+  }
+  // Replace everything with a saved copy
+  function applyAll(snap) {
+    var keepP = {}, keepT = {};
+    snap.parts.forEach(function (p) { keepP[p.id] = 1; });
+    snap.transactions.forEach(function (t) { keepT[t.id] = 1; });
+    var curP = [], curT = [];
+    Object.keys(allParts).forEach(function (k) { MACHINES.forEach(function (m) { allParts[k][m].forEach(function (r) { curP.push(r.id); }); }); });
+    Object.keys(allTx).forEach(function (k) { allTx[k].forEach(function (t) { curT.push(t.id); }); });
+    // rebuild local state
+    allParts = {}; allTx = {};
+    snap.parts.forEach(function (r) {
+      if (MACHINES.indexOf(r.machine) === -1) return;
+      var row = clean(r, r.machine);
+      if (!allParts[row.month]) allParts[row.month] = emptyData();
+      allParts[row.month][row.machine].push(row);
+    });
+    Object.keys(allParts).forEach(function (k) { MACHINES.forEach(function (m) { allParts[k][m].sort(function (a, b) { return a.created - b.created; }); }); });
+    snap.transactions.forEach(function (t) { var tx = cleanTx(t); (allTx[tx.month] = allTx[tx.month] || []).push(tx); });
+    Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
+    openSheet();
+    if (!db) { saveLocal(); }
+    else {
+      curP.forEach(function (id) { if (!keepP[id]) deleteDoc("parts", id); });
+      curT.forEach(function (id) { if (!keepT[id]) deleteDoc("transactions", id); });
+      snap.parts.forEach(function (r) { var b = Object.assign({}, r); delete b.id; saveDoc("parts", r.id, b); });
+      snap.transactions.forEach(function (t) { var b = Object.assign({}, t); delete b.id; saveDoc("transactions", t.id, b); });
+    }
+    renderMonths(); renderTabs(); renderRows();
+  }
+
+  // ---- Daily copies inside the site (last 30 days) ----
+  // meta in "snapshots/<key>", data split over "snapshotChunks/<key>-<n>"
+  var SNAP_KEY = "uii-snapshots-v1";
+  var CHUNK = 200000;
+  function localSnaps() { try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || {}; } catch (e) { return {}; } }
+  function listSnapshots() {
+    if (!db) {
+      var all = localSnaps();
+      return Promise.resolve(Object.keys(all).map(function (k) { return all[k].meta; }));
+    }
+    return db.collection("snapshots").get().then(function (q) { return q.docs.map(function (d) { var v = d.data() || {}; v.key = d.id; return v; }); });
+  }
+  function takeSnapshot(key, kind) {
+    var data = JSON.stringify(serializeAll());
+    var meta = { key: key, kind: kind, at: Date.now(), parts: serializeAll().parts.length, transactions: serializeAll().transactions.length };
+    if (!db) {
+      var all = localSnaps();
+      all[key] = { meta: meta, data: data };
+      try { localStorage.setItem(SNAP_KEY, JSON.stringify(all)); } catch (e) { return Promise.resolve(false); }
+      return Promise.resolve(true);
+    }
+    var chunks = [];
+    for (var i = 0; i < data.length; i += CHUNK) chunks.push(data.slice(i, i + CHUNK));
+    meta.chunks = chunks.length;
+    var p = Promise.resolve();
+    chunks.forEach(function (c, i) { p = p.then(function () { return db.collection("snapshotChunks").doc(key + "-" + i).set({ data: c }); }); });
+    return p.then(function () { return db.collection("snapshots").doc(key).set(meta); }).then(function () { return true; });
+  }
+  function readSnapshot(meta) {
+    if (!db) { var s = localSnaps()[meta.key]; return Promise.resolve(s ? JSON.parse(s.data) : null); }
+    var parts = [], p = Promise.resolve();
+    for (var i = 0; i < (meta.chunks || 0); i++) (function (i) {
+      p = p.then(function () { return db.collection("snapshotChunks").doc(meta.key + "-" + i).get().then(function (d) { parts[i] = d.exists ? (d.data() || {}).data : ""; }); });
+    })(i);
+    return p.then(function () { return JSON.parse(parts.join("")); });
+  }
+  function dropSnapshot(meta) {
+    if (!db) { var all = localSnaps(); delete all[meta.key]; try { localStorage.setItem(SNAP_KEY, JSON.stringify(all)); } catch (e) {} return Promise.resolve(); }
+    var p = db.collection("snapshots").doc(meta.key).delete();
+    for (var i = 0; i < (meta.chunks || 0); i++) (function (i) { p = p.then(function () { return db.collection("snapshotChunks").doc(meta.key + "-" + i).delete(); }); })(i);
+    return p;
+  }
+  function pruneSnapshots(list) {
+    var daily = list.filter(function (m) { return m.kind === "daily"; }).sort(function (a, b) { return a.key < b.key ? 1 : -1; });
+    var pre = list.filter(function (m) { return m.kind === "pre"; }).sort(function (a, b) { return b.at - a.at; });
+    var drop = daily.slice(30).concat(pre.slice(3));
+    return drop.reduce(function (p, m) { return p.then(function () { return dropSnapshot(m); }); }, Promise.resolve());
+  }
+  var dailyDone = false;
+  // Once per page load: today's copy is how things stood when the site was first opened that day
+  function maybeDailySnapshot() {
+    if (dailyDone) return;
+    dailyDone = true;
+    if (readOnly || !hasAnyData()) return;
+    var key = ymd(Date.now());
+    listSnapshots().then(function (list) {
+      if (list.some(function (m) { return m.key === key; })) return pruneSnapshots(list);
+      return takeSnapshot(key, "daily").then(function () { return listSnapshots(); }).then(pruneSnapshots);
+    }).catch(function () {});
+  }
+
+  // ---- Last full backup + end-of-month reminder ----
+  var BK_KEY = "uii-last-backup";
+  var lastBackupAt = 0;
+  try { lastBackupAt = Number(localStorage.getItem(BK_KEY)) || 0; } catch (e) {}
+  function loadLastBackup() {
+    if (!db) { updateReminder(); return; }
+    db.doc("meta/backup").get().then(function (d) {
+      var v = d.exists ? d.data() || {} : {};
+      lastBackupAt = Math.max(lastBackupAt, Number(v.at) || 0);
+      updateReminder();
+    }, function () { updateReminder(); });
+  }
+  function recordBackup() {
+    lastBackupAt = Date.now();
+    try { localStorage.setItem(BK_KEY, String(lastBackupAt)); } catch (e) {}
+    if (db) db.doc("meta/backup").set({ at: lastBackupAt }).catch(function () {});
+    updateReminder();
+  }
+  // Shows on the last 3 days of the month until a full backup is downloaded in that window
+  function updateReminder() {
+    var el = document.getElementById("reminder");
+    var now = new Date();
+    var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    var daysLeft = lastDay - now.getDate();
+    var windowStart = new Date(now.getFullYear(), now.getMonth(), lastDay - 2).getTime();
+    var show = daysLeft <= 2 && lastBackupAt < windowStart && !readOnly;
+    el.hidden = !show;
+    if (!show) return;
+    var mName = MONTH_NAMES[now.getMonth()];
+    document.getElementById("reminderTitle").textContent = daysLeft === 0
+      ? "🔔 Today is the last day of " + mName + "."
+      : "🔔 " + mName + " ends in " + daysLeft + (daysLeft === 1 ? " day." : " days.");
+  }
+  function downloadFullBackup(btn) {
+    flushWrites();
+    var json = JSON.stringify(serializeAll(), null, 1);
+    var name = "UII-full-backup-" + ymd(Date.now()) + ".json";
+    return saveFile(name, json, "application/json", btn, "Backup").then(function (ok) { if (ok) recordBackup(); renderBackupDlg(); });
+  }
+  document.getElementById("reminderBtn").addEventListener("click", function () { downloadFullBackup(this); });
+
+  // ---- Backups dialog ----
+  var backupDlg = document.getElementById("backupDlg");
+  function fmtDay(key) {
+    var d = new Date(key.slice(0, 4), parseInt(key.slice(5, 7), 10) - 1, parseInt(key.slice(8, 10), 10));
+    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  }
+  function renderBackupDlg() {
+    document.getElementById("lastBackup").textContent = lastBackupAt
+      ? "Last full backup: " + fmtTime(lastBackupAt).replace("  ", " at ")
+      : "No full backup downloaded yet.";
+    var listEl = document.getElementById("snapList");
+    listEl.innerHTML = '<div class="snap-empty">Loading…</div>';
+    listSnapshots().then(function (list) {
+      list.sort(function (a, b) { return b.at - a.at; });
+      listEl.innerHTML = "";
+      if (!list.length) { listEl.innerHTML = '<div class="snap-empty">No daily copies yet. The first one is made today once there is data.</div>'; return; }
+      list.forEach(function (m) {
+        var row = document.createElement("div");
+        row.className = "snap";
+        var info = document.createElement("div");
+        info.textContent = m.kind === "pre" ? "Before a restore" : fmtDay(m.key);
+        var sm = document.createElement("small");
+        sm.textContent = "Saved " + fmtTime(m.at).replace("  ", " at ") + " · " + m.parts + (m.parts === 1 ? " part, " : " parts, ") + m.transactions + (m.transactions === 1 ? " transaction" : " transactions");
+        info.appendChild(sm);
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "btn"; b.textContent = "Restore";
+        b.addEventListener("click", function () {
+          askCode("Restore " + (m.kind === "pre" ? "the copy from before the last restore" : "the copy from " + fmtDay(m.key)) + "? Everything goes back to how it was then.", function () {
+            readSnapshot(m).then(function (snap) { restoreFrom(snap, "the copy from " + (m.kind === "pre" ? "before the last restore" : fmtDay(m.key))); });
+          });
+        });
+        row.appendChild(info); row.appendChild(b);
+        listEl.appendChild(row);
+      });
+    }, function () { listEl.innerHTML = '<div class="snap-empty">Couldn’t load the daily copies.</div>'; });
+  }
+  function restoreFrom(snap, label) {
+    if (!snap || !Array.isArray(snap.parts) || !Array.isArray(snap.transactions)) { setStatus("That backup can't be read.", "error"); return; }
+    flushWrites();
+    takeSnapshot("pre-" + Date.now(), "pre").then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
+      applyAll(snap);
+      backupDlg.hidden = true;
+      setStatus("Restored " + label, "saved");
+    });
+  }
+  document.getElementById("backupBtn").addEventListener("click", function () { backupDlg.hidden = false; renderBackupDlg(); });
+  document.getElementById("backupClose").addEventListener("click", function () { backupDlg.hidden = true; });
+  backupDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") backupDlg.hidden = true; });
+  document.getElementById("fullBackupBtn").addEventListener("click", function () { downloadFullBackup(this); });
+  document.getElementById("restoreFileBtn").addEventListener("click", function () { document.getElementById("restoreFile").click(); });
+  document.getElementById("restoreFile").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var snap;
+      try { snap = JSON.parse(reader.result); } catch (e) { setStatus("That file isn't a UII backup.", "error"); return; }
+      if (!snap || snap.app !== "UII parts") { setStatus("That file isn't a UII backup.", "error"); return; }
+      askCode("Restore everything from " + f.name + "? All months go back to how they are in that file.", function () { restoreFrom(snap, f.name); });
+    };
+    reader.readAsText(f);
+  });
+
   // ---- Boot ----
   try {
     var savedTab = localStorage.getItem(TAB_KEY);
@@ -2373,6 +2687,7 @@
   renderMonths();
   renderTabs();
   renderRows();
+  if (!useClaude) { maybeDailySnapshot(); updateReminder(); }
 
   if (useClaude) {
     setStatus("Loading…");
@@ -2383,14 +2698,20 @@
         renderMonths();
         renderTabs();
         renderRows();
+        maybeDailySnapshot();
+        updateReminder();
         setStatus("Saving in this browser only.", "");
         return;
       }
       db = store;
       setStatus("");
       var lost = function () { setStatus("Lost connection to saved data. Reload the page.", "error"); };
-      db.collection("parts").onSnapshot(applyParts, lost);
-      db.collection("transactions").onSnapshot(applyTx, lost);
+      // the daily copy waits until both lists have loaded once
+      var gotParts = false, gotTx = false;
+      function ready() { if (gotParts && gotTx) maybeDailySnapshot(); }
+      db.collection("parts").onSnapshot(function (snap) { applyParts(snap); if (!snap.metadata || !snap.metadata.fromCache) { gotParts = true; ready(); } }, lost);
+      db.collection("transactions").onSnapshot(function (snap) { applyTx(snap); if (!snap.metadata || !snap.metadata.fromCache) { gotTx = true; ready(); } }, lost);
+      loadLastBackup();
     });
   }
 })();
