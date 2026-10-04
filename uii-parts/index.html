@@ -163,6 +163,23 @@
   .month[aria-current="true"] { color: #06101f; background: var(--accent); border-color: var(--accent); }
   .month .dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; vertical-align: middle; }
 
+  /* Copy parts into an empty month */
+  .copy-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    margin-bottom: 12px;
+    padding: 14px 16px;
+    border: 1px dashed rgba(91,157,255,0.45);
+    border-radius: var(--radius);
+    background: rgba(91,157,255,0.07);
+  }
+  .copy-banner strong { display: block; font-size: 15px; }
+  .copy-banner span { color: var(--muted); font-size: 13px; }
+  .copy-banner[hidden], body.readonly .copy-banner { display: none; }
+
   /* Tabs */
   .tabs {
     display: flex;
@@ -491,6 +508,14 @@
 
   <div class="months-wrap">
     <nav class="months" id="months" aria-label="Monthly sheets"></nav>
+  </div>
+
+  <div class="copy-banner" id="copyBanner" hidden>
+    <div>
+      <strong id="copyTitle"></strong>
+      <span id="copyText"></span>
+    </div>
+    <button class="btn btn-primary" id="copyBtn" type="button"></button>
   </div>
 
   <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
@@ -933,8 +958,52 @@
     return m === TX ? txList.length : data[m].length;
   }
 
+  // The nearest earlier month that has parts, for filling an empty month
+  function copySource() {
+    for (var i = MONTHS.indexOf(month) - 1; i >= 0; i--) {
+      var p = allParts[MONTHS[i]];
+      if (p && MACHINES.some(function (m) { return p[m].some(hasContent); })) return MONTHS[i];
+    }
+    return null;
+  }
+  function hasContent(r) { return (r.name + r.reference + r.quantity).trim() !== ""; }
+  function monthIsEmpty() {
+    return !MACHINES.some(function (m) { return data[m].length; }) && !txList.length;
+  }
+  var copyBanner = document.getElementById("copyBanner");
+  function updateCopyBanner() {
+    var src = monthIsEmpty() ? copySource() : null;
+    copyBanner.hidden = !src || readOnly;
+    if (!src) return;
+    var n = 0;
+    MACHINES.forEach(function (m) { n += allParts[src][m].filter(hasContent).length; });
+    document.getElementById("copyTitle").textContent = monthLabel(month) + " is empty";
+    document.getElementById("copyText").textContent = "Start it with the " + n + (n === 1 ? " part" : " parts") + " from " + monthLabel(src) + " and their last quantities. No transactions are recorded.";
+    document.getElementById("copyBtn").textContent = "Copy from " + monthLabel(src);
+    copyBanner.setAttribute("data-src", src);
+  }
+  document.getElementById("copyBtn").addEventListener("click", function () {
+    var src = copyBanner.getAttribute("data-src");
+    if (readOnly || !src || !allParts[src] || !monthIsEmpty()) return;
+    flushWrites();
+    var t = Date.now();
+    MACHINES.forEach(function (m) {
+      allParts[src][m].filter(hasContent).forEach(function (r) {
+        // the copied quantity is this month's starting stock, so it is already "logged"
+        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity,
+          loggedQty: r.quantity, date: "", baseline: false, arrival: false, created: t++ }, m);
+        data[m].push(row);
+        writeRow(row);
+      });
+    });
+    renderTabs();
+    renderRows();
+    setStatus("Copied from " + monthLabel(src), "saved");
+  });
+
   function updateCounts() {
     renderMonths();
+    updateCopyBanner();
     TABS.forEach(function (m) {
       var c = document.querySelector("#tab-" + m + " .count");
       if (c) c.textContent = tabCount(m);
