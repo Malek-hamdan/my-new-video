@@ -326,6 +326,26 @@
   .tab.tx { color: #b9c6dc; }
   .tab-sep { flex: 0 0 1px; align-self: stretch; margin: 6px 2px; background: var(--border-strong); }
   body.tx-view .add-group, body.tx-view .panel-foot { display: none; }
+  .tx-filter { display: none; flex-wrap: wrap; gap: 6px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  body.tx-view .tx-filter { display: flex; }
+  .tx-filter button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .tx-filter button:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .tx-filter button[aria-pressed="true"] { color: var(--text); background: var(--accent-soft); border-color: rgba(91,157,255,0.5); }
+  .tx-filter .count { min-width: 18px; padding: 0 6px; border-radius: 999px; background: rgba(255,255,255,0.07); font-size: 11px; text-align: center; }
 
   tbody tr { transition: background 0.15s ease; }
   tbody tr + tr td { border-top: 1px solid var(--border); }
@@ -537,6 +557,8 @@
         </button>
       </div>
     </div>
+
+    <div class="tx-filter" id="txFilter" role="group" aria-label="Show transactions for"></div>
 
     <table>
       <thead id="thead">
@@ -1066,12 +1088,37 @@
     return del;
   }
 
+  // "All" or one machine; remembered per browser
+  var TXF_KEY = "uii-spare-parts-tx-filter";
+  var txFilter = "All";
+  try { var savedF = localStorage.getItem(TXF_KEY); if (savedF === "All" || MACHINES.indexOf(savedF) !== -1) txFilter = savedF; } catch (e) {}
+  var txFilterEl = document.getElementById("txFilter");
+  function renderTxFilter() {
+    txFilterEl.innerHTML = "";
+    ["All"].concat(MACHINES).forEach(function (f) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-pressed", f === txFilter ? "true" : "false");
+      b.innerHTML = '<span></span><span class="count"></span>';
+      b.firstChild.textContent = f;
+      b.lastChild.textContent = f === "All" ? txList.length : txList.filter(function (t) { return t.machine === f; }).length;
+      b.addEventListener("click", function () {
+        txFilter = f;
+        try { localStorage.setItem(TXF_KEY, f); } catch (e) {}
+        renderTransactions();
+      });
+      txFilterEl.appendChild(b);
+    });
+  }
+
   function renderTransactions() {
     document.getElementById("thead").innerHTML = TX_HEAD;
-    titleEl.textContent = TX;
+    titleEl.textContent = txFilter === "All" ? TX : txFilter + " " + TX;
+    renderTxFilter();
     rowsEl.innerHTML = "";
     var inSum = 0, outSum = 0;
-    txList.forEach(function (t, i) {
+    var shown = txFilter === "All" ? txList : txList.filter(function (t) { return t.machine === txFilter; });
+    shown.forEach(function (t, i) {
       // show the part's current name and reference while it still exists
       var part = findRow(t.partId);
       var name = part && part.name ? part.name : t.name;
@@ -1105,9 +1152,9 @@
       tr.appendChild(act);
       rowsEl.appendChild(tr);
     });
-    var n = txList.length;
+    var n = shown.length;
     metaEl.textContent = monthLabel(month) + " \u00B7 " + n + (n === 1 ? " entry" : " entries") + " · " + inSum + " in · " + outSum + " out";
-    emptyEl.querySelector("strong").textContent = "No transactions yet";
+    emptyEl.querySelector("strong").textContent = txFilter === "All" ? "No transactions yet" : "No " + txFilter + " transactions yet";
     emptyEl.querySelector("span").textContent = "Set or change a part’s quantity on a machine tab and the difference is recorded here.";
     emptyEl.hidden = n !== 0;
     updateCounts();
