@@ -21,6 +21,7 @@
     --radius: 14px;
     --mx: 50vw;
     --my: 30vh;
+    color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
@@ -255,6 +256,19 @@
     outline: none;
   }
   .del svg { width: 16px; height: 16px; }
+  .del.armed {
+    width: auto;
+    padding: 0 10px;
+    opacity: 1;
+    color: var(--danger);
+    background: var(--danger-soft);
+    border-color: rgba(255,107,107,0.45);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  body.readonly #addTop, body.readonly .panel-foot, body.readonly .del { display: none; }
 
   .empty {
     padding: 48px 18px;
@@ -385,6 +399,7 @@
   <div class="status" id="status" aria-live="polite"></div>
 </div>
 
+
 <script>
 (function () {
   "use strict";
@@ -392,56 +407,36 @@
   var MACHINES = ["BLM", "BCW3", "Bonal", "Sollas"];
   var STORAGE_KEY = "uii-spare-parts-v1";
   var TAB_KEY = "uii-spare-parts-active-tab";
+  var FIELDS = ["name", "reference", "price"];
 
-  // ---- Storage ----
+  // data[machine] = [{id, name, reference, price, created}]
+  var data = emptyData();
+  var active = MACHINES[0];
+  var db = null;          // shared store when running as a published artifact
+  var readOnly = false;
+
   function emptyData() {
     var d = {};
     MACHINES.forEach(function (m) { d[m] = []; });
     return d;
   }
 
-  function load() {
-    var data = emptyData();
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        MACHINES.forEach(function (m) {
-          if (Array.isArray(parsed[m])) {
-            data[m] = parsed[m].map(function (r) {
-              return {
-                id: r.id || uid(),
-                name: String(r.name || ""),
-                reference: String(r.reference || ""),
-                price: String(r.price || "")
-              };
-            });
-          }
-        });
-      }
-    } catch (e) {
-      setStatus("Could not read saved data from this browser.", "error");
-    }
-    return data;
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
-  var saveTimer = null;
-  function save() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      setStatus("Saved", "saved");
-    } catch (e) {
-      setStatus("Saving failed — this browser is blocking local storage.", "error");
-    }
+  function clean(r, machine) {
+    return {
+      id: String(r.id),
+      machine: machine,
+      name: String(r.name || ""),
+      reference: String(r.reference || ""),
+      price: String(r.price || ""),
+      created: Number(r.created) || 0
+    };
   }
-  function scheduleSave() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 250);
-  }
-  window.addEventListener("beforeunload", function () {
-    if (saveTimer) { clearTimeout(saveTimer); save(); }
-  });
 
+  // ---- Status line ----
   var statusEl = document.getElementById("status");
   var statusTimer = null;
   function setStatus(msg, kind) {
@@ -453,17 +448,90 @@
     }
   }
 
-  function uid() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  // ---- Local storage (used when the shared store is unavailable) ----
+  function loadLocal() {
+    var d = emptyData();
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        MACHINES.forEach(function (m) {
+          if (Array.isArray(parsed[m])) {
+            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, price: r.price, created: r.created }, m); });
+          }
+        });
+      }
+    } catch (e) {}
+    return d;
+  }
+  function saveLocal() {
+    try {
+      var out = {};
+      MACHINES.forEach(function (m) {
+        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, price: r.price, created: r.created }; });
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
+      setStatus("Saved", "saved");
+    } catch (e) {
+      setStatus("Not saved: this browser is blocking storage.", "error");
+    }
   }
 
-  // ---- State ----
-  var data = load();
-  var active = MACHINES[0];
-  try {
-    var savedTab = localStorage.getItem(TAB_KEY);
-    if (MACHINES.indexOf(savedTab) !== -1) active = savedTab;
-  } catch (e) {}
+  // ---- Shared store writes: one at a time per row ----
+  var queues = {};
+  function enqueue(id, fn) {
+    var prev = queues[id] || Promise.resolve();
+    var next = prev.then(fn, fn);
+    queues[id] = next.catch(function () {});
+    return next;
+  }
+  function onWriteError(e) {
+    var code = e && e.code;
+    if (code === "invalid_argument" || code === "not_granted" || code === "revoked") {
+      readOnly = true;
+      document.body.classList.add("readonly");
+      setStatus("You can view this list but not edit it.", "error");
+    } else if (code === "quota_exceeded") {
+      setStatus("Storage is full. Delete unused rows to add more.", "error");
+    } else {
+      setStatus("Not saved. Check your connection and try again.", "error");
+    }
+  }
+  function writeRow(row) {
+    if (!db) { saveLocal(); return; }
+    var body = { machine: row.machine, name: row.name, reference: row.reference, price: row.price, created: row.created };
+    enqueue(row.id, function () { return db.collection("parts").doc(row.id).set(body); })
+      .then(function () { setStatus("Saved", "saved"); }, onWriteError);
+  }
+  function removeRow(row) {
+    if (!db) { saveLocal(); return; }
+    enqueue(row.id, function () { return db.collection("parts").doc(row.id).delete(); })
+      .then(function () { setStatus("Deleted", "saved"); }, onWriteError);
+  }
+
+  var editTimers = {};
+  function scheduleWrite(row) {
+    clearTimeout(editTimers[row.id]);
+    editTimers[row.id] = setTimeout(function () { delete editTimers[row.id]; writeRow(row); }, 400);
+  }
+  function flushWrites() {
+    Object.keys(editTimers).forEach(function (id) {
+      clearTimeout(editTimers[id]);
+      delete editTimers[id];
+      var row = findRow(id);
+      if (row) writeRow(row);
+    });
+  }
+  window.addEventListener("pagehide", flushWrites);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) flushWrites(); });
+
+  function findRow(id) {
+    for (var i = 0; i < MACHINES.length; i++) {
+      var list = data[MACHINES[i]];
+      for (var j = 0; j < list.length; j++) if (list[j].id === id) return list[j];
+    }
+    return null;
+  }
 
   // ---- DOM ----
   var tabsEl = document.getElementById("tabs");
@@ -521,24 +589,36 @@
     emptyEl.hidden = n !== 0;
   }
 
-  function makeCell(row, field, label, placeholder) {
+  function makeCell(row, field, label) {
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var input = document.createElement("input");
     input.className = "cell" + (field === "price" ? " price" : "");
     input.type = "text";
+    input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
-    input.placeholder = placeholder;
+    input.placeholder = label;
     input.setAttribute("aria-label", label);
+    input.setAttribute("data-field", field);
     input.autocomplete = "off";
     input.spellcheck = false;
+    input.readOnly = readOnly;
     if (field === "price") input.inputMode = "decimal";
     input.addEventListener("input", function () {
       row[field] = input.value;
-      scheduleSave();
+      scheduleWrite(row);
     });
     td.appendChild(input);
     return td;
+  }
+
+  function disarmAll(except) {
+    rowsEl.querySelectorAll(".del.armed").forEach(function (b) {
+      if (b === except) return;
+      b.classList.remove("armed");
+      b.innerHTML = TRASH;
+      b.setAttribute("aria-label", b.getAttribute("data-label"));
+    });
   }
 
   function renderRows(focusId) {
@@ -547,15 +627,16 @@
     rowsEl.innerHTML = "";
     data[active].forEach(function (row, i) {
       var tr = document.createElement("tr");
+      tr.setAttribute("data-id", row.id);
 
       var num = document.createElement("td");
       num.className = "col-num";
       num.textContent = i + 1;
       tr.appendChild(num);
 
-      tr.appendChild(makeCell(row, "name", "Name", "Name"));
-      tr.appendChild(makeCell(row, "reference", "Reference", "Reference"));
-      tr.appendChild(makeCell(row, "price", "Price", "Price"));
+      tr.appendChild(makeCell(row, "name", "Name"));
+      tr.appendChild(makeCell(row, "reference", "Reference"));
+      tr.appendChild(makeCell(row, "price", "Price"));
 
       var act = document.createElement("td");
       act.className = "col-act";
@@ -563,9 +644,21 @@
       del.type = "button";
       del.className = "del";
       del.title = "Delete row";
+      del.setAttribute("data-label", "Delete row " + (i + 1));
       del.setAttribute("aria-label", "Delete row " + (i + 1));
       del.innerHTML = TRASH;
-      del.addEventListener("click", function () { deleteRow(row.id); });
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var hasContent = (row.name + row.reference + row.price).trim() !== "";
+        if (hasContent && !del.classList.contains("armed")) {
+          disarmAll(del);
+          del.classList.add("armed");
+          del.textContent = "Delete?";
+          del.setAttribute("aria-label", "Confirm delete row " + (i + 1));
+          return;
+        }
+        deleteRow(row.id);
+      });
       act.appendChild(del);
       tr.appendChild(act);
 
@@ -582,32 +675,33 @@
     updateCounts();
   }
 
+  document.addEventListener("click", function () { disarmAll(null); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") disarmAll(null); });
+
   function addRow() {
-    var row = { id: uid(), name: "", reference: "", price: "" };
+    if (readOnly) return;
+    var row = clean({ id: uid(), created: Date.now() }, active);
     data[active].push(row);
-    save();
+    writeRow(row);
     renderRows(row.id);
   }
 
   function deleteRow(id) {
     var list = data[active];
     var idx = list.findIndex(function (r) { return r.id === id; });
-    if (idx === -1) return;
-    var r = list[idx];
-    var hasContent = (r.name + r.reference + r.price).trim() !== "";
-    if (hasContent) {
-      var label = r.name.trim() || r.reference.trim() || ("row " + (idx + 1));
-      if (!confirm("Delete “" + label + "” from " + active + "?")) return;
-    }
+    if (idx === -1 || readOnly) return;
+    var row = list[idx];
+    clearTimeout(editTimers[id]);
+    delete editTimers[id];
     list.splice(idx, 1);
-    save();
+    removeRow(row);
     renderRows();
   }
 
   document.getElementById("addTop").addEventListener("click", addRow);
   document.getElementById("addBottom").addEventListener("click", addRow);
 
-  // Enter in the last field of a row jumps to the next row's first field
+  // Enter moves to the next field
   rowsEl.addEventListener("keydown", function (e) {
     if (e.key !== "Enter" || !e.target.classList.contains("cell")) return;
     e.preventDefault();
@@ -615,6 +709,44 @@
     var next = cells[cells.indexOf(e.target) + 1];
     if (next) next.focus(); else e.target.blur();
   });
+
+  // ---- Apply a snapshot from the shared store without disturbing typing ----
+  function applySnapshot(snap) {
+    var next = emptyData();
+    snap.docs.forEach(function (d) {
+      var v = d.data() || {};
+      if (MACHINES.indexOf(v.machine) === -1) return;
+      var row = clean({ id: d.id, name: v.name, reference: v.reference, price: v.price, created: v.created }, v.machine);
+      // keep local text for rows with an edit still waiting to be sent
+      var local = editTimers[d.id] && findRow(d.id);
+      next[v.machine].push(local || row);
+    });
+    MACHINES.forEach(function (m) { next[m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
+
+    var before = data[active].map(function (r) { return r.id; }).join(",");
+    var after = next[active].map(function (r) { return r.id; }).join(",");
+    data = next;
+
+    if (before !== after) {
+      var focused = document.activeElement;
+      var keep = focused && focused.id && focused.classList.contains("cell") ? focused.id : null;
+      renderRows();
+      if (keep) { var el = document.getElementById(keep); if (el) el.focus(); }
+    } else {
+      // same rows: refresh values in place, leave the field being typed in alone
+      data[active].forEach(function (row) {
+        FIELDS.forEach(function (f) {
+          var el = document.getElementById("f-" + row.id + "-" + f);
+          if (el && el !== document.activeElement && el.value !== row[f]) el.value = row[f];
+        });
+      });
+      updateCounts();
+    }
+    MACHINES.forEach(function (m) {
+      var c = document.querySelector("#tab-" + m + " .count");
+      if (c) c.textContent = data[m].length;
+    });
+  }
 
   // ---- Glow follows pointer (rAF-throttled) ----
   var glow = document.getElementById("glow");
@@ -637,8 +769,35 @@
   document.addEventListener("mouseenter", function () { glow.style.opacity = "1"; });
   paint();
 
+  // ---- Boot ----
+  try {
+    var savedTab = localStorage.getItem(TAB_KEY);
+    if (MACHINES.indexOf(savedTab) !== -1) active = savedTab;
+  } catch (e) {}
+
+  var useClaude = window.claude && typeof window.claude.use === "function";
+  if (!useClaude) data = loadLocal();
   renderTabs();
   renderRows();
+
+  if (useClaude) {
+    setStatus("Loading…");
+    window.claude.use("db").then(function (store) {
+      if (!store) {
+        // No shared store in this view: keep entries in this browser
+        data = loadLocal();
+        renderTabs();
+        renderRows();
+        setStatus("Saving in this browser only.", "");
+        return;
+      }
+      db = store;
+      setStatus("");
+      db.collection("parts").onSnapshot(applySnapshot, function () {
+        setStatus("Lost connection to saved data. Reload the page.", "error");
+      });
+    });
+  }
 })();
 </script>
 </body>
