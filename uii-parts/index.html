@@ -8,7 +8,7 @@
 <style>
   :root {
     --bg: #0b0d12;
-    --surface: rgba(20, 24, 33, 0.86);
+    --surface: #141821;
     --surface-2: rgba(28, 33, 45, 0.9);
     --border: rgba(255, 255, 255, 0.08);
     --border-strong: rgba(255, 255, 255, 0.16);
@@ -49,6 +49,8 @@
       radial-gradient(520px circle at var(--mx) var(--my), rgba(91, 157, 255, 0.10), transparent 60%),
       radial-gradient(180px circle at var(--mx) var(--my), rgba(140, 190, 255, 0.07), transparent 70%);
     transition: opacity 0.4s ease;
+    will-change: background;
+    contain: strict;
   }
 
   .grid-bg {
@@ -353,8 +355,6 @@
     border-radius: var(--radius);
     overflow-x: auto;
     scrollbar-width: none;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
   }
   .tabs::-webkit-scrollbar { display: none; }
 
@@ -398,8 +398,6 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     overflow: hidden;
   }
 
@@ -441,7 +439,7 @@
   .btn svg { width: 16px; height: 16px; }
 
   /* Table */
-  table { width: 100%; border-collapse: collapse; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   thead th {
     padding: 12px 18px;
     text-align: left;
@@ -1893,10 +1891,23 @@
     return td;
   }
 
+  var dupTimer = null;
   // Grow a wrapping text box to show all of its text
   function fitHeight(el) {
     el.style.height = "auto";
     el.style.height = el.scrollHeight + 2 + "px";
+  }
+  // While typing: resize once per frame, and only when the text needs another line or freed one
+  var fitQueue = [];
+  function fitSoon(el) {
+    if (fitQueue.indexOf(el) === -1) fitQueue.push(el);
+    if (fitQueue.length === 1) requestAnimationFrame(function () {
+      var q = fitQueue; fitQueue = [];
+      q.forEach(function (t) {
+        if (t.scrollHeight > t.clientHeight + 1 || t.value.length < (t._len || 0)) fitHeight(t);
+        t._len = t.value.length;
+      });
+    });
   }
   var fitTimer = null;
   window.addEventListener("resize", function () {
@@ -1930,9 +1941,9 @@
       var cur = findRow(row.id) || row;
       cur[field] = input.value;
       if (field === "quantity" || field === "price" || field === "min") updateTotal(cur);
-      if (field === "reference") updateCounts();
+      if (field === "reference") { clearTimeout(dupTimer); dupTimer = setTimeout(updateCounts, 300); }
       if (field === "date") input.classList.toggle("blank", !input.value);
-      if (multi) { if (/\n/.test(input.value)) input.value = input.value.replace(/\n/g, " "); fitHeight(input); cur[field] = input.value; }
+      if (multi) { if (/\n/.test(input.value)) input.value = input.value.replace(/\n/g, " "); fitSoon(input); cur[field] = input.value; }
       scheduleWrite(cur);
     });
     if (field === "quantity") {
@@ -2555,9 +2566,10 @@
   var glow = document.getElementById("glow");
   var root = document.documentElement;
   var px = window.innerWidth / 2, py = window.innerHeight * 0.3, pending = false;
+  // only the glow layer restyles; setting these on the page root restyled everything
   function paint() {
-    root.style.setProperty("--mx", px + "px");
-    root.style.setProperty("--my", py + "px");
+    glow.style.setProperty("--mx", px + "px");
+    glow.style.setProperty("--my", py + "px");
     pending = false;
   }
   function track(x, y) {
