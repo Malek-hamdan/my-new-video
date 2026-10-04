@@ -211,7 +211,8 @@
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
   .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
-  th.col-mach { width: 14%; }
+  th.col-mach { width: 13%; }
+  th.col-used { width: 13%; }
   .tx-text { display: block; padding: 8px 10px; min-height: 39px; overflow-wrap: anywhere; }
   .tx-text.muted { color: var(--muted); }
   .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -228,6 +229,7 @@
   .tab.tx { color: #b9c6dc; }
   .tab-sep { flex: 0 0 1px; align-self: stretch; margin: 6px 2px; background: var(--border-strong); }
   body.tx-view #addTop, body.tx-view .panel-foot { display: none; }
+  body.tx-view .cell { border-color: var(--border-strong); background: rgba(255,255,255,0.03); }
 
   tbody tr { transition: background 0.15s ease; }
   tbody tr + tr td { border-top: 1px solid var(--border); }
@@ -458,6 +460,7 @@
       name: String(r.name || ""),
       reference: String(r.reference || ""),
       quantity: String(r.quantity || ""),
+      used: String(r.used || ""),
       date: String(r.date || ""),
       created: Number(r.created) || 0
     };
@@ -484,7 +487,7 @@
         var parsed = JSON.parse(raw);
         MACHINES.forEach(function (m) {
           if (Array.isArray(parsed[m])) {
-            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, quantity: r.quantity, date: r.date, created: r.created }, m); });
+            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, quantity: r.quantity, used: r.used, date: r.date, created: r.created }, m); });
           }
         });
       }
@@ -495,7 +498,7 @@
     try {
       var out = {};
       MACHINES.forEach(function (m) {
-        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, quantity: r.quantity, date: r.date, created: r.created }; });
+        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, quantity: r.quantity, used: r.used, date: r.date, created: r.created }; });
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
       setStatus("Saved", "saved");
@@ -526,7 +529,7 @@
   }
   function writeRow(row) {
     if (!db) { saveLocal(); return; }
-    var body = { machine: row.machine, name: row.name, reference: row.reference, quantity: row.quantity, date: row.date, created: row.created };
+    var body = { machine: row.machine, name: row.name, reference: row.reference, quantity: row.quantity, used: row.used, date: row.date, created: row.created };
     enqueue(row.id, function () { return db.collection("parts").doc(row.id).set(body); })
       .then(function () { setStatus("Saved", "saved"); }, onWriteError);
   }
@@ -647,7 +650,7 @@
   }
 
   var MACHINE_HEAD = document.getElementById("thead").innerHTML;
-  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-date">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-qty">Quantity used</th></tr>';
+  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-date">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-qty">Quantity</th><th class="col-used">Used</th></tr>';
 
   function txCell(label, text, cls) {
     var td = document.createElement("td");
@@ -659,11 +662,18 @@
     return td;
   }
 
+  function txMeta(list) {
+    var pieces = 0;
+    list.forEach(function (r) { pieces += parseInt(r.used, 10) || 0; });
+    metaEl.textContent = list.length + (list.length === 1 ? " entry" : " entries") + " · " + pieces + (pieces === 1 ? " piece used" : " pieces used");
+  }
+
+  var txIds = "";
   function renderTransactions() {
     var list = transactions();
+    txIds = list.map(function (r) { return r.id; }).join(",");
     document.getElementById("thead").innerHTML = TX_HEAD;
     titleEl.textContent = TX;
-    var pieces = 0;
     rowsEl.innerHTML = "";
     list.forEach(function (r, i) {
       var tr = document.createElement("tr");
@@ -679,14 +689,36 @@
       tr.appendChild(mtd);
       tr.appendChild(txCell("Name", r.name));
       tr.appendChild(txCell("Reference", r.reference));
-      tr.appendChild(txCell("Quantity used", r.quantity, "qty"));
+      var q = txCell("Quantity", r.quantity, "qty");
+      q.firstChild.id = "t-" + r.id + "-quantity";
+      tr.appendChild(q);
+      tr.appendChild(makeCell(r, "used", "Used"));
       rowsEl.appendChild(tr);
-      pieces += parseInt(r.quantity, 10) || 0;
     });
-    metaEl.textContent = list.length + (list.length === 1 ? " entry" : " entries") + " · " + pieces + (pieces === 1 ? " piece used" : " pieces used");
+    txMeta(list);
     emptyEl.querySelector("strong").textContent = "No transactions yet";
-    emptyEl.querySelector("span").textContent = "Parts you add on any machine tab show up here with the machine and quantity used.";
+    emptyEl.querySelector("span").textContent = "Parts you add on any machine tab show up here, ready for the quantity used.";
     emptyEl.hidden = list.length !== 0;
+    updateCounts();
+  }
+
+  // Same rows as on screen: update values without touching the field being typed in
+  function refreshTransactions() {
+    var list = transactions();
+    if (list.map(function (r) { return r.id; }).join(",") !== txIds) {
+      var focused = document.activeElement;
+      var keep = focused && focused.id && focused.classList.contains("cell") ? focused.id : null;
+      renderTransactions();
+      if (keep) { var el = document.getElementById(keep); if (el) el.focus(); }
+      return;
+    }
+    list.forEach(function (r) {
+      var q = document.getElementById("t-" + r.id + "-quantity");
+      if (q) { q.textContent = r.quantity || "—"; q.classList.toggle("muted", !r.quantity); }
+      var u = document.getElementById("f-" + r.id + "-used");
+      if (u && u !== document.activeElement && u.value !== r.used) u.value = r.used;
+    });
+    txMeta(list);
     updateCounts();
   }
 
@@ -694,7 +726,7 @@
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var input = document.createElement("input");
-    input.className = "cell" + (field === "quantity" ? " qty" : "") + (field === "date" ? " date" : "");
+    input.className = "cell" + (field === "quantity" || field === "used" ? " qty" : "") + (field === "date" ? " date" : "");
     input.type = field === "date" ? "date" : "text";
     input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
@@ -704,12 +736,13 @@
     input.autocomplete = "off";
     input.spellcheck = false;
     input.readOnly = readOnly;
-    if (field === "quantity") input.inputMode = "numeric";
+    if (field === "quantity" || field === "used") input.inputMode = "numeric";
     if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
-      if (field === "quantity" && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
+      if ((field === "quantity" || field === "used") && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
       row[field] = input.value;
       updateCounts();
+      if (active === TX) txMeta(transactions());
       if (field === "date") input.classList.toggle("blank", !input.value);
       scheduleWrite(row);
     });
@@ -760,7 +793,7 @@
       del.innerHTML = TRASH;
       del.addEventListener("click", function (e) {
         e.stopPropagation();
-        var hasContent = (row.name + row.reference + row.quantity + row.date).trim() !== "";
+        var hasContent = (row.name + row.reference + row.quantity + row.used + row.date).trim() !== "";
         if (hasContent && !del.classList.contains("armed")) {
           disarmAll(del);
           del.classList.add("armed");
@@ -827,14 +860,14 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, name: v.name, reference: v.reference, quantity: v.quantity, date: v.date, created: v.created }, v.machine);
+      var row = clean({ id: d.id, name: v.name, reference: v.reference, quantity: v.quantity, used: v.used, date: v.date, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       next[v.machine].push(local || row);
     });
     MACHINES.forEach(function (m) { next[m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
 
-    if (active === TX) { data = next; renderTransactions(); return; }
+    if (active === TX) { data = next; refreshTransactions(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
     var after = next[active].map(function (r) { return r.id; }).join(",");
     data = next;
