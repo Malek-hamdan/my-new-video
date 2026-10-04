@@ -1366,57 +1366,177 @@
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
   }
   function colName(i) { var s = ""; i++; while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
-  // rows: arrays of values; numbers become numeric cells, the first row is a bold header
-  function sheetXml(rows, widths) {
-    var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
-    out += '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
-    out += "<cols>" + widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
-    rows.forEach(function (row, r) {
-      out += '<row r="' + (r + 1) + '">';
-      row.forEach(function (v, c) {
-        var ref = colName(c) + (r + 1);
-        var st = r === 0 ? ' s="1"' : "";
-        if (typeof v === "number" && isFinite(v)) out += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
-        else if (v !== "" && v != null) out += '<c r="' + ref + '"' + st + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(v) + "</t></is></c>";
-      });
-      out += "</row>";
-    });
-    return out + "</sheetData></worksheet>";
+  // ---- Workbook styling ----
+  // fonts / fills / borders are listed once; XF names map to cellXfs indexes
+  var XL_FONTS = [
+    '<font><sz val="12"/><color rgb="FF1F2937"/><name val="Calibri"/></font>',                 // 0 body
+    '<font><b/><sz val="20"/><color rgb="FF1F3864"/><name val="Calibri"/></font>',             // 1 title
+    '<font><sz val="11"/><color rgb="FF6B7280"/><name val="Calibri"/></font>',                 // 2 subtitle
+    '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>',             // 3 header
+    '<font><b/><sz val="12"/><color rgb="FF1E7B45"/><name val="Calibri"/></font>',             // 4 green
+    '<font><b/><sz val="12"/><color rgb="FFC0392B"/><name val="Calibri"/></font>',             // 5 red
+    '<font><b/><sz val="12"/><color rgb="FF1F2937"/><name val="Calibri"/></font>'              // 6 bold body
+  ];
+  function solid(rgb) { return '<fill><patternFill patternType="solid"><fgColor rgb="FF' + rgb + '"/><bgColor indexed="64"/></patternFill></fill>'; }
+  var XL_FILLS = [
+    '<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>',
+    solid("1F3864"),  // 2 header navy
+    solid("F3F6FB"),  // 3 zebra
+    solid("E6F4EA"),  // 4 in
+    solid("FDECEA"),  // 5 out
+    solid("DCE4F2")   // 6 totals
+  ];
+  var XL_BORDERS = [
+    '<border><left/><right/><top/><bottom/><diagonal/></border>',
+    '<border><left style="thin"><color rgb="FFD5DCE8"/></left><right style="thin"><color rgb="FFD5DCE8"/></right><top style="thin"><color rgb="FFD5DCE8"/></top><bottom style="thin"><color rgb="FFD5DCE8"/></bottom><diagonal/></border>',
+    '<border><left style="thin"><color rgb="FFD5DCE8"/></left><right style="thin"><color rgb="FFD5DCE8"/></right><top style="medium"><color rgb="FF1F3864"/></top><bottom style="thin"><color rgb="FFD5DCE8"/></bottom><diagonal/></border>'
+  ];
+  var XL_XF = {};
+  var XL_XF_LIST = [];
+  function xf(name, font, fill, border, h, wrap) {
+    XL_XF[name] = XL_XF_LIST.length;
+    XL_XF_LIST.push('<xf numFmtId="0" fontId="' + font + '" fillId="' + fill + '" borderId="' + border + '" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' + h + '" vertical="center"' + (wrap ? ' wrapText="1"' : "") + "/></xf>");
+  }
+  xf("default", 0, 0, 0, "general");
+  xf("title", 1, 0, 0, "left");
+  xf("subtitle", 2, 0, 0, "left");
+  xf("header", 3, 2, 1, "center", true);
+  [["", 0], ["Z", 3]].forEach(function (z) {
+    xf("text" + z[0], 0, z[1], 1, "left", true);
+    xf("center" + z[0], 0, z[1], 1, "center");
+    xf("qtyPos" + z[0], 4, z[1], 1, "center");
+    xf("qtyNeg" + z[0], 5, z[1], 1, "center");
+    xf("bold" + z[0], 6, z[1], 1, "center");
+  });
+  xf("typeIn", 4, 4, 1, "center");
+  xf("typeOut", 5, 5, 1, "center");
+  xf("totalLabel", 6, 6, 2, "right");
+  xf("totalNum", 6, 6, 2, "center");
+  xf("totalIn", 4, 6, 2, "center");
+  xf("totalOut", 5, 6, 2, "center");
+  function stylesXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<fonts count="' + XL_FONTS.length + '">' + XL_FONTS.join("") + "</fonts>" +
+      '<fills count="' + XL_FILLS.length + '">' + XL_FILLS.join("") + "</fills>" +
+      '<borders count="' + XL_BORDERS.length + '">' + XL_BORDERS.join("") + "</borders>" +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="' + XL_XF_LIST.length + '">' + XL_XF_LIST.join("") + "</cellXfs>" +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  }
+
+  // A cell: {v: value | f: formula, s: style name}
+  function cellXml(ref, c) {
+    var st = ' s="' + XL_XF[c.s || "default"] + '"';
+    if (c.f) return '<c r="' + ref + '"' + st + "><f>" + xmlEsc(c.f) + "</f></c>";
+    if (typeof c.v === "number" && isFinite(c.v)) return '<c r="' + ref + '"' + st + "><v>" + c.v + "</v></c>";
+    if (c.v === "" || c.v == null) return '<c r="' + ref + '"' + st + "/>";
+    return '<c r="' + ref + '"' + st + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(c.v) + "</t></is></c>";
+  }
+
+  // spec: {title, subtitle, tab, columns: [{name, width}], rows: [[cell]], totals: [[cell]]}
+  var HEAD_ROW = 4;
+  function sheetXml(spec) {
+    var n = spec.columns.length, last = colName(n - 1);
+    var lines = [];
+    function row(r, cells, height) {
+      lines.push('<row r="' + r + '"' + (height ? ' ht="' + height + '" customHeight="1"' : "") + ">" +
+        cells.map(function (c, i) { return cellXml(colName(i) + r, c); }).join("") + "</row>");
+    }
+    function spanRow(r, cell, height) {
+      var cells = [cell];
+      for (var i = 1; i < n; i++) cells.push({ v: "", s: cell.s });
+      row(r, cells, height);
+    }
+    spanRow(1, { v: spec.title, s: "title" }, 34);
+    spanRow(2, { v: spec.subtitle, s: "subtitle" }, 20);
+    row(3, [], 8);
+    row(HEAD_ROW, spec.columns.map(function (c) { return { v: c.name, s: "header" }; }), 28);
+    var r = HEAD_ROW + 1;
+    spec.rows.forEach(function (cells) { row(r++, cells, 22); });
+    var lastData = r - 1;
+    (spec.totals || []).forEach(function (cells) { row(r++, cells, 24); });
+
+    var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    out += '<sheetPr><tabColor rgb="FF' + spec.tab + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
+    out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="' + HEAD_ROW + '" topLeftCell="A' + (HEAD_ROW + 1) + '" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+    out += '<sheetFormatPr defaultRowHeight="18"/>';
+    out += "<cols>" + spec.columns.map(function (c, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.width + '" customWidth="1"/>'; }).join("") + "</cols>";
+    out += "<sheetData>" + lines.join("") + "</sheetData>";
+    if (lastData > HEAD_ROW) out += '<autoFilter ref="A' + HEAD_ROW + ":" + last + lastData + '"/>';
+    out += '<mergeCells count="2"><mergeCell ref="A1:' + last + '1"/><mergeCell ref="A2:' + last + '2"/></mergeCells>';
+    out += '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>';
+    out += '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+    return out + "</worksheet>";
   }
   function numOrText(v) { return /^\d+$/.test(v) ? parseInt(v, 10) : v; }
 
   function buildWorkbook() {
-    function txRow(t, withMachine) {
-      var part = findRow(t.partId);
-      var row = [fmtTime(t.ts)];
-      if (withMachine) row.push(t.machine);
-      return row.concat([part && part.name ? part.name : t.name, part && part.reference ? part.reference : t.reference,
-        t.change > 0 ? "In" : "Out", t.change, t.after]);
+    var label = monthLabel(month);
+    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    var firstRow = HEAD_ROW + 1;
+    function z(name, i) { return name + (i % 2 ? "Z" : ""); }
+
+    function partsSheet(m) {
+      var list = data[m].filter(hasContent);
+      var rows = list.map(function (r, i) {
+        return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
+          { v: numOrText(r.quantity), s: z("bold", i) }, { v: r.date, s: z("center", i) }];
+      });
+      var totals = list.length ? [[{ v: "", s: "totalLabel" }, { v: "Total", s: "totalLabel" },
+        { f: "SUM(C" + firstRow + ":C" + (firstRow + list.length - 1) + ")", s: "totalNum" }, { v: "", s: "totalNum" }]] : [];
+      return { name: m, xml: sheetXml({
+        title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
+        tab: "1F3864", rows: rows, totals: totals,
+        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 13 }, { name: "Date", width: 15 }]
+      }) };
     }
+
+    function txSheet(name, title, list, withMachine, tab) {
+      var rows = list.map(function (t, i) {
+        var part = findRow(t.partId), isIn = t.change > 0;
+        var cells = [{ v: fmtTime(t.ts).replace("  ", " "), s: z("center", i) }];
+        if (withMachine) cells.push({ v: t.machine, s: z("center", i) });
+        return cells.concat([
+          { v: part && part.name ? part.name : t.name, s: z("text", i) },
+          { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
+          { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" },
+          { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
+          { v: t.after, s: z("center", i) }]);
+      });
+      var off = withMachine ? 1 : 0;
+      var qCol = colName(4 + off), from = firstRow, to = firstRow + list.length - 1;
+      var pad = function (k) { var a = []; for (var i = 0; i < k; i++) a.push({ v: "", s: "totalLabel" }); return a; };
+      var totals = list.length ? [
+        pad(3 + off).concat([{ v: "Total in", s: "totalLabel" }, { f: "SUMIF(" + qCol + from + ":" + qCol + to + ',">0")', s: "totalIn" }, { v: "", s: "totalNum" }]),
+        pad(3 + off).concat([{ v: "Total out", s: "totalLabel" }, { f: "-SUMIF(" + qCol + from + ":" + qCol + to + ',"<0")', s: "totalOut" }, { v: "", s: "totalNum" }])
+      ] : [];
+      var cols = [{ name: "Date", width: 19 }];
+      if (withMachine) cols.push({ name: "Machine", width: 12 });
+      cols = cols.concat([{ name: "Name", width: 40 }, { name: "Reference", width: 22 }, { name: "Type", width: 13 }, { name: "Quantity", width: 12 }, { name: "Stock after", width: 13 }]);
+      return { name: name, xml: sheetXml({
+        title: title, subtitle: "Transactions · " + label + " · " + list.length + (list.length === 1 ? " entry" : " entries") + " · " + stamp,
+        tab: tab, rows: rows, totals: totals, columns: cols
+      }) };
+    }
+
     // Each machine gets its parts sheet followed by its own transaction sheet
     var sheets = [];
     MACHINES.forEach(function (m) {
-      var rows = [["Name", "Reference", "Quantity", "Date"]];
-      data[m].forEach(function (r) { rows.push([r.name, r.reference, numOrText(r.quantity), r.date]); });
-      sheets.push({ name: m, xml: sheetXml(rows, [40, 24, 12, 14]) });
-      var tx = [["Date", "Name", "Reference", "Type", "Quantity", "Stock after"]];
-      txList.forEach(function (t) { if (t.machine === m) tx.push(txRow(t, false)); });
-      sheets.push({ name: m + " " + TX, xml: sheetXml(tx, [18, 40, 24, 8, 10, 12]) });
+      sheets.push(partsSheet(m));
+      sheets.push(txSheet(m + " " + TX, "UII — " + m + " " + TX, txList.filter(function (t) { return t.machine === m; }), false, "1E7B45"));
     });
-    var all = [["Date", "Machine", "Name", "Reference", "Type", "Quantity", "Stock after"]];
-    txList.forEach(function (t) { all.push(txRow(t, true)); });
-    sheets.push({ name: "All " + TX + "s", xml: sheetXml(all, [18, 10, 40, 24, 8, 10, 12]) });
+    sheets.push(txSheet("All " + TX + "s", "UII — All " + TX + "s", txList, true, "6B7280"));
 
     var files = [];
     files.push(["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
       sheets.map(function (sh, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>"]);
     files.push(["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>']);
     files.push(["xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
-      sheets.map(function (sh, i) { return '<sheet name="' + xmlEsc(sh.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>"]);
+      sheets.map(function (sh, i) { return '<sheet name="' + xmlEsc(sh.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets><calcPr calcId=\"191029\" fullCalcOnLoad=\"1\"/></workbook>"]);
     files.push(["xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
       sheets.map(function (sh, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
       '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>']);
-    files.push(["xl/styles.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>']);
+    files.push(["xl/styles.xml", stylesXml()]);
     sheets.forEach(function (sh, i) { files.push(["xl/worksheets/sheet" + (i + 1) + ".xml", sh.xml]); });
     return zipStore(files);
   }
