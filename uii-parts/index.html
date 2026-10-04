@@ -101,6 +101,11 @@
   .snap { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 14px; }
   .snap:first-child { border-top: 0; }
   .snap small { display: block; color: var(--muted); font-size: 12px; }
+  .snap-title { font-weight: 600; }
+  .snap-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
+  .snap-chips .chip { font-size: 11px; padding: 1px 7px; }
+  .chip.chip-empty { opacity: 0.45; }
+  #undoWrap[hidden] { display: none; }
   .snap .btn { padding: 6px 10px; font-size: 13px; }
   .snap-empty { padding: 14px 12px; color: var(--muted); font-size: 13px; }
   .copy-banner.reminder { border-color: rgba(255,196,87,0.55); background: rgba(255,196,87,0.09); }
@@ -835,8 +840,13 @@
         <button class="btn" id="restoreFileBtn" type="button">Restore from file…</button>
         <input type="file" id="restoreFile" accept=".xlsx,.json" hidden>
       </div>
+      <div id="undoWrap" hidden>
+        <h4>Undo last restore</h4>
+        <p class="muted-p">Everything as it was just before the last restore. Only the latest one is kept.</p>
+        <div class="snap-list" id="undoList"></div>
+      </div>
       <h4>Daily copies (last 30 days)</h4>
-      <p class="muted-p">The site saves a copy of everything once a day when you open it. Restoring puts everything back as it was that day; a copy of the current state is saved first.</p>
+      <p class="muted-p">The site saves one copy a day, the first time you open it that day. Restoring puts everything back as it was then.</p>
       <div class="snap-list" id="snapList"></div>
     </div>
   </div>
@@ -2654,9 +2664,19 @@
     }
     return db.collection("snapshots").get().then(function (q) { return q.docs.map(function (d) { var v = d.data() || {}; v.key = d.id; return v; }); });
   }
-  function takeSnapshot(key, kind) {
-    var data = JSON.stringify(serializeAll());
-    var meta = { key: key, kind: kind, at: Date.now(), parts: serializeAll().parts.length, transactions: serializeAll().transactions.length };
+  // What a copy holds, for the list: parts per machine and the months with data
+  function describeData(all) {
+    var byMachine = {}, months = {};
+    MACHINES.forEach(function (m) { byMachine[m] = 0; });
+    all.parts.forEach(function (r) { if (byMachine[r.machine] != null && (r.name + r.reference + r.quantity + (r.price || "")).trim()) { byMachine[r.machine]++; months[r.month] = 1; } });
+    all.transactions.forEach(function (t) { months[t.month] = 1; });
+    return { byMachine: byMachine, months: Object.keys(months).sort() };
+  }
+  function takeSnapshot(key, kind, note) {
+    var all = serializeAll();
+    var data = JSON.stringify(all);
+    var d = describeData(all);
+    var meta = { key: key, kind: kind, at: Date.now(), parts: all.parts.length, transactions: all.transactions.length, byMachine: d.byMachine, months: d.months, note: note || "" };
     if (!db) {
       var all = localSnaps();
       all[key] = { meta: meta, data: data };
@@ -2687,13 +2707,16 @@
   function pruneSnapshots(list) {
     var daily = list.filter(function (m) { return m.kind === "daily"; }).sort(function (a, b) { return a.key < b.key ? 1 : -1; });
     var pre = list.filter(function (m) { return m.kind === "pre"; }).sort(function (a, b) { return b.at - a.at; });
-    var drop = daily.slice(30).concat(pre.slice(3));
+    var drop = daily.slice(30).concat(pre.slice(1));
     return drop.reduce(function (p, m) { return p.then(function () { return dropSnapshot(m); }); }, Promise.resolve());
   }
   var dailyDone = false;
   // Once per page load: today's copy is how things stood when the site was first opened that day
+  var loadedAt = Date.now();
   function maybeDailySnapshot() {
     if (dailyDone) return;
+    // data can arrive a moment after the first (empty) update; wait for it briefly
+    if (!hasAnyData() && Date.now() - loadedAt < 5000) return;
     dailyDone = true;
     if (readOnly || !hasAnyData()) return;
     var key = ymd(Date.now());
@@ -2756,33 +2779,65 @@
     var listEl = document.getElementById("snapList");
     listEl.innerHTML = '<div class="snap-empty">Loading…</div>';
     listSnapshots().then(function (list) {
-      list.sort(function (a, b) { return b.at - a.at; });
+      // tidy up copies left from before only one "before a restore" was kept
+      if (list.filter(function (m) { return m.kind === "pre"; }).length > 1) pruneSnapshots(list).catch(function () {});
+      var pre = list.filter(function (m) { return m.kind === "pre"; }).sort(function (a, b) { return b.at - a.at; }).slice(0, 1);
+      var daily = list.filter(function (m) { return m.kind === "daily"; }).sort(function (a, b) { return a.key < b.key ? 1 : -1; });
       listEl.innerHTML = "";
-      if (!list.length) { listEl.innerHTML = '<div class="snap-empty">No daily copies yet. The first one is made today once there is data.</div>'; return; }
-      list.forEach(function (m) {
-        var row = document.createElement("div");
-        row.className = "snap";
-        var info = document.createElement("div");
-        info.textContent = m.kind === "pre" ? "Before a restore" : fmtDay(m.key);
-        var sm = document.createElement("small");
-        sm.textContent = "Saved " + fmtTime(m.at).replace("  ", " at ") + " · " + m.parts + (m.parts === 1 ? " part, " : " parts, ") + m.transactions + (m.transactions === 1 ? " transaction" : " transactions");
-        info.appendChild(sm);
-        var b = document.createElement("button");
-        b.type = "button"; b.className = "btn"; b.textContent = "Restore";
-        b.addEventListener("click", function () {
-          askCode("Restore " + (m.kind === "pre" ? "the copy from before the last restore" : "the copy from " + fmtDay(m.key)) + "? Everything goes back to how it was then.", function () {
-            readSnapshot(m).then(function (snap) { restoreFrom(snap, "the copy from " + (m.kind === "pre" ? "before the last restore" : fmtDay(m.key))); });
-          });
-        });
-        row.appendChild(info); row.appendChild(b);
-        listEl.appendChild(row);
+      var undoEl = document.getElementById("undoList");
+      undoEl.innerHTML = "";
+      document.getElementById("undoWrap").hidden = !pre.length;
+      pre.forEach(function (m) {
+        undoEl.appendChild(snapRow(m, "Before restoring " + (m.note || "a copy"), "the state from before the last restore"));
+      });
+      if (!daily.length) { listEl.innerHTML = '<div class="snap-empty">No daily copies yet. The first one is made the next time the site opens with data in it.</div>'; return; }
+      var today = ymd(Date.now());
+      daily.forEach(function (m) {
+        listEl.appendChild(snapRow(m, fmtDay(m.key) + (m.key === today ? " (today)" : ""), "the copy from " + fmtDay(m.key)));
       });
     }, function () { listEl.innerHTML = '<div class="snap-empty">Couldn’t load the daily copies.</div>'; });
   }
+  // One line in the copies list: title, saved time, parts per machine, months
+  function snapRow(m, title, what) {
+    var row = document.createElement("div");
+    row.className = "snap";
+    var info = document.createElement("div");
+    var t = document.createElement("div");
+    t.className = "snap-title";
+    t.textContent = title;
+    info.appendChild(t);
+    var sm = document.createElement("small");
+    sm.textContent = "Saved " + fmtTime(m.at).replace("  ", " at ") + " \u00B7 " + m.parts + (m.parts === 1 ? " part, " : " parts, ") + m.transactions + (m.transactions === 1 ? " transaction" : " transactions");
+    info.appendChild(sm);
+    if (m.byMachine) {
+      var chips = document.createElement("div");
+      chips.className = "snap-chips";
+      MACHINES.forEach(function (mc) {
+        var c = document.createElement("span");
+        c.className = "chip" + (m.byMachine[mc] ? "" : " chip-empty");
+        c.textContent = mc + " " + (m.byMachine[mc] || 0);
+        chips.appendChild(c);
+      });
+      info.appendChild(chips);
+      var mo = document.createElement("small");
+      mo.textContent = m.months && m.months.length ? "Months: " + m.months.map(monthLabel).join(", ") : "No parts in this copy";
+      info.appendChild(mo);
+    }
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "btn"; b.textContent = "Restore";
+    b.addEventListener("click", function () {
+      askCode("Restore " + what + "? Everything goes back to how it was then.", function () {
+        readSnapshot(m).then(function (snap) { restoreFrom(snap, what.replace(/^the copy from /, "")); });
+      });
+    });
+    row.appendChild(info); row.appendChild(b);
+    return row;
+  }
+
   function restoreFrom(snap, label) {
     if (!snap || !Array.isArray(snap.parts) || !Array.isArray(snap.transactions)) { setStatus("That backup can't be read.", "error"); return; }
     flushWrites();
-    takeSnapshot("pre-" + Date.now(), "pre").then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
+    takeSnapshot("pre-" + Date.now(), "pre", label).then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
       applyAll(snap);
       backupDlg.hidden = true;
       setStatus("Restored " + label, "saved");
