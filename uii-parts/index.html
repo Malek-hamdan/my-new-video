@@ -1473,7 +1473,6 @@
   function buildWorkbook() {
     var label = monthLabel(month);
     var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
-    var firstRow = HEAD_ROW + 1;
     function z(name, i) { return name + (i % 2 ? "Z" : ""); }
 
     function partsSheet(m) {
@@ -1482,8 +1481,7 @@
         return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
           { v: numOrText(r.quantity), s: z("bold", i) }, { v: r.date, s: z("center", i) }];
       });
-      var totals = list.length ? [[{ v: "", s: "totalLabel" }, { v: "Total", s: "totalLabel" },
-        { f: "SUM(C" + firstRow + ":C" + (firstRow + list.length - 1) + ")", s: "totalNum" }, { v: "", s: "totalNum" }]] : [];
+      var totals = [];
       return { name: m, xml: sheetXml({
         title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
         tab: "1F3864", rows: rows, totals: totals,
@@ -1503,13 +1501,7 @@
           { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
           { v: t.after, s: z("center", i) }]);
       });
-      var off = withMachine ? 1 : 0;
-      var qCol = colName(4 + off), from = firstRow, to = firstRow + list.length - 1;
-      var pad = function (k) { var a = []; for (var i = 0; i < k; i++) a.push({ v: "", s: "totalLabel" }); return a; };
-      var totals = list.length ? [
-        pad(3 + off).concat([{ v: "Total in", s: "totalLabel" }, { f: "SUMIF(" + qCol + from + ":" + qCol + to + ',">0")', s: "totalIn" }, { v: "", s: "totalNum" }]),
-        pad(3 + off).concat([{ v: "Total out", s: "totalLabel" }, { f: "-SUMIF(" + qCol + from + ":" + qCol + to + ',"<0")', s: "totalOut" }, { v: "", s: "totalNum" }])
-      ] : [];
+      var totals = [];
       var cols = [{ name: "Date", width: 19 }];
       if (withMachine) cols.push({ name: "Machine", width: 12 });
       cols = cols.concat([{ name: "Name", width: 40 }, { name: "Reference", width: 22 }, { name: "Type", width: 13 }, { name: "Quantity", width: 12 }, { name: "Stock after", width: 13 }]);
