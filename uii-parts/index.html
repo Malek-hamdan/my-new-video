@@ -290,9 +290,28 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-qty { width: 11%; }
-  th.col-price { width: 11%; }
-  th.col-ref { width: 21%; }
+  th.col-qty { width: 10%; }
+  th.col-price { width: 16%; }
+  th.col-total { width: 12%; }
+  th.col-ref { width: 16%; }
+  .price-wrap { display: flex; gap: 6px; align-items: center; }
+  .price-wrap .cell { min-width: 0; flex: 1; }
+  .cur {
+    flex: 0 0 auto;
+    padding: 7px 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cur:focus { outline: none; border-color: rgba(91,157,255,0.6); }
+  .cur.unset { color: var(--muted); }
+  .total-text { display: block; padding: 8px 10px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .total-text.muted { color: var(--muted); font-weight: 400; }
   th.col-date { width: 14%; }
   .cell.date { min-height: 39px; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
@@ -568,7 +587,8 @@
           <th>Name</th>
           <th class="col-ref">Reference</th>
           <th class="col-qty">Quantity</th>
-          <th class="col-price">Price</th>
+          <th class="col-price">Unit price</th>
+          <th class="col-total">Total price</th>
           <th class="col-date">Date</th>
           <th class="col-act"><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
         </tr>
@@ -626,7 +646,10 @@
     if (MONTHS.indexOf(k) !== -1) return k;
     return k < MONTHS[0] ? MONTHS[0] : MONTHS[MONTHS.length - 1];
   }
-  var FIELDS = ["name", "reference", "quantity", "price", "date"];
+  var FIELDS = ["name", "reference", "quantity", "price", "currency", "date"];
+  var CURRENCIES = ["USD", "EUR"];
+  var CUR_SIGN = { USD: "$", EUR: "\u20AC" };
+  var CUR_KEY = "uii-spare-parts-currency";
   var TX = "Transaction";
   var TABS = MACHINES.concat([TX]);
 
@@ -670,6 +693,7 @@
       reference: String(r.reference || ""),
       quantity: qty,
       price: String(r.price || ""),
+      currency: CURRENCIES.indexOf(r.currency) !== -1 ? r.currency : "",
       // parts saved before transactions existed start from their current stock
       loggedQty: r.loggedQty == null ? qty : String(r.loggedQty),
       date: String(r.date || ""),
@@ -694,7 +718,7 @@
   }
 
   function rowBody(r) {
-    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
+    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
     return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
@@ -730,7 +754,7 @@
         });
         rows.forEach(function (r) {
           if (MACHINES.indexOf(r.machine) === -1) return;
-          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
+          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
           if (!allParts[row.month]) allParts[row.month] = emptyData();
           allParts[row.month][row.machine].push(row);
         });
@@ -1015,7 +1039,7 @@
     MACHINES.forEach(function (m) {
       allParts[src][m].filter(hasContent).forEach(function (r) {
         // the copied quantity is this month's starting stock, so it is already "logged"
-        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price,
+        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency,
           loggedQty: r.quantity, date: "", baseline: false, arrival: false, created: t++ }, m);
         data[m].push(row);
         writeRow(row);
@@ -1172,6 +1196,66 @@
     renderTransactions();
   }
 
+  function lastCurrency() {
+    try { var c = localStorage.getItem(CUR_KEY); return CURRENCIES.indexOf(c) !== -1 ? c : ""; } catch (e) { return ""; }
+  }
+  function unitPrice(r) {
+    var t = String(r.price).trim().replace(",", ".");
+    return /^\d+(\.\d+)?$/.test(t) || /^\d*\.\d+$/.test(t) ? parseFloat(t) : null;
+  }
+  // Total price = quantity x unit price; null until both are filled in
+  function totalOf(r) {
+    var p = unitPrice(r);
+    if (p === null || !/^\d+$/.test(r.quantity)) return null;
+    return Math.round(parseInt(r.quantity, 10) * p * 100) / 100;
+  }
+  function money(n, currency) {
+    var txt = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return currency ? CUR_SIGN[currency] + txt : txt;
+  }
+  function updateTotal(r) {
+    var el = document.getElementById("t-" + r.id + "-total");
+    if (!el) return;
+    var t = totalOf(r);
+    el.textContent = t === null ? "\u2014" : money(t, r.currency);
+    el.classList.toggle("muted", t === null);
+  }
+
+  function makePriceCell(row) {
+    var td = makeCell(row, "price", "Unit price");
+    var input = td.firstChild;
+    var wrap = document.createElement("div");
+    wrap.className = "price-wrap";
+    td.replaceChild(wrap, input);
+    wrap.appendChild(input);
+    var sel = document.createElement("select");
+    sel.className = "cur" + (row.currency ? "" : " unset");
+    sel.id = "f-" + row.id + "-currency";
+    sel.setAttribute("aria-label", "Currency");
+    sel.disabled = readOnly;
+    sel.innerHTML = '<option value="">Cur.</option>' + CURRENCIES.map(function (c) { return '<option value="' + c + '">' + c + "</option>"; }).join("");
+    sel.value = row.currency;
+    sel.addEventListener("change", function () {
+      var cur = findRow(row.id) || row;
+      cur.currency = sel.value;
+      sel.classList.toggle("unset", !sel.value);
+      if (sel.value) { try { localStorage.setItem(CUR_KEY, sel.value); } catch (e) {} }
+      updateTotal(cur);
+      scheduleWrite(cur);
+    });
+    wrap.appendChild(sel);
+    return td;
+  }
+  function makeTotalCell(row) {
+    var td = document.createElement("td");
+    td.setAttribute("data-label", "Total price");
+    var span = document.createElement("span");
+    span.className = "total-text";
+    span.id = "t-" + row.id + "-total";
+    td.appendChild(span);
+    return td;
+  }
+
   function makeCell(row, field, label) {
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
@@ -1193,8 +1277,10 @@
     if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
       if (field === "quantity" && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
+      if (field === "price" && /[^\d.,]/.test(input.value)) input.value = input.value.replace(/[^\d.,]/g, "");
       var cur = findRow(row.id) || row;
       cur[field] = input.value;
+      if (field === "quantity" || field === "price") updateTotal(cur);
       if (field === "date") input.classList.toggle("blank", !input.value);
       scheduleWrite(cur);
     });
@@ -1235,7 +1321,8 @@
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
       tr.appendChild(makeCell(row, "quantity", "Quantity"));
-      tr.appendChild(makeCell(row, "price", "Price"));
+      tr.appendChild(makePriceCell(row));
+      tr.appendChild(makeTotalCell(row));
       tr.appendChild(makeCell(row, "date", "Date"));
 
       var act = document.createElement("td");
@@ -1247,6 +1334,7 @@
       tr.appendChild(act);
 
       rowsEl.appendChild(tr);
+      updateTotal(row);
 
       if (row.id === focusId) {
         var first = tr.querySelector(".cell");
@@ -1266,7 +1354,7 @@
   // Otherwise the first quantity is starting stock and is not logged.
   function addRow(received) {
     if (readOnly || active === TX) return;
-    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received }, active);
+    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency() }, active);
     data[active].push(row);
     writeRow(row);
     renderRows(row.id);
@@ -1312,7 +1400,7 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, price: v.price, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
+      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, price: v.price, currency: v.currency, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       if (local) row = local;
@@ -1345,8 +1433,10 @@
           if (el && el !== document.activeElement && el.value !== row[f]) {
             el.value = row[f];
             if (f === "date") el.classList.toggle("blank", !el.value);
+            if (f === "currency") el.classList.toggle("unset", !el.value);
           }
         });
+        updateTotal(row);
       });
     }
     updateCounts();
@@ -1398,9 +1488,9 @@
   ];
   var XL_XF = {};
   var XL_XF_LIST = [];
-  function xf(name, font, fill, border, h, wrap) {
+  function xf(name, font, fill, border, h, wrap, fmt) {
     XL_XF[name] = XL_XF_LIST.length;
-    XL_XF_LIST.push('<xf numFmtId="0" fontId="' + font + '" fillId="' + fill + '" borderId="' + border + '" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' + h + '" vertical="center"' + (wrap ? ' wrapText="1"' : "") + "/></xf>");
+    XL_XF_LIST.push('<xf numFmtId="' + (fmt || 0) + '"' + (fmt ? ' applyNumberFormat="1"' : "") + ' fontId="' + font + '" fillId="' + fill + '" borderId="' + border + '" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="' + h + '" vertical="center"' + (wrap ? ' wrapText="1"' : "") + "/></xf>");
   }
   xf("default", 0, 0, 0, "general");
   xf("title", 1, 0, 0, "left");
@@ -1412,6 +1502,8 @@
     xf("qtyPos" + z[0], 4, z[1], 1, "center");
     xf("qtyNeg" + z[0], 5, z[1], 1, "center");
     xf("bold" + z[0], 6, z[1], 1, "center");
+    xf("money" + z[0], 0, z[1], 1, "center", false, 4);
+    xf("moneyBold" + z[0], 6, z[1], 1, "center", false, 4);
   });
   xf("typeIn", 4, 4, 1, "center");
   xf("typeOut", 5, 5, 1, "center");
@@ -1475,7 +1567,7 @@
   }
   function numOrText(v) { return /^\d+$/.test(v) ? parseInt(v, 10) : v; }
   // a plain number (1250 or 12.5) becomes a numeric cell; anything else stays as typed
-  function priceVal(v) { var t = String(v).trim(); return /^\d+(\.\d+)?$/.test(t) ? parseFloat(t) : t; }
+  function priceVal(v) { var t = String(v).trim().replace(",", "."); return /^\d+(\.\d+)?$/.test(t) || /^\d*\.\d+$/.test(t) ? parseFloat(t) : t; }
 
   function buildWorkbook() {
     var label = monthLabel(month);
@@ -1486,13 +1578,15 @@
       var list = data[m].filter(hasContent);
       var rows = list.map(function (r, i) {
         return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: z("bold", i) }, { v: priceVal(r.price), s: z("center", i) }, { v: r.date, s: z("center", i) }];
+          { v: numOrText(r.quantity), s: z("bold", i) }, { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) },
+          totalOf(r) === null ? { v: "", s: z("money", i) } : { f: "C" + (HEAD_ROW + 1 + i) + "*D" + (HEAD_ROW + 1 + i), s: z("moneyBold", i) },
+          { v: r.date, s: z("center", i) }];
       });
       var totals = [];
       return { name: m, xml: sheetXml({
         title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
         tab: "1F3864", rows: rows, totals: totals,
-        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 13 }, { name: "Price", width: 14 }, { name: "Date", width: 15 }]
+        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 12 }, { name: "Unit price", width: 14 }, { name: "Currency", width: 11 }, { name: "Total price", width: 16 }, { name: "Date", width: 15 }]
       }) };
     }
 
