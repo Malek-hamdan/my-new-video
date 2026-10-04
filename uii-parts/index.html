@@ -204,8 +204,12 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-price { width: 22%; }
-  th.col-ref { width: 28%; }
+  th.col-price { width: 16%; }
+  th.col-ref { width: 24%; }
+  th.col-date { width: 19%; }
+  .cell.date { min-height: 39px; }
+  .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
+  .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
 
   tbody tr { transition: background 0.15s ease; }
@@ -377,6 +381,7 @@
           <th>Name</th>
           <th class="col-ref">Reference</th>
           <th class="col-price">Price</th>
+          <th class="col-date">Date</th>
           <th class="col-act"><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
         </tr>
       </thead>
@@ -407,7 +412,7 @@
   var MACHINES = ["BLM", "BCW3", "Bonal", "Sollas"];
   var STORAGE_KEY = "uii-spare-parts-v1";
   var TAB_KEY = "uii-spare-parts-active-tab";
-  var FIELDS = ["name", "reference", "price"];
+  var FIELDS = ["name", "reference", "price", "date"];
 
   // data[machine] = [{id, name, reference, price, created}]
   var data = emptyData();
@@ -432,6 +437,7 @@
       name: String(r.name || ""),
       reference: String(r.reference || ""),
       price: String(r.price || ""),
+      date: String(r.date || ""),
       created: Number(r.created) || 0
     };
   }
@@ -457,7 +463,7 @@
         var parsed = JSON.parse(raw);
         MACHINES.forEach(function (m) {
           if (Array.isArray(parsed[m])) {
-            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, price: r.price, created: r.created }, m); });
+            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, price: r.price, date: r.date, created: r.created }, m); });
           }
         });
       }
@@ -468,7 +474,7 @@
     try {
       var out = {};
       MACHINES.forEach(function (m) {
-        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, price: r.price, created: r.created }; });
+        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, price: r.price, date: r.date, created: r.created }; });
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
       setStatus("Saved", "saved");
@@ -499,7 +505,7 @@
   }
   function writeRow(row) {
     if (!db) { saveLocal(); return; }
-    var body = { machine: row.machine, name: row.name, reference: row.reference, price: row.price, created: row.created };
+    var body = { machine: row.machine, name: row.name, reference: row.reference, price: row.price, date: row.date, created: row.created };
     enqueue(row.id, function () { return db.collection("parts").doc(row.id).set(body); })
       .then(function () { setStatus("Saved", "saved"); }, onWriteError);
   }
@@ -593,8 +599,8 @@
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var input = document.createElement("input");
-    input.className = "cell" + (field === "price" ? " price" : "");
-    input.type = "text";
+    input.className = "cell" + (field === "price" ? " price" : "") + (field === "date" ? " date" : "");
+    input.type = field === "date" ? "date" : "text";
     input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
     input.placeholder = label;
@@ -604,8 +610,10 @@
     input.spellcheck = false;
     input.readOnly = readOnly;
     if (field === "price") input.inputMode = "decimal";
+    if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
       row[field] = input.value;
+      if (field === "date") input.classList.toggle("blank", !input.value);
       scheduleWrite(row);
     });
     td.appendChild(input);
@@ -637,6 +645,7 @@
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
       tr.appendChild(makeCell(row, "price", "Price"));
+      tr.appendChild(makeCell(row, "date", "Date"));
 
       var act = document.createElement("td");
       act.className = "col-act";
@@ -649,7 +658,7 @@
       del.innerHTML = TRASH;
       del.addEventListener("click", function (e) {
         e.stopPropagation();
-        var hasContent = (row.name + row.reference + row.price).trim() !== "";
+        var hasContent = (row.name + row.reference + row.price + row.date).trim() !== "";
         if (hasContent && !del.classList.contains("armed")) {
           disarmAll(del);
           del.classList.add("armed");
@@ -716,7 +725,7 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, name: v.name, reference: v.reference, price: v.price, created: v.created }, v.machine);
+      var row = clean({ id: d.id, name: v.name, reference: v.reference, price: v.price, date: v.date, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       next[v.machine].push(local || row);
@@ -737,7 +746,7 @@
       data[active].forEach(function (row) {
         FIELDS.forEach(function (f) {
           var el = document.getElementById("f-" + row.id + "-" + f);
-          if (el && el !== document.activeElement && el.value !== row[f]) el.value = row[f];
+          if (el && el !== document.activeElement && el.value !== row[f]) { el.value = row[f]; if (f === "date") el.classList.toggle("blank", !el.value); }
         });
       });
       updateCounts();
