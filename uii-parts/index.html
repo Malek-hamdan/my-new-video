@@ -290,8 +290,9 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-qty { width: 12%; }
-  th.col-ref { width: 24%; }
+  th.col-qty { width: 11%; }
+  th.col-price { width: 11%; }
+  th.col-ref { width: 21%; }
   th.col-date { width: 14%; }
   .cell.date { min-height: 39px; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
@@ -567,6 +568,7 @@
           <th>Name</th>
           <th class="col-ref">Reference</th>
           <th class="col-qty">Quantity</th>
+          <th class="col-price">Price</th>
           <th class="col-date">Date</th>
           <th class="col-act"><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
         </tr>
@@ -624,7 +626,7 @@
     if (MONTHS.indexOf(k) !== -1) return k;
     return k < MONTHS[0] ? MONTHS[0] : MONTHS[MONTHS.length - 1];
   }
-  var FIELDS = ["name", "reference", "quantity", "date"];
+  var FIELDS = ["name", "reference", "quantity", "price", "date"];
   var TX = "Transaction";
   var TABS = MACHINES.concat([TX]);
 
@@ -667,6 +669,7 @@
       name: String(r.name || ""),
       reference: String(r.reference || ""),
       quantity: qty,
+      price: String(r.price || ""),
       // parts saved before transactions existed start from their current stock
       loggedQty: r.loggedQty == null ? qty : String(r.loggedQty),
       date: String(r.date || ""),
@@ -691,7 +694,7 @@
   }
 
   function rowBody(r) {
-    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
+    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
     return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
@@ -727,7 +730,7 @@
         });
         rows.forEach(function (r) {
           if (MACHINES.indexOf(r.machine) === -1) return;
-          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
+          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
           if (!allParts[row.month]) allParts[row.month] = emptyData();
           allParts[row.month][row.machine].push(row);
         });
@@ -988,7 +991,7 @@
     }
     return null;
   }
-  function hasContent(r) { return (r.name + r.reference + r.quantity).trim() !== ""; }
+  function hasContent(r) { return (r.name + r.reference + r.quantity + r.price).trim() !== ""; }
   function monthIsEmpty() {
     return !MACHINES.some(function (m) { return data[m].length; }) && !txList.length;
   }
@@ -1012,7 +1015,7 @@
     MACHINES.forEach(function (m) {
       allParts[src][m].filter(hasContent).forEach(function (r) {
         // the copied quantity is this month's starting stock, so it is already "logged"
-        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity,
+        var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price,
           loggedQty: r.quantity, date: "", baseline: false, arrival: false, created: t++ }, m);
         data[m].push(row);
         writeRow(row);
@@ -1173,7 +1176,7 @@
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var input = document.createElement("input");
-    input.className = "cell" + (field === "quantity" ? " qty" : "") + (field === "date" ? " date" : "");
+    input.className = "cell" + (field === "quantity" || field === "price" ? " qty" : "") + (field === "date" ? " date" : "");
     input.type = field === "date" ? "date" : "text";
     input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
@@ -1186,6 +1189,7 @@
     input.dir = "auto";
     input.readOnly = readOnly;
     if (field === "quantity") input.inputMode = "numeric";
+    if (field === "price") input.inputMode = "decimal";
     if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
       if (field === "quantity" && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
@@ -1231,13 +1235,14 @@
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
       tr.appendChild(makeCell(row, "quantity", "Quantity"));
+      tr.appendChild(makeCell(row, "price", "Price"));
       tr.appendChild(makeCell(row, "date", "Date"));
 
       var act = document.createElement("td");
       act.className = "col-act";
       act.appendChild(deleteButton("Delete row " + (i + 1), function () {
         var cur = findRow(row.id) || row;
-        return (cur.name + cur.reference + cur.quantity + cur.date).trim() !== "";
+        return (cur.name + cur.reference + cur.quantity + cur.price + cur.date).trim() !== "";
       }, function () { deleteRow(row.id); }));
       tr.appendChild(act);
 
@@ -1307,7 +1312,7 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
+      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, price: v.price, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       if (local) row = local;
@@ -1469,6 +1474,8 @@
     return out + "</worksheet>";
   }
   function numOrText(v) { return /^\d+$/.test(v) ? parseInt(v, 10) : v; }
+  // a plain number (1250 or 12.5) becomes a numeric cell; anything else stays as typed
+  function priceVal(v) { var t = String(v).trim(); return /^\d+(\.\d+)?$/.test(t) ? parseFloat(t) : t; }
 
   function buildWorkbook() {
     var label = monthLabel(month);
@@ -1479,13 +1486,13 @@
       var list = data[m].filter(hasContent);
       var rows = list.map(function (r, i) {
         return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: z("bold", i) }, { v: r.date, s: z("center", i) }];
+          { v: numOrText(r.quantity), s: z("bold", i) }, { v: priceVal(r.price), s: z("center", i) }, { v: r.date, s: z("center", i) }];
       });
       var totals = [];
       return { name: m, xml: sheetXml({
         title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
         tab: "1F3864", rows: rows, totals: totals,
-        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 13 }, { name: "Date", width: 15 }]
+        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 13 }, { name: "Price", width: 14 }, { name: "Date", width: 15 }]
       }) };
     }
 
