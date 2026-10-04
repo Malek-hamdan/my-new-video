@@ -318,11 +318,12 @@
   .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
   th.col-mach { width: 9%; }
-  body.tx-view th.col-ref { width: 16%; }
-  th.col-when { width: 15%; }
-  th.col-type { width: 8%; }
-  th.col-change { width: 9%; }
-  th.col-after { width: 9%; }
+  body.tx-view th.col-ref { width: 13%; }
+  th.col-when { width: 14%; }
+  th.col-type { width: 7%; }
+  th.col-change { width: 8%; }
+  th.col-value { width: 10%; }
+  th.col-after { width: 8%; }
   .tx-text.when { font-variant-numeric: tabular-nums; white-space: pre; }
   .tx-text.pos { color: #7fd6a4; }
   .tx-text.neg { color: var(--danger); }
@@ -331,7 +332,8 @@
   .chip.chip-out { background: var(--danger-soft); border-color: rgba(255,107,107,0.35); color: #ffb3b3; }
   .tx-text { display: block; padding: 8px 10px; min-height: 39px; overflow-wrap: anywhere; }
   .tx-text.muted { color: var(--muted); }
-  .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  body.tx-view .cell.date { border-color: var(--border-strong); background: rgba(255,255,255,0.03); }
   .chip {
     display: inline-block;
     padding: 2px 9px;
@@ -713,6 +715,8 @@
       reference: String(t.reference || ""),
       change: Number(t.change) || 0,
       after: Number(t.after) || 0,
+      // date shown in Transaction; editable, defaults to the day it was recorded
+      date: /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : "",
       ts: Number(t.ts) || 0
     };
   }
@@ -721,10 +725,20 @@
     return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, date: t.date, ts: t.ts };
   }
+  function ymd(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + "-" + (d.getMonth() < 9 ? "0" : "") + (d.getMonth() + 1) + "-" + (d.getDate() < 10 ? "0" : "") + d.getDate();
+  }
+  function txDate(t) { return t.date || ymd(t.ts); }
+  // newest date first; same day: most recently recorded first
   function sortTx(list) {
-    list.sort(function (a, b) { return b.ts - a.ts || (a.id < b.id ? 1 : -1); });
+    list.sort(function (a, b) {
+      var da = txDate(a), dbb = txDate(b);
+      if (da !== dbb) return da < dbb ? 1 : -1;
+      return b.ts - a.ts || (a.id < b.id ? 1 : -1);
+    });
   }
 
   // ---- Status line ----
@@ -867,14 +881,16 @@
     }
     var tx = cleanTx({
       partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: after - before, after: after, ts: Date.now()
+      change: after - before, after: after, date: row.date, ts: Date.now()
     }, uid());
     row.loggedQty = row.quantity;
     clearTimeout(editTimers[row.id]);
     delete editTimers[row.id];
     txList.unshift(tx);
+    sortTx(txList);
     writeRow(row);
     saveDoc("transactions", tx.id, txBody(tx));
+    updateTotal(row);
     updateCounts();
   }
 
@@ -1064,7 +1080,7 @@
   }
 
   var MACHINE_HEAD = document.getElementById("thead").innerHTML;
-  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-when">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-type">Type</th><th class="col-change">Quantity</th><th class="col-after">Stock after</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
+  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-when">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-type">Type</th><th class="col-change">Quantity</th><th class="col-value">Value</th><th class="col-after">Stock after</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function fmtTime(ts) {
@@ -1158,7 +1174,25 @@
       num.className = "col-num";
       num.textContent = i + 1;
       tr.appendChild(num);
-      tr.appendChild(txCell("Date", fmtTime(t.ts), "when"));
+      var dtd = document.createElement("td");
+      dtd.setAttribute("data-label", "Date");
+      var din = document.createElement("input");
+      din.type = "date";
+      din.className = "cell date";
+      din.id = "tx-" + t.id + "-date";
+      din.value = txDate(t);
+      din.title = "Recorded " + fmtTime(t.ts).replace("  ", " at ");
+      din.setAttribute("aria-label", "Transaction date");
+      din.readOnly = readOnly;
+      din.addEventListener("change", function () {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(din.value)) { din.value = txDate(t); return; }
+        t.date = din.value;
+        sortTx(txList);
+        saveDoc("transactions", t.id, txBody(t));
+        renderTransactions();
+      });
+      dtd.appendChild(din);
+      tr.appendChild(dtd);
       var mtd = document.createElement("td");
       mtd.setAttribute("data-label", "Machine");
       mtd.innerHTML = '<span class="tx-text"><span class="chip"></span></span>';
@@ -1171,6 +1205,8 @@
       ttd.innerHTML = '<span class="tx-text"><span class="chip ' + (isIn ? "chip-in" : "chip-out") + '">' + (isIn ? "In" : "Out") + "</span></span>";
       tr.appendChild(ttd);
       tr.appendChild(txCell("Quantity", (isIn ? "+" : "−") + Math.abs(t.change), "qty " + (isIn ? "pos" : "neg")));
+      var val = txValue(t, part);
+      tr.appendChild(txCell("Value", val === null ? "" : money(val, part.currency), "qty " + (isIn ? "pos" : "neg")));
       tr.appendChild(txCell("Stock after", String(t.after), "after"));
 
       var act = document.createElement("td");
@@ -1203,11 +1239,25 @@
     var t = String(r.price).trim().replace(",", ".");
     return /^\d+(\.\d+)?$/.test(t) || /^\d*\.\d+$/.test(t) ? parseFloat(t) : null;
   }
-  // Total price = quantity x unit price; null until both are filled in
+  // Quantity this month's sheet started with plus everything received.
+  // Parts used (Out) do not lower it, so Total price keeps the value as entered.
+  function receivedQty(r) {
+    var base = r.baseline ? r.quantity : r.loggedQty;
+    if (!/^\d+$/.test(base)) return null;
+    var used = 0;
+    (allTx[r.month] || []).forEach(function (t) { if (t.partId === r.id && t.change < 0) used -= t.change; });
+    return parseInt(base, 10) + used;
+  }
+  // Total price = received quantity x unit price; null until both are known
   function totalOf(r) {
-    var p = unitPrice(r);
-    if (p === null || !/^\d+$/.test(r.quantity)) return null;
-    return Math.round(parseInt(r.quantity, 10) * p * 100) / 100;
+    var p = unitPrice(r), q = receivedQty(r);
+    if (p === null || q === null) return null;
+    return Math.round(q * p * 100) / 100;
+  }
+  // Value of one transaction at the part's unit price
+  function txValue(t, part) {
+    var p = part ? unitPrice(part) : null;
+    return p === null ? null : Math.round(Math.abs(t.change) * p * 100) / 100;
   }
   function money(n, currency) {
     var txt = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1579,7 +1629,7 @@
       var rows = list.map(function (r, i) {
         return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
           { v: numOrText(r.quantity), s: z("bold", i) }, { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) },
-          totalOf(r) === null ? { v: "", s: z("money", i) } : { f: "C" + (HEAD_ROW + 1 + i) + "*D" + (HEAD_ROW + 1 + i), s: z("moneyBold", i) },
+          { v: totalOf(r) === null ? "" : totalOf(r), s: z("moneyBold", i) },
           { v: r.date, s: z("center", i) }];
       });
       var totals = [];
@@ -1593,19 +1643,22 @@
     function txSheet(name, title, list, withMachine, tab) {
       var rows = list.map(function (t, i) {
         var part = findRow(t.partId), isIn = t.change > 0;
-        var cells = [{ v: fmtTime(t.ts).replace("  ", " "), s: z("center", i) }];
+        var cells = [{ v: txDate(t), s: z("center", i) }];
         if (withMachine) cells.push({ v: t.machine, s: z("center", i) });
         return cells.concat([
           { v: part && part.name ? part.name : t.name, s: z("text", i) },
           { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" },
           { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
+          { v: part ? priceVal(part.price) : "", s: z("money", i) },
+          { v: part ? part.currency : "", s: z("center", i) },
+          { v: txValue(t, part) === null ? "" : txValue(t, part), s: z("moneyBold", i) },
           { v: t.after, s: z("center", i) }]);
       });
       var totals = [];
-      var cols = [{ name: "Date", width: 19 }];
+      var cols = [{ name: "Date", width: 14 }];
       if (withMachine) cols.push({ name: "Machine", width: 12 });
-      cols = cols.concat([{ name: "Name", width: 40 }, { name: "Reference", width: 22 }, { name: "Type", width: 13 }, { name: "Quantity", width: 12 }, { name: "Stock after", width: 13 }]);
+      cols = cols.concat([{ name: "Name", width: 40 }, { name: "Reference", width: 22 }, { name: "Type", width: 10 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 11 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]);
       return { name: name, xml: sheetXml({
         title: title, subtitle: "Transactions · " + label + " · " + list.length + (list.length === 1 ? " entry" : " entries") + " · " + stamp,
         tab: tab, rows: rows, totals: totals, columns: cols
