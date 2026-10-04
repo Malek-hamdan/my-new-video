@@ -288,6 +288,13 @@
   tbody tr { transition: background 0.15s ease; }
   tbody tr + tr td { border-top: 1px solid var(--border); }
   tbody tr:hover { background: rgba(255,255,255,0.03); }
+  /* Rows added with New arrival */
+  tbody tr.arrival { background: rgba(127,214,164,0.13); }
+  tbody tr.arrival:hover { background: rgba(127,214,164,0.18); }
+  tbody tr.arrival td:first-child { box-shadow: inset 4px 0 0 #7fd6a4; color: #a9e8c4; font-weight: 700; }
+  tbody tr.arrival .cell { border-color: rgba(127,214,164,0.25); }
+  .btn.btn-arrival { background: rgba(127,214,164,0.16); border-color: rgba(127,214,164,0.55); color: #c6f1d8; }
+  .btn.btn-arrival:hover { background: rgba(127,214,164,0.26); border-color: #7fd6a4; box-shadow: 0 0 0 3px rgba(127,214,164,0.1); }
   tbody td { padding: 6px 18px; vertical-align: middle; }
   td.col-num { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 
@@ -399,6 +406,18 @@
       font-size: 12px;
     }
     td.col-num::before { content: "#"; }
+    tbody tr.arrival { box-shadow: inset 4px 0 0 #7fd6a4; }
+    tbody tr.arrival td:first-child { box-shadow: none; }
+    tbody tr.arrival td.col-num::after {
+      content: "New arrival";
+      margin-left: 8px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: rgba(127,214,164,0.18);
+      color: #c6f1d8;
+      font-size: 11px;
+      font-weight: 600;
+    }
     td[data-label] {
       display: grid;
       grid-template-columns: 82px 1fr;
@@ -462,7 +481,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           <span>Add part</span>
         </button>
-        <button class="btn btn-primary" id="recvTop" type="button" title="Add a part that just arrived. Its quantity is recorded as In.">
+        <button class="btn btn-arrival" id="recvTop" type="button" title="Add a part that just arrived. Its quantity is recorded as In.">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>
           <span>New arrival</span>
         </button>
@@ -493,7 +512,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         Add part
       </button>
-      <button class="btn" id="recvBottom" type="button">
+      <button class="btn btn-arrival" id="recvBottom" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>
         New arrival
       </button>
@@ -578,6 +597,7 @@
       loggedQty: r.loggedQty == null ? qty : String(r.loggedQty),
       date: String(r.date || ""),
       baseline: !!r.baseline,
+      arrival: !!r.arrival,
       created: Number(r.created) || 0
     };
   }
@@ -597,7 +617,7 @@
   }
 
   function rowBody(r) {
-    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, created: r.created };
+    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
     return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, ts: t.ts };
@@ -633,7 +653,7 @@
         });
         rows.forEach(function (r) {
           if (MACHINES.indexOf(r.machine) === -1) return;
-          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, created: r.created }, r.machine);
+          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
           if (!allParts[row.month]) allParts[row.month] = emptyData();
           allParts[row.month][row.machine].push(row);
         });
@@ -1031,6 +1051,10 @@
     data[active].forEach(function (row, i) {
       var tr = document.createElement("tr");
       tr.setAttribute("data-id", row.id);
+      if (row.arrival) {
+        tr.className = "arrival";
+        tr.title = "New arrival";
+      }
 
       var num = document.createElement("td");
       num.className = "col-num";
@@ -1070,7 +1094,7 @@
   // Otherwise the first quantity is starting stock and is not logged.
   function addRow(received) {
     if (readOnly || active === TX) return;
-    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received }, active);
+    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received }, active);
     data[active].push(row);
     writeRow(row);
     renderRows(row.id);
@@ -1116,7 +1140,7 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, created: v.created }, v.machine);
+      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       if (local) row = local;
