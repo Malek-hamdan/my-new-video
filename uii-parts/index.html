@@ -204,13 +204,30 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-price { width: 16%; }
+  th.col-qty { width: 16%; }
   th.col-ref { width: 24%; }
   th.col-date { width: 19%; }
   .cell.date { min-height: 39px; }
   .cell.date::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; }
   .cell.date.blank { color: var(--muted); }
   th.col-act, td.col-act { width: 56px; text-align: right; }
+  th.col-mach { width: 14%; }
+  .tx-text { display: block; padding: 8px 10px; min-height: 39px; overflow-wrap: anywhere; }
+  .tx-text.muted { color: var(--muted); }
+  .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chip {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(91,157,255,0.3);
+    color: #cfe0ff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tab.tx { color: #b9c6dc; }
+  .tab-sep { flex: 0 0 1px; align-self: stretch; margin: 6px 2px; background: var(--border-strong); }
+  body.tx-view #addTop, body.tx-view .panel-foot { display: none; }
 
   tbody tr { transition: background 0.15s ease; }
   tbody tr + tr td { border-top: 1px solid var(--border); }
@@ -235,7 +252,7 @@
     border-color: rgba(91,157,255,0.6);
     background: rgba(91,157,255,0.06);
   }
-  .cell.price { font-variant-numeric: tabular-nums; }
+  .cell.qty { font-variant-numeric: tabular-nums; }
 
   .del {
     display: inline-flex;
@@ -303,6 +320,8 @@
     .panel-head { padding: 14px; }
     .panel-head .btn span { display: none; }
     .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px; }
+    .tab.tx { grid-column: 1 / -1; }
+    .tab-sep { display: none; }
     .tab { padding: 9px 4px; gap: 5px; font-size: 14px; min-width: 0; }
     .tab .count { min-width: 18px; padding: 1px 5px; font-size: 11px; }
     thead { display: none; }
@@ -360,7 +379,7 @@
     <p class="subtitle">Machine Spare Parts Register</p>
   </header>
 
-  <nav class="tabs" role="tablist" id="tabs" aria-label="Machines"></nav>
+  <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
 
   <section class="panel" role="tabpanel" id="panel" aria-labelledby="">
     <div class="panel-head">
@@ -375,12 +394,12 @@
     </div>
 
     <table>
-      <thead>
+      <thead id="thead">
         <tr>
           <th class="col-num">#</th>
           <th>Name</th>
           <th class="col-ref">Reference</th>
-          <th class="col-price">Price</th>
+          <th class="col-qty">Quantity</th>
           <th class="col-date">Date</th>
           <th class="col-act"><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
         </tr>
@@ -390,7 +409,7 @@
 
     <div class="empty" id="empty" hidden>
       <strong>No parts yet</strong>
-      Use “Add row” to start this machine’s list.
+      <span>Use “Add row” to start this machine’s list.</span>
     </div>
 
     <div class="panel-foot">
@@ -412,9 +431,11 @@
   var MACHINES = ["BLM", "BCW3", "Bonal", "Sollas"];
   var STORAGE_KEY = "uii-spare-parts-v1";
   var TAB_KEY = "uii-spare-parts-active-tab";
-  var FIELDS = ["name", "reference", "price", "date"];
+  var FIELDS = ["name", "reference", "quantity", "date"];
+  var TX = "Transaction";
+  var TABS = MACHINES.concat([TX]);
 
-  // data[machine] = [{id, name, reference, price, created}]
+  // data[machine] = [{id, name, reference, quantity, created}]
   var data = emptyData();
   var active = MACHINES[0];
   var db = null;          // shared store when running as a published artifact
@@ -436,7 +457,7 @@
       machine: machine,
       name: String(r.name || ""),
       reference: String(r.reference || ""),
-      price: String(r.price || ""),
+      quantity: String(r.quantity || ""),
       date: String(r.date || ""),
       created: Number(r.created) || 0
     };
@@ -463,7 +484,7 @@
         var parsed = JSON.parse(raw);
         MACHINES.forEach(function (m) {
           if (Array.isArray(parsed[m])) {
-            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, price: r.price, date: r.date, created: r.created }, m); });
+            d[m] = parsed[m].map(function (r) { return clean({ id: r.id || uid(), name: r.name, reference: r.reference, quantity: r.quantity, date: r.date, created: r.created }, m); });
           }
         });
       }
@@ -474,7 +495,7 @@
     try {
       var out = {};
       MACHINES.forEach(function (m) {
-        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, price: r.price, date: r.date, created: r.created }; });
+        out[m] = data[m].map(function (r) { return { id: r.id, name: r.name, reference: r.reference, quantity: r.quantity, date: r.date, created: r.created }; });
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(out));
       setStatus("Saved", "saved");
@@ -505,7 +526,7 @@
   }
   function writeRow(row) {
     if (!db) { saveLocal(); return; }
-    var body = { machine: row.machine, name: row.name, reference: row.reference, price: row.price, date: row.date, created: row.created };
+    var body = { machine: row.machine, name: row.name, reference: row.reference, quantity: row.quantity, date: row.date, created: row.created };
     enqueue(row.id, function () { return db.collection("parts").doc(row.id).set(body); })
       .then(function () { setStatus("Saved", "saved"); }, onWriteError);
   }
@@ -551,10 +572,16 @@
 
   function renderTabs() {
     tabsEl.innerHTML = "";
-    MACHINES.forEach(function (m) {
+    TABS.forEach(function (m) {
+      if (m === TX) {
+        var sep = document.createElement("span");
+        sep.className = "tab-sep";
+        sep.setAttribute("aria-hidden", "true");
+        tabsEl.appendChild(sep);
+      }
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "tab";
+      b.className = "tab" + (m === TX ? " tx" : "");
       b.id = "tab-" + m;
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", m === active ? "true" : "false");
@@ -562,19 +589,19 @@
       b.tabIndex = m === active ? 0 : -1;
       b.innerHTML = '<span></span><span class="count"></span>';
       b.firstChild.textContent = m;
-      b.lastChild.textContent = data[m].length;
+      b.lastChild.textContent = tabCount(m);
       b.addEventListener("click", function () { switchTo(m); });
       tabsEl.appendChild(b);
     });
   }
 
   tabsEl.addEventListener("keydown", function (e) {
-    var i = MACHINES.indexOf(active);
-    if (e.key === "ArrowRight") i = (i + 1) % MACHINES.length;
-    else if (e.key === "ArrowLeft") i = (i - 1 + MACHINES.length) % MACHINES.length;
+    var i = TABS.indexOf(active);
+    if (e.key === "ArrowRight") i = (i + 1) % TABS.length;
+    else if (e.key === "ArrowLeft") i = (i - 1 + TABS.length) % TABS.length;
     else return;
     e.preventDefault();
-    switchTo(MACHINES[i]);
+    switchTo(TABS[i]);
     document.getElementById("tab-" + active).focus();
   });
 
@@ -585,21 +612,89 @@
     renderRows();
   }
 
-  function updateCounts() {
-    MACHINES.forEach(function (m) {
-      var c = document.querySelector("#tab-" + m + " .count");
-      if (c) c.textContent = data[m].length;
+  function hasEntry(r) {
+    return (r.name + r.reference + r.quantity).trim() !== "";
+  }
+
+  // Every filled-in part on every machine, newest first
+  function transactions() {
+    var out = [];
+    MACHINES.forEach(function (m) { data[m].forEach(function (r) { if (hasEntry(r)) out.push(r); }); });
+    out.sort(function (a, b) {
+      if (a.date !== b.date) {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return a.date < b.date ? 1 : -1;
+      }
+      return b.created - a.created;
     });
+    return out;
+  }
+
+  function tabCount(m) {
+    return m === TX ? transactions().length : data[m].length;
+  }
+
+  function updateCounts() {
+    TABS.forEach(function (m) {
+      var c = document.querySelector("#tab-" + m + " .count");
+      if (c) c.textContent = tabCount(m);
+    });
+    if (active === TX) return;
     var n = data[active].length;
     metaEl.textContent = n + (n === 1 ? " part" : " parts");
     emptyEl.hidden = n !== 0;
+  }
+
+  var MACHINE_HEAD = document.getElementById("thead").innerHTML;
+  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-date">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-qty">Quantity used</th></tr>';
+
+  function txCell(label, text, cls) {
+    var td = document.createElement("td");
+    td.setAttribute("data-label", label);
+    var span = document.createElement("span");
+    span.className = "tx-text" + (cls ? " " + cls : "") + (text ? "" : " muted");
+    span.textContent = text || "—";
+    td.appendChild(span);
+    return td;
+  }
+
+  function renderTransactions() {
+    var list = transactions();
+    document.getElementById("thead").innerHTML = TX_HEAD;
+    titleEl.textContent = TX;
+    var pieces = 0;
+    rowsEl.innerHTML = "";
+    list.forEach(function (r, i) {
+      var tr = document.createElement("tr");
+      var num = document.createElement("td");
+      num.className = "col-num";
+      num.textContent = i + 1;
+      tr.appendChild(num);
+      tr.appendChild(txCell("Date", r.date));
+      var mtd = document.createElement("td");
+      mtd.setAttribute("data-label", "Machine");
+      mtd.innerHTML = '<span class="tx-text"><span class="chip"></span></span>';
+      mtd.querySelector(".chip").textContent = r.machine;
+      tr.appendChild(mtd);
+      tr.appendChild(txCell("Name", r.name));
+      tr.appendChild(txCell("Reference", r.reference));
+      tr.appendChild(txCell("Quantity used", r.quantity, "qty"));
+      rowsEl.appendChild(tr);
+      pieces += parseInt(r.quantity, 10) || 0;
+    });
+    metaEl.textContent = list.length + (list.length === 1 ? " entry" : " entries") + " · " + pieces + (pieces === 1 ? " piece used" : " pieces used");
+    emptyEl.querySelector("strong").textContent = "No transactions yet";
+    emptyEl.querySelector("span").textContent = "Parts you add on any machine tab show up here with the machine and quantity used.";
+    emptyEl.hidden = list.length !== 0;
+    updateCounts();
   }
 
   function makeCell(row, field, label) {
     var td = document.createElement("td");
     td.setAttribute("data-label", label);
     var input = document.createElement("input");
-    input.className = "cell" + (field === "price" ? " price" : "") + (field === "date" ? " date" : "");
+    input.className = "cell" + (field === "quantity" ? " qty" : "") + (field === "date" ? " date" : "");
     input.type = field === "date" ? "date" : "text";
     input.id = "f-" + row.id + "-" + field;
     input.value = row[field];
@@ -609,10 +704,12 @@
     input.autocomplete = "off";
     input.spellcheck = false;
     input.readOnly = readOnly;
-    if (field === "price") input.inputMode = "decimal";
+    if (field === "quantity") input.inputMode = "numeric";
     if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
+      if (field === "quantity" && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
       row[field] = input.value;
+      updateCounts();
       if (field === "date") input.classList.toggle("blank", !input.value);
       scheduleWrite(row);
     });
@@ -631,6 +728,11 @@
 
   function renderRows(focusId) {
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
+    document.body.classList.toggle("tx-view", active === TX);
+    if (active === TX) { renderTransactions(); return; }
+    document.getElementById("thead").innerHTML = MACHINE_HEAD;
+    emptyEl.querySelector("strong").textContent = "No parts yet";
+    emptyEl.querySelector("span").textContent = "Use \u201CAdd row\u201D to start this machine\u2019s list.";
     titleEl.textContent = active;
     rowsEl.innerHTML = "";
     data[active].forEach(function (row, i) {
@@ -644,7 +746,7 @@
 
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
-      tr.appendChild(makeCell(row, "price", "Price"));
+      tr.appendChild(makeCell(row, "quantity", "Quantity"));
       tr.appendChild(makeCell(row, "date", "Date"));
 
       var act = document.createElement("td");
@@ -658,7 +760,7 @@
       del.innerHTML = TRASH;
       del.addEventListener("click", function (e) {
         e.stopPropagation();
-        var hasContent = (row.name + row.reference + row.price + row.date).trim() !== "";
+        var hasContent = (row.name + row.reference + row.quantity + row.date).trim() !== "";
         if (hasContent && !del.classList.contains("armed")) {
           disarmAll(del);
           del.classList.add("armed");
@@ -688,7 +790,7 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") disarmAll(null); });
 
   function addRow() {
-    if (readOnly) return;
+    if (readOnly || active === TX) return;
     var row = clean({ id: uid(), created: Date.now() }, active);
     data[active].push(row);
     writeRow(row);
@@ -725,13 +827,14 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, name: v.name, reference: v.reference, price: v.price, date: v.date, created: v.created }, v.machine);
+      var row = clean({ id: d.id, name: v.name, reference: v.reference, quantity: v.quantity, date: v.date, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       next[v.machine].push(local || row);
     });
     MACHINES.forEach(function (m) { next[m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
 
+    if (active === TX) { data = next; renderTransactions(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
     var after = next[active].map(function (r) { return r.id; }).join(",");
     data = next;
@@ -751,10 +854,7 @@
       });
       updateCounts();
     }
-    MACHINES.forEach(function (m) {
-      var c = document.querySelector("#tab-" + m + " .count");
-      if (c) c.textContent = data[m].length;
-    });
+    updateCounts();
   }
 
   // ---- Glow follows pointer (rAF-throttled) ----
@@ -781,7 +881,7 @@
   // ---- Boot ----
   try {
     var savedTab = localStorage.getItem(TAB_KEY);
-    if (MACHINES.indexOf(savedTab) !== -1) active = savedTab;
+    if (TABS.indexOf(savedTab) !== -1) active = savedTab;
   } catch (e) {}
 
   var useClaude = window.claude && typeof window.claude.use === "function";
