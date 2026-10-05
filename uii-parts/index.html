@@ -1046,53 +1046,125 @@
   }
 
   // ---- Local storage (used when the shared store is unavailable) ----
-  function loadLocal() {
-    allParts = {};
-    allTx = {};
+  // ---- Saving in this browser (the standalone file) ----
+  // Data lives in IndexedDB (hundreds of MB available). localStorage, capped near 5 MB,
+  // only keeps a small journal of the open month in case the browser closes mid-save.
+  var IDB_NAME = "uii-spare-parts", JOURNAL_KEY = "uii-journal-v1";
+  var idbConn = null, localBackend = "ls", localReady = false;
+  function idbOpen() {
+    return new Promise(function (resolve) {
+      try {
+        var req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = function () { req.result.createObjectStore("kv"); };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { resolve(null); };
+        req.onblocked = function () { resolve(null); };
+      } catch (e) { resolve(null); }
+    });
+  }
+  function idbTx(mode, fn) {
+    return new Promise(function (resolve, reject) {
+      var tx = idbConn.transaction("kv", mode), store = tx.objectStore("kv"), out;
+      fn(store, function (v) { out = v; });
+      tx.oncomplete = function () { resolve(out); };
+      tx.onerror = tx.onabort = function () { reject(tx.error); };
+    });
+  }
+  function kvGet(key) { return idbTx("readonly", function (st, set) { st.get(key).onsuccess = function (e) { set(e.target.result); }; }); }
+  function kvPutMany(obj) { return idbTx("readwrite", function (st) { Object.keys(obj).forEach(function (k) { st.put(obj[k], k); }); }); }
+  function kvDel(key) { return idbTx("readwrite", function (st) { st.delete(key); }); }
+  function kvKeys(prefix) { return idbTx("readonly", function (st, set) { st.getAllKeys().onsuccess = function (e) { set(e.target.result.filter(function (k) { return String(k).indexOf(prefix) === 0; })); }; }); }
+
+  // Rebuild the in-memory months from flat lists of parts and transactions
+  function buildFromLists(rows, txs) {
+    allParts = {}; allTx = {};
+    (rows || []).forEach(function (r) {
+      if (MACHINES.indexOf(r.machine) === -1) return;
+      var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
+      if (!allParts[row.month]) allParts[row.month] = emptyData();
+      allParts[row.month][row.machine].push(row);
+    });
+    Object.keys(allParts).forEach(function (k) { MACHINES.forEach(function (m) { allParts[k][m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); }); });
+    (txs || []).forEach(function (t) { var tx = cleanTx(t); (allTx[tx.month] = allTx[tx.month] || []).push(tx); });
+    Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
+    openSheet();
+  }
+  // Older saves kept everything in localStorage
+  function readLegacyLocal() {
+    var rows = [], txs = [];
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
         // v2 keeps a flat list with each row's month; v1 grouped rows by machine
-        var rows = Array.isArray(parsed.parts) ? parsed.parts : [];
-        MACHINES.forEach(function (m) {
-          if (Array.isArray(parsed[m])) parsed[m].forEach(function (r) { r.machine = m; rows.push(r); });
-        });
-        rows.forEach(function (r) {
-          if (MACHINES.indexOf(r.machine) === -1) return;
-          var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
-          if (!allParts[row.month]) allParts[row.month] = emptyData();
-          allParts[row.month][row.machine].push(row);
-        });
+        if (Array.isArray(parsed.parts)) rows = parsed.parts;
+        MACHINES.forEach(function (m) { if (Array.isArray(parsed[m])) parsed[m].forEach(function (r) { r.machine = m; rows.push(r); }); });
       }
       var rawTx = localStorage.getItem(TX_KEY);
-      if (rawTx) {
-        var arr = JSON.parse(rawTx);
-        if (Array.isArray(arr)) arr.forEach(function (t) {
-          var tx = cleanTx(t);
-          (allTx[tx.month] = allTx[tx.month] || []).push(tx);
-        });
-      }
+      if (rawTx) { var arr = JSON.parse(rawTx); if (Array.isArray(arr)) txs = arr; }
     } catch (e) {}
-    Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
-    openSheet();
+    return { parts: rows, transactions: txs, found: !!(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(TX_KEY)) };
   }
+  function loadLocal() {
+    return loadLocalData().then(function () { localReady = true; });
+  }
+  function loadLocalData() {
+    return idbOpen().then(function (conn) {
+      if (!conn) { localBackend = "ls"; var l = readLegacyLocal(); buildFromLists(l.parts, l.transactions); return; }
+      idbConn = conn; localBackend = "idb";
+      return Promise.all([kvGet("parts"), kvGet("transactions"), kvGet("savedAt")]).then(function (v) {
+        var rows = v[0], txs = v[1], savedAt = v[2] || 0;
+        if (!rows) {
+          // first run with IndexedDB: move what was in localStorage over, then free that space
+          var l = readLegacyLocal();
+          rows = l.parts; txs = l.transactions;
+          return migrateSnapshots().then(function () {
+            return kvPutMany({ parts: rows, transactions: txs, savedAt: Date.now() });
+          }).then(function () {
+            if (l.found) { try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(TX_KEY); } catch (e) {} }
+            buildFromLists(rows, txs);
+          });
+        }
+        // a save that did not finish before the browser closed: the journal has the open month
+        try {
+          var j = JSON.parse(localStorage.getItem(JOURNAL_KEY) || "null");
+          if (j && j.savedAt > savedAt && j.month) {
+            rows = rows.filter(function (r) { return r.month !== j.month; }).concat(j.parts || []);
+            txs = (txs || []).filter(function (t) { return t.month !== j.month; }).concat(j.transactions || []);
+          }
+        } catch (e) {}
+        buildFromLists(rows, txs);
+      });
+    }).catch(function () { localBackend = "ls"; var l = readLegacyLocal(); buildFromLists(l.parts, l.transactions); });
+  }
+  var idbChain = Promise.resolve(), idbPending = null;
   function saveLocal() {
-    try {
-      var parts = [], txs = [];
-      Object.keys(allParts).forEach(function (k) {
-        MACHINES.forEach(function (m) {
-          allParts[k][m].forEach(function (r) { var b = rowBody(r); b.id = r.id; parts.push(b); });
+    if (!localReady) return; // nothing is overwritten before the saved data has loaded
+    var all = serializeAll(), stamp = Date.now();
+    if (localBackend === "idb") {
+      // small journal first (synchronous), then the full save
+      try {
+        localStorage.setItem(JOURNAL_KEY, JSON.stringify({ savedAt: stamp, month: month,
+          parts: all.parts.filter(function (r) { return r.month === month; }),
+          transactions: all.transactions.filter(function (t) { return t.month === month; }) }));
+      } catch (e) {}
+      // only the latest state needs writing; collapse saves that pile up
+      var first = !idbPending;
+      idbPending = { parts: all.parts, transactions: all.transactions, savedAt: stamp };
+      if (first) idbChain = idbChain.then(function () {
+        var job = idbPending; idbPending = null;
+        return kvPutMany(job).then(function () { setStatus("Saved", "saved"); }, function () {
+          setStatus("Not saved: the browser refused to store the data. Download a full backup now.", "error");
         });
       });
-      Object.keys(allTx).forEach(function (k) {
-        allTx[k].forEach(function (t) { var b = txBody(t); b.id = t.id; txs.push(b); });
-      });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ parts: parts }));
-      localStorage.setItem(TX_KEY, JSON.stringify(txs));
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ parts: all.parts }));
+      localStorage.setItem(TX_KEY, JSON.stringify(all.transactions));
       setStatus("Saved", "saved");
     } catch (e) {
-      setStatus("Not saved: this browser is blocking storage.", "error");
+      setStatus("Not saved: browser storage is full or blocked. Download a full backup now.", "error");
     }
   }
 
@@ -1924,6 +1996,13 @@
     el.style.height = "auto";
     el.style.height = el.scrollHeight + 2 + "px";
   }
+  // Many at once: set every height to auto, read all, then write all
+  function fitAll(list) {
+    list = Array.prototype.slice.call(list);
+    list.forEach(function (el) { el.style.height = "auto"; });
+    var h = list.map(function (el) { return el.scrollHeight; });
+    list.forEach(function (el, i) { el.style.height = h[i] + 2 + "px"; el._len = el.value.length; });
+  }
   // While typing: resize once per frame, and only when the text needs another line or freed one
   var fitQueue = [];
   function fitSoon(el) {
@@ -2110,7 +2189,6 @@
       tr.appendChild(act);
 
       rowsEl.appendChild(tr);
-      tr.querySelectorAll("textarea.wrap").forEach(fitHeight);
       updateTotal(row);
 
       if (row.id === focusId) {
@@ -2121,6 +2199,7 @@
         }, 0);
       }
     });
+    fitAll(rowsEl.querySelectorAll("textarea.wrap"));
     updateCounts();
   }
 
@@ -2797,7 +2876,18 @@
   var SNAP_KEY = "uii-snapshots-v1";
   var CHUNK = 200000;
   function localSnaps() { try { return JSON.parse(localStorage.getItem(SNAP_KEY)) || {}; } catch (e) { return {}; } }
+  // copies made before IndexedDB move across once
+  function migrateSnapshots() {
+    var old = localSnaps(), keys = Object.keys(old);
+    if (!keys.length) return Promise.resolve();
+    var put = {};
+    keys.forEach(function (k) { put["snapmeta:" + k] = old[k].meta; put["snapdata:" + k] = old[k].data; });
+    return kvPutMany(put).then(function () { try { localStorage.removeItem(SNAP_KEY); } catch (e) {} }, function () {});
+  }
   function listSnapshots() {
+    if (!db && localBackend === "idb") {
+      return kvKeys("snapmeta:").then(function (keys) { return Promise.all(keys.map(kvGet)); });
+    }
     if (!db) {
       var all = localSnaps();
       return Promise.resolve(Object.keys(all).map(function (k) { return all[k].meta; }));
@@ -2817,6 +2907,10 @@
     var data = JSON.stringify(all);
     var d = describeData(all);
     var meta = { key: key, kind: kind, at: Date.now(), parts: all.parts.length, transactions: all.transactions.length, byMachine: d.byMachine, months: d.months, note: note || "" };
+    if (!db && localBackend === "idb") {
+      var put = {}; put["snapmeta:" + key] = meta; put["snapdata:" + key] = data;
+      return kvPutMany(put).then(function () { return true; }, function () { return false; });
+    }
     if (!db) {
       var all = localSnaps();
       all[key] = { meta: meta, data: data };
@@ -2831,6 +2925,7 @@
     return p.then(function () { return db.collection("snapshots").doc(key).set(meta); }).then(function () { return true; });
   }
   function readSnapshot(meta) {
+    if (!db && localBackend === "idb") return kvGet("snapdata:" + meta.key).then(function (d) { return d ? JSON.parse(d) : null; });
     if (!db) { var s = localSnaps()[meta.key]; return Promise.resolve(s ? JSON.parse(s.data) : null); }
     var parts = [], p = Promise.resolve();
     for (var i = 0; i < (meta.chunks || 0); i++) (function (i) {
@@ -2839,6 +2934,7 @@
     return p.then(function () { return JSON.parse(parts.join("")); });
   }
   function dropSnapshot(meta) {
+    if (!db && localBackend === "idb") return kvDel("snapmeta:" + meta.key).then(function () { return kvDel("snapdata:" + meta.key); });
     if (!db) { var all = localSnaps(); delete all[meta.key]; try { localStorage.setItem(SNAP_KEY, JSON.stringify(all)); } catch (e) {} return Promise.resolve(); }
     var p = db.collection("snapshots").doc(meta.key).delete();
     for (var i = 0; i < (meta.chunks || 0); i++) (function (i) { p = p.then(function () { return db.collection("snapshotChunks").doc(meta.key + "-" + i).delete(); }); })(i);
@@ -3091,24 +3187,27 @@
   openSheet();
 
   var useClaude = window.claude && typeof window.claude.use === "function";
-  if (!useClaude) loadLocal();
   renderMonths();
   renderTabs();
   renderRows();
-  if (!useClaude) { maybeDailySnapshot(); updateReminder(); }
+  if (!useClaude) loadLocal().then(function () {
+    renderMonths(); renderTabs(); renderRows();
+    maybeDailySnapshot(); updateReminder();
+  });
 
   if (useClaude) {
     setStatus("Loading…");
     window.claude.use("db").then(function (store) {
       if (!store) {
         // No shared store in this view: keep entries in this browser
-        loadLocal();
-        renderMonths();
-        renderTabs();
-        renderRows();
-        maybeDailySnapshot();
-        updateReminder();
-        setStatus("Saving in this browser only.", "");
+        loadLocal().then(function () {
+          renderMonths();
+          renderTabs();
+          renderRows();
+          maybeDailySnapshot();
+          updateReminder();
+          setStatus("Saving in this browser only.", "");
+        });
         return;
       }
       db = store;
