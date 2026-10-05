@@ -298,6 +298,12 @@
   .confirm-card strong { display: block; font-size: 18px; margin-bottom: 8px; color: #ffe3a8; }
   .confirm-card p { margin: 0 0 18px; color: var(--text); line-height: 1.55; }
   .cell.pass { margin-bottom: 8px; padding: 12px; border-color: var(--border-strong); font-size: 20px; letter-spacing: 0.3em; text-align: center; }
+  .restore-opts { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+  .restore-opts[hidden] { display: none; }
+  .restore-opts .opt { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  .restore-opts .opt.target { justify-content: space-between; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .restore-opts select { font-size: 14px; padding: 6px 8px; flex: 1; min-width: 0; max-width: 100%; }
+  .restore-opts .opt.target { white-space: nowrap; }
   .pass-err { margin-bottom: 12px; color: var(--danger); font-size: 13px; font-weight: 600; }
   .pass-err[hidden] { display: none; }
   .shake { animation: shake 0.35s ease; }
@@ -856,6 +862,11 @@
       <strong id="unlockTitle">Unlock month</strong>
       <p id="unlockText"></p>
       <input class="cell pass" id="unlockPass" type="password" inputmode="numeric" autocomplete="off" aria-label="Unlock code" placeholder="Code">
+      <div class="restore-opts" id="restoreOpts" hidden>
+        <label class="opt target">Put into <select id="restoreTarget" class="cur"></select></label>
+        <label class="opt"><input type="radio" name="restoreScope" value="all" checked> Parts and transactions</label>
+        <label class="opt"><input type="radio" name="restoreScope" value="parts"> Parts only (no transactions)</label>
+      </div>
       <div class="pass-err" id="unlockErr" hidden>Wrong code. Try again.</div>
       <div class="confirm-actions">
         <button class="btn" id="unlockCancel" type="button">Cancel</button>
@@ -1984,10 +1995,12 @@
   var unlockPass = document.getElementById("unlockPass");
   var unlockErr = document.getElementById("unlockErr");
   var codeCallback = null;
-  function closeUnlock() { unlockDlg.hidden = true; unlockPass.value = ""; unlockErr.hidden = true; codeCallback = null; }
+  function closeUnlock() { unlockDlg.hidden = true; unlockPass.value = ""; unlockErr.hidden = true; codeCallback = null; document.getElementById("restoreOpts").hidden = true; }
   // Ask for the code, then run onOk
-  function askCode(text, onOk) {
+  function askCode(text, onOk, showRestoreOpts) {
     codeCallback = onOk;
+    document.getElementById("restoreOpts").hidden = !showRestoreOpts;
+    if (showRestoreOpts) document.querySelector('input[name="restoreScope"][value="all"]').checked = true;
     document.getElementById("unlockTitle").textContent = "Enter the code";
     document.getElementById("unlockText").textContent = text;
     unlockErr.hidden = true;
@@ -2008,8 +2021,9 @@
     e.preventDefault();
     if (codeHash(unlockPass.value.trim()) === UNLOCK_HASH) {
       var cb = codeCallback;
-      closeUnlock();
+      unlockDlg.hidden = true; unlockPass.value = ""; unlockErr.hidden = true; codeCallback = null;
       if (cb) cb();
+      document.getElementById("restoreOpts").hidden = true;
       return;
     }
     unlockErr.hidden = false;
@@ -2940,14 +2954,30 @@
   }
 
   // Put one month back from a month file; other months stay as they are
-  function restoreMonth(snap, label) {
-    if (!snap || MONTHS.indexOf(snap.month) === -1) { setStatus("That file's month can't be read.", "error"); return; }
+  // Put a month file's parts into the target month (the one open on screen).
+  // The target's current parts are replaced; every other month stays as it is.
+  function restoreMonth(snap, label, target, withTx) {
+    if (!snap || MONTHS.indexOf(target) === -1) { setStatus("That file's month can't be read.", "error"); return; }
+    var ids = {}, stamp = Date.now();
+    var parts = snap.parts.map(function (r, i) {
+      var c = Object.assign({}, r);
+      // fresh ids when the parts go into another month, so the file's own month keeps its parts
+      if (target !== snap.month) { ids[r.id] = uid() + i; c.id = ids[r.id]; c.created = stamp + i; } else ids[r.id] = r.id;
+      c.month = target;
+      if (!withTx) { c.loggedQty = c.quantity; c.baseline = false; }
+      return c;
+    });
+    var txs = !withTx ? [] : snap.transactions.map(function (t, i) {
+      var c = Object.assign({}, t);
+      if (target !== snap.month) c.id = uid() + "t" + i;
+      c.partId = ids[t.partId] || "";
+      c.month = target;
+      return c;
+    });
     var all = serializeAll();
-    snap.parts.forEach(function (r) { r.month = snap.month; });
-    snap.transactions.forEach(function (t) { t.month = snap.month; });
-    restoreFrom({ app: "UII parts", parts: all.parts.filter(function (r) { return r.month !== snap.month; }).concat(snap.parts),
-      transactions: all.transactions.filter(function (t) { return t.month !== snap.month; }).concat(snap.transactions) }, label, function () {
-      if (month !== snap.month) selectMonth(snap.month);
+    restoreFrom({ app: "UII parts", parts: all.parts.filter(function (r) { return r.month !== target; }).concat(parts),
+      transactions: all.transactions.filter(function (t) { return t.month !== target; }).concat(txs) }, label, function () {
+      if (month !== target) selectMonth(target);
     });
   }
 
@@ -2975,10 +3005,23 @@
     reading.then(function (snap) {
       if (!snap || snap.app !== "UII parts") throw new Error("not a backup");
       if (snap.kind === "month") {
-        var mName = monthLabel(snap.month), n = snap.parts.length;
-        askCode("Restore " + mName + " from " + f.name + " (" + n + (n === 1 ? " part" : " parts") + ")? Only " + mName + " is replaced; other months stay as they are." +
-          (snap.rebuilt ? " This older file has no exact copy, so parts come back as Add part and transactions as they appear in the file." : ""),
-          function () { restoreMonth(snap, mName + " from " + f.name); });
+        var from = monthLabel(snap.month), n = snap.parts.length;
+        var sel = document.getElementById("restoreTarget");
+        sel.innerHTML = "";
+        MONTHS.forEach(function (k) {
+          var o = document.createElement("option");
+          o.value = k;
+          o.textContent = monthLabel(k) + (k === month ? " (open now)" : "") + (k === snap.month ? " (file\u2019s month)" : "") + (monthHasData(k) ? " \u2014 has data" : "");
+          sel.appendChild(o);
+        });
+        sel.value = month;
+        askCode("This file has " + n + (n === 1 ? " part" : " parts") + " from " + from + ". Pick the month to put them into. That month\u2019s current parts are replaced; all other months stay as they are." +
+          (snap.rebuilt ? " This older file has no exact copy, so parts come back as Add part." : ""),
+          function () {
+            var withTx = document.querySelector('input[name="restoreScope"]:checked').value === "all";
+            var target = sel.value;
+            restoreMonth(snap, from + " into " + monthLabel(target), target, withTx);
+          }, true);
         return;
       }
       askCode("Restore everything from " + f.name + "? All months go back to how they are in that file.", function () { restoreFrom(snap, f.name); });
