@@ -833,7 +833,7 @@
         <button class="btn" id="backupClose" type="button">Close</button>
       </div>
       <h4>Full backup on your device</h4>
-      <p class="muted-p">One Excel file with everything: an overview by month, all parts and all transactions. Keep it on your laptop or email it to yourself. Restore reads the same file back.</p>
+      <p class="muted-p">One Excel file with everything: an overview by month, all parts and all transactions. Keep it on your laptop or email it to yourself. Restore takes a full backup (all months) or a month’s Excel export (only that month).</p>
       <p class="muted-p" id="lastBackup"></p>
       <div class="dlg-actions">
         <button class="btn btn-primary" id="fullBackupBtn" type="button">Download full backup</button>
@@ -2368,6 +2368,11 @@
       sheets.push(txSheet(m + " " + TX, "UII — " + m + " " + TX, txList.filter(function (t) { return t.machine === m; }), false, "1E7B45"));
     });
     sheets.push(txSheet("All " + TX + "s", "UII — All " + TX + "s", txList, true, "6B7280"));
+    // hidden copy of this month so the file can be restored into the site
+    var mp = [], mt = [];
+    MACHINES.forEach(function (m) { data[m].forEach(function (r) { var b = rowBody(r); b.id = r.id; mp.push(b); }); });
+    txList.forEach(function (t) { var b = txBody(t); b.id = t.id; mt.push(b); });
+    sheets.push(dataSheet(MONTH_MARK, { app: "UII parts", kind: "month", month: month, savedAt: Date.now(), parts: mp, transactions: mt }));
 
     return packXlsx(sheets);
   }
@@ -2439,11 +2444,15 @@
         { name: "Type", width: 9 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]
     }) });
 
-    // Hidden copy of the exact data, split to fit Excel's cell size
-    var json = JSON.stringify(all), rows = '<row r="1"><c r="A1" t="inlineStr"><is><t>' + BACKUP_MARK + "</t></is></c></row>";
-    for (var i = 0, r = 2; i < json.length; i += 30000, r++) rows += '<row r="' + r + '"><c r="A' + r + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(json.slice(i, i + 30000)) + "</t></is></c></row>";
-    sheets.push({ name: "_data", hidden: true, xml: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + rows + "</sheetData></worksheet>" });
+    sheets.push(dataSheet(BACKUP_MARK, all));
     return packXlsx(sheets);
+  }
+  // Hidden "_data" sheet: a marker in A1, then the JSON split to fit Excel's cell size
+  var MONTH_MARK = "UII-MONTH-v1";
+  function dataSheet(mark, obj) {
+    var json = JSON.stringify(obj), rows = '<row r="1"><c r="A1" t="inlineStr"><is><t>' + mark + "</t></is></c></row>";
+    for (var i = 0, r = 2; i < json.length; i += 30000, r++) rows += '<row r="' + r + '"><c r="A' + r + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(json.slice(i, i + 30000)) + "</t></is></c></row>";
+    return { name: "_data", hidden: true, xml: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + rows + "</sheetData></worksheet>" };
   }
 
   // ---- Reading a backup .xlsx back (also after it was opened and saved in Excel) ----
@@ -2478,27 +2487,94 @@
   function readBackupXlsx(buf) {
     var files = unzipEntries(buf), parse = function (t) { return new DOMParser().parseFromString(t, "application/xml"); };
     var wb, rels, shared = [];
+    function colIndex(ref) { var m = /^([A-Z]+)(\d+)$/.exec(ref || ""), n = 0; if (!m) return null; for (var i = 0; i < m[1].length; i++) n = n * 26 + m[1].charCodeAt(i) - 64; return { c: n - 1, r: parseInt(m[2], 10) }; }
+    // rows[rowNumber][column] = text of every filled cell in the named sheet
+    function sheetRows(name) {
+      var sheet = Array.prototype.find.call(wb.getElementsByTagName("sheet"), function (el) { return el.getAttribute("name") === name; });
+      if (!sheet) return Promise.resolve(null);
+      var rid = sheet.getAttribute("r:id") || sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+      var rel = Array.prototype.find.call(rels.getElementsByTagName("Relationship"), function (el) { return el.getAttribute("Id") === rid; });
+      var target = rel.getAttribute("Target").replace(/^\//, "");
+      return readZipText(files, target.indexOf("xl/") === 0 ? target : "xl/" + target).then(function (t) {
+        var rows = {};
+        Array.prototype.forEach.call(parse(t).getElementsByTagName("c"), function (c) {
+          var pos = colIndex(c.getAttribute("r")); if (!pos) return;
+          var type = c.getAttribute("t"), v = c.getElementsByTagName("v")[0], val;
+          if (type === "s") val = shared[parseInt(v.textContent, 10)];
+          else if (type === "inlineStr") val = c.getElementsByTagName("is")[0].textContent;
+          else val = v ? v.textContent : "";
+          (rows[pos.r] = rows[pos.r] || [])[pos.c] = val;
+        });
+        return rows;
+      });
+    }
     return readZipText(files, "xl/workbook.xml").then(function (t) { wb = parse(t);
       return readZipText(files, "xl/_rels/workbook.xml.rels"); }).then(function (t) { rels = parse(t);
       return readZipText(files, "xl/sharedStrings.xml"); }).then(function (t) {
       if (t) Array.prototype.forEach.call(parse(t).getElementsByTagName("si"), function (si) { shared.push(si.textContent); });
-      var sheet = Array.prototype.find.call(wb.getElementsByTagName("sheet"), function (el) { return el.getAttribute("name") === "_data"; });
-      if (!sheet) throw new Error("no data sheet");
-      var rid = sheet.getAttribute("r:id") || sheet.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
-      var rel = Array.prototype.find.call(rels.getElementsByTagName("Relationship"), function (el) { return el.getAttribute("Id") === rid; });
-      var target = rel.getAttribute("Target").replace(/^\//, "");
-      return readZipText(files, target.indexOf("xl/") === 0 ? target : "xl/" + target);
-    }).then(function (t) {
-      var vals = [];
-      Array.prototype.forEach.call(parse(t).getElementsByTagName("c"), function (c) {
-        if (!/^A\d+$/.test(c.getAttribute("r") || "")) return;
-        var type = c.getAttribute("t"), v = c.getElementsByTagName("v")[0];
-        if (type === "s") vals.push(shared[parseInt(v.textContent, 10)]);
-        else if (type === "inlineStr") vals.push(c.getElementsByTagName("is")[0].textContent);
-        else vals.push(v ? v.textContent : "");
+      return sheetRows("_data");
+    }).then(function (rows) {
+      if (rows) {
+        var nums = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
+        var vals = nums.map(function (n) { return rows[n][0] || ""; });
+        if (vals[0] === BACKUP_MARK || vals[0] === MONTH_MARK) return JSON.parse(vals.slice(1).join(""));
+      }
+      return readMonthSheets(sheetRows);
+    });
+  }
+
+  // Older month exports have no hidden copy: rebuild the month from its visible sheets
+  var LABEL_TO_MONTH = {};
+  function readMonthSheets(sheetRows) {
+    var key = null, parts = [], txs = [];
+    function headerMap(rows) {
+      var h = {}, head = rows[HEAD_ROW] || [];
+      head.forEach(function (name, i) { if (name) h[String(name).trim().toLowerCase()] = i; });
+      return h;
+    }
+    function body(rows) { return Object.keys(rows).map(Number).filter(function (n) { return n > HEAD_ROW; }).sort(function (a, b) { return a - b; }).map(function (n) { return rows[n]; }); }
+    function get(row, h, names) { for (var i = 0; i < names.length; i++) if (h[names[i]] != null && row[h[names[i]]] != null) return String(row[h[names[i]]]).trim(); return ""; }
+    function findMonth(rows) {
+      var sub = rows && rows[2] && rows[2][0] ? String(rows[2][0]) : "";
+      var m = /([A-Z][a-z]+ \d{4})/.exec(sub);
+      if (m) MONTHS.forEach(function (k) { if (monthLabel(k) === m[1]) key = k; });
+    }
+    var p = Promise.resolve();
+    MACHINES.forEach(function (m) {
+      p = p.then(function () { return sheetRows(m); }).then(function (rows) {
+        if (!rows) return;
+        if (!key) findMonth(rows);
+        var h = headerMap(rows);
+        body(rows).forEach(function (row, i) {
+          var r = { id: uid() + i, machine: m, name: get(row, h, ["name"]), reference: get(row, h, ["reference"]),
+            quantity: get(row, h, ["quantity"]).replace(/\D/g, ""), min: get(row, h, ["min"]).replace(/\D/g, ""),
+            price: get(row, h, ["unit price", "price"]), currency: get(row, h, ["currency"]), date: get(row, h, ["date"]),
+            created: Date.now() + parts.length };
+          if (!(r.name + r.reference + r.quantity).trim()) return;
+          r.loggedQty = r.quantity; r.baseline = false; r.arrival = false;
+          parts.push(r);
+        });
+      }).then(function () { return sheetRows(m + " " + TX); }).then(function (rows) {
+        if (!rows) return;
+        var h = headerMap(rows);
+        body(rows).forEach(function (row) {
+          var name = get(row, h, ["name"]), ref = get(row, h, ["reference"]);
+          var change = parseFloat(get(row, h, ["quantity"]).replace("−", "-")) || 0;
+          if (!change) return;
+          var type = get(row, h, ["type"]);
+          if (type === "Out" && change > 0) change = -change;
+          var d = get(row, h, ["date"]).slice(0, 10);
+          var part = parts.find(function (x) { return x.machine === m && x.name === name && x.reference === ref; });
+          txs.push({ id: uid() + txs.length, partId: part ? part.id : "", machine: m, name: name, reference: ref, change: change,
+            after: parseInt(get(row, h, ["stock after"]), 10) || 0, date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "", ts: Date.parse(d) || Date.now() });
+        });
       });
-      if (vals[0] !== BACKUP_MARK) throw new Error("not a UII backup");
-      return JSON.parse(vals.slice(1).join(""));
+    });
+    return p.then(function () {
+      if (!key || !parts.length && !txs.length) throw new Error("not a UII file");
+      parts.forEach(function (r) { r.month = key; });
+      txs.forEach(function (t) { t.month = key; });
+      return { app: "UII parts", kind: "month", month: key, rebuilt: true, parts: parts, transactions: txs };
     });
   }
 
@@ -2863,12 +2939,25 @@
     return row;
   }
 
-  function restoreFrom(snap, label) {
+  // Put one month back from a month file; other months stay as they are
+  function restoreMonth(snap, label) {
+    if (!snap || MONTHS.indexOf(snap.month) === -1) { setStatus("That file's month can't be read.", "error"); return; }
+    var all = serializeAll();
+    snap.parts.forEach(function (r) { r.month = snap.month; });
+    snap.transactions.forEach(function (t) { t.month = snap.month; });
+    restoreFrom({ app: "UII parts", parts: all.parts.filter(function (r) { return r.month !== snap.month; }).concat(snap.parts),
+      transactions: all.transactions.filter(function (t) { return t.month !== snap.month; }).concat(snap.transactions) }, label, function () {
+      if (month !== snap.month) selectMonth(snap.month);
+    });
+  }
+
+  function restoreFrom(snap, label, after) {
     if (!snap || !Array.isArray(snap.parts) || !Array.isArray(snap.transactions)) { setStatus("That backup can't be read.", "error"); return; }
     flushWrites();
     takeSnapshot("pre-" + Date.now(), "pre", label).then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
       applyAll(snap);
       backupDlg.hidden = true;
+      if (after) after();
       setStatus("Restored " + label, "saved");
     });
   }
@@ -2885,8 +2974,15 @@
     var reading = isJson ? f.text().then(function (t) { return JSON.parse(t); }) : f.arrayBuffer().then(readBackupXlsx);
     reading.then(function (snap) {
       if (!snap || snap.app !== "UII parts") throw new Error("not a backup");
+      if (snap.kind === "month") {
+        var mName = monthLabel(snap.month), n = snap.parts.length;
+        askCode("Restore " + mName + " from " + f.name + " (" + n + (n === 1 ? " part" : " parts") + ")? Only " + mName + " is replaced; other months stay as they are." +
+          (snap.rebuilt ? " This older file has no exact copy, so parts come back as Add part and transactions as they appear in the file." : ""),
+          function () { restoreMonth(snap, mName + " from " + f.name); });
+        return;
+      }
       askCode("Restore everything from " + f.name + "? All months go back to how they are in that file.", function () { restoreFrom(snap, f.name); });
-    }).catch(function () { setStatus("That file isn't a UII full backup.", "error"); });
+    }).catch(function () { setStatus("That file isn't a UII backup or month export.", "error"); });
   });
 
   // ---- Boot ----
