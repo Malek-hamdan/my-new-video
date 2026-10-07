@@ -463,17 +463,32 @@
     border-bottom: 1px solid var(--border);
   }
   th.col-num, td.col-num { width: 48px; text-align: center; padding-left: 12px; padding-right: 0; }
-  th.col-qty { width: 6%; }
-  th.col-min { width: 8%; }
+  th.col-qty { width: 8%; }
+  th.col-line { width: 9%; }
+  th.col-min { width: 6%; }
+  /* quantity: arrows to step, saved only with Enter */
+  .qty-wrap { display: flex; align-items: center; gap: 4px; }
+  .qty-wrap .cell { min-width: 0; flex: 1; }
+  .stepper { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+  .stepper button { width: 22px; height: 17px; padding: 0; border: 1px solid var(--border); border-radius: 5px; background: rgba(255,255,255,0.04); color: var(--muted); font-size: 9px; line-height: 1; cursor: pointer; }
+  .stepper button:hover { color: var(--text); border-color: var(--border-strong); background: rgba(255,255,255,0.08); }
+  body.locked .stepper, body.readonly .stepper { display: none; }
+  .cell.qty.dirty { border-color: #e7b84f; background: rgba(231,184,79,0.12); color: #ffe2a3; }
+  /* Line a part was taken to (each machine runs two) */
+  .line-sel { display: block; width: 100%; height: 36px; padding: 0 4px 0 8px; border: 1px solid var(--border); border-radius: 8px; background: rgba(255,255,255,0.03); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .line-sel.no-line { color: var(--muted); }
+  .line-sel option { background: #141821; color: var(--text); }
+  .line-sel.need { border-color: var(--danger); background: var(--danger-soft); color: #ffd0d0; box-shadow: 0 0 0 3px rgba(255,107,107,0.18); }
+  .line-sel:disabled { opacity: 0.7; cursor: default; }
   .min-wrap { display: flex; gap: 6px; align-items: center; }
   .min-wrap .cell { min-width: 44px; flex: 1; }
   .order-tag { display: none; flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: var(--danger-soft); border: 1px solid rgba(255,107,107,0.45); color: #ffb3b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
   tr.low .order-tag { display: inline-block; }
   tr.low .cell.qty[data-field="quantity"] { border-color: rgba(255,107,107,0.7); background: var(--danger-soft); color: #ffd0d0; font-weight: 700; }
-  th.col-price { width: 16%; }
+  th.col-price { width: 15%; }
   th.col-total { width: 10%; }
-  th.col-ref { width: 19%; }
-  th.col-name { width: 22%; }
+  th.col-ref { width: 16%; }
+  th.col-name { width: 18%; }
   .price-wrap { display: flex; gap: 6px; align-items: center; }
   .price-wrap .cell { min-width: 0; flex: 1; }
   .cur {
@@ -503,6 +518,7 @@
   th.col-when { width: 14%; }
   th.col-type { width: 7%; }
   th.col-change { width: 8%; }
+  body.tx-view th.col-line { width: 8%; }
   th.col-value { width: 10%; }
   th.col-after { width: 8%; }
   .tx-text.when { font-variant-numeric: tabular-nums; white-space: pre; }
@@ -698,6 +714,7 @@
     }
     .cell { border-color: var(--border); background: rgba(255,255,255,0.02); font-size: 16px; }
     td.col-act { position: absolute; top: 6px; right: 10px; width: auto; padding: 0; }
+    .stepper button { width: 34px; height: 22px; font-size: 11px; }
     .del { opacity: 1; }
     .panel-foot { padding: 12px 14px; }
     .panel-foot { flex-direction: column; }
@@ -808,7 +825,8 @@
           <th class="col-num">#</th>
           <th class="col-name">Name</th>
           <th class="col-ref">Reference</th>
-          <th class="col-qty">Quantity</th>
+          <th class="col-qty" title="Use the arrows or type, then press Enter to save">Quantity</th>
+          <th class="col-line" title="Line the part was taken to. Needed when the quantity goes down.">Line</th>
           <th class="col-min" title="Minimum stock: the row turns red when Quantity drops below it">Min</th>
           <th class="col-price">Unit price</th>
           <th class="col-total">Total price</th>
@@ -1007,6 +1025,8 @@
       reference: String(t.reference || ""),
       change: Number(t.change) || 0,
       after: Number(t.after) || 0,
+      // Line 1 or 2 the parts were taken to (Out only)
+      line: t.line === "1" || t.line === "2" || t.line === 1 || t.line === 2 ? String(t.line) : "",
       // date shown in Transaction; editable, defaults to the day it was recorded
       date: /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : "",
       ts: Number(t.ts) || 0
@@ -1017,7 +1037,7 @@
     return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, date: t.date, ts: t.ts };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts };
   }
   function ymd(ts) {
     var d = new Date(ts);
@@ -1206,11 +1226,6 @@
     editTimers[row.id] = setTimeout(function () { delete editTimers[row.id]; writeRow(findRow(row.id) || row); }, 400);
   }
   function flushWrites() {
-    var el = document.activeElement;
-    if (el && el.getAttribute && el.getAttribute("data-field") === "quantity") {
-      var r = findRow(el.getAttribute("data-row"));
-      if (r && !pendingConfirm) commitQuantity(r, true);
-    }
     Object.keys(editTimers).forEach(function (id) {
       clearTimeout(editTimers[id]);
       delete editTimers[id];
@@ -1236,12 +1251,14 @@
     var ch = Math.abs(after - before);
     return ch >= 50 || (before >= 2 && after >= before * 5);
   }
-  function askBigChange(row, before, after) {
+  var pendingLine = "";
+  function askBigChange(row, before, after, line) {
     var ch = after - before;
     document.getElementById("confirmText").textContent =
       row.machine + " \u00B7 " + (row.name || "this part") + ": " + before + " \u2192 " + after +
       ". This records " + (ch > 0 ? "In +" : "Out \u2212") + Math.abs(ch) + ". Is that right, or was it a typo?";
     pendingConfirm = row;
+    pendingLine = line || "";
     confirmEl.hidden = false;
     document.getElementById("confirmNo").focus();
   }
@@ -1250,11 +1267,11 @@
     pendingConfirm = null;
     confirmEl.hidden = true;
     if (!row) return;
-    if (yes) { commitQuantity(row, true); return; }
+    if (yes) { commitQuantity(row, true, pendingLine); return; }
     // put the quantity back to what was recorded
     row.quantity = row.loggedQty;
     var el = document.getElementById("f-" + row.id + "-quantity");
-    if (el) { el.value = row.quantity; el.focus(); }
+    if (el) { el.value = row.quantity; el.classList.remove("dirty"); el.focus(); }
     clearTimeout(editTimers[row.id]);
     delete editTimers[row.id];
     writeRow(row);
@@ -1264,11 +1281,13 @@
   document.getElementById("confirmNo").addEventListener("click", function () { closeConfirm(false); });
   confirmEl.addEventListener("keydown", function (e) { if (e.key === "Escape") closeConfirm(false); });
 
-  function commitQuantity(row, confirmed) {
+  // Parts that already have a saved stock show the Line box; new ones don't need it
+  function needsLine(row) { return !row.baseline && String(row.loggedQty).trim() !== ""; }
+  function commitQuantity(row, confirmed, line) {
     var before = parseInt(row.loggedQty, 10) || 0;
     var after = parseInt(row.quantity, 10) || 0;
     if (before === after) return;
-    if (!row.baseline && !confirmed && isBigChange(before, after)) { askBigChange(row, before, after); return; }
+    if (!row.baseline && !confirmed && isBigChange(before, after)) { askBigChange(row, before, after, line); return; }
     if (row.baseline) {
       // starting stock for a part already on the shelf: no transaction
       row.baseline = false;
@@ -1280,8 +1299,10 @@
     }
     var tx = cleanTx({
       partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: after - before, after: after, date: row.date, ts: Date.now()
+      change: after - before, after: after, line: after < before ? line : "", date: row.date, ts: Date.now()
     }, uid());
+    var sel = document.getElementById("f-" + row.id + "-line");
+    if (sel) { sel.value = ""; sel.classList.add("no-line"); sel.classList.remove("need"); }
     row.loggedQty = row.quantity;
     clearTimeout(editTimers[row.id]);
     delete editTimers[row.id];
@@ -1615,7 +1636,7 @@
   }
 
   var MACHINE_HEAD = document.getElementById("thead").innerHTML;
-  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-when">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-type">Type</th><th class="col-change">Quantity</th><th class="col-value">Value</th><th class="col-after">Stock after</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
+  var TX_HEAD = '<tr><th class="col-num">#</th><th class="col-when">Date</th><th class="col-mach">Machine</th><th>Name</th><th class="col-ref">Reference</th><th class="col-type">Type</th><th class="col-change">Quantity</th><th class="col-line">Line</th><th class="col-value">Value</th><th class="col-after">Stock after</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function fmtTime(ts) {
@@ -1740,6 +1761,21 @@
       ttd.innerHTML = '<span class="tx-text"><span class="chip ' + (isIn ? "chip-in" : "chip-out") + '">' + (isIn ? "In" : "Out") + "</span></span>";
       tr.appendChild(ttd);
       tr.appendChild(txCell("Quantity", (isIn ? "+" : "−") + Math.abs(t.change), "qty " + (isIn ? "pos" : "neg")));
+      if (isIn) tr.appendChild(txCell("Line", ""));
+      else {
+        // Line can be set or fixed here too
+        var ltd = document.createElement("td");
+        ltd.setAttribute("data-label", "Line");
+        var lsel = document.createElement("select");
+        lsel.className = "line-sel" + (t.line ? "" : " no-line");
+        lsel.setAttribute("aria-label", "Line");
+        [["", "\u2014"], ["1", "Line 1"], ["2", "Line 2"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; lsel.appendChild(op); });
+        lsel.value = t.line || "";
+        lsel.disabled = ro();
+        lsel.addEventListener("change", function () { t.line = lsel.value; lsel.classList.toggle("no-line", !t.line); saveDoc("transactions", t.id, txBody(t)); });
+        ltd.appendChild(lsel);
+        tr.appendChild(ltd);
+      }
       var val = txValue(t, part);
       tr.appendChild(txCell("Value", val === null ? "" : money(val, part.currency), "qty " + (isIn ? "pos" : "neg")));
       tr.appendChild(txCell("Stock after", String(t.after), "after"));
@@ -2043,6 +2079,7 @@
     if (field === "date") input.classList.toggle("blank", !input.value);
     input.addEventListener("input", function () {
       if ((field === "quantity" || field === "min") && /\D/.test(input.value)) input.value = input.value.replace(/\D/g, "");
+      if (field === "quantity") { markQty(input, row); return; }
       if (field === "price" && /[^\d.,]/.test(input.value)) input.value = input.value.replace(/[^\d.,]/g, "");
       var cur = findRow(row.id) || row;
       cur[field] = input.value;
@@ -2053,15 +2090,99 @@
       scheduleWrite(cur);
     });
     if (field === "quantity") {
-      // fires when the edit is finished (leaving the field or pressing Enter)
-      input.addEventListener("change", function () {
-        var cur = findRow(row.id) || row;
-        cur.quantity = input.value;
-        commitQuantity(cur);
+      // saved only with Enter; Esc puts the saved number back
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); saveQty(row.id); }
+        else if (e.key === "Escape") { var cur = findRow(row.id) || row; input.value = cur.quantity; markQty(input, cur); }
+        else if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); stepQty(input, row, e.key === "ArrowUp" ? 1 : -1); }
       });
+      var wrap = document.createElement("div");
+      wrap.className = "qty-wrap";
+      wrap.appendChild(input);
+      var st = document.createElement("div");
+      st.className = "stepper";
+      [["\u25B2", 1, "One more"], ["\u25BC", -1, "One less"]].forEach(function (b) {
+        var btn = document.createElement("button");
+        btn.type = "button"; btn.tabIndex = -1; btn.textContent = b[0]; btn.title = b[2]; btn.setAttribute("aria-label", b[2]);
+        // keep the cursor in the box so Enter still saves
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        btn.addEventListener("click", function () { if (ro()) return; stepQty(input, row, b[1]); input.focus(); });
+        st.appendChild(btn);
+      });
+      wrap.appendChild(st);
+      td.appendChild(wrap);
+      return td;
     }
     td.appendChild(input);
     return td;
+  }
+  function stepQty(input, row, d) {
+    if (ro()) return;
+    input.value = String(Math.max(0, (parseInt(input.value, 10) || 0) + d));
+    markQty(input, row);
+  }
+  // yellow until saved with Enter
+  var qtyHintShown = false;
+  function markQty(input, row) {
+    var cur = findRow(row.id) || row;
+    var dirty = input.value !== String(cur.quantity);
+    input.classList.toggle("dirty", dirty);
+    input.title = dirty ? "Not saved yet: press Enter to save, Esc to cancel" : "";
+    if (dirty && !qtyHintShown) { qtyHintShown = true; setStatus("Press Enter to save the quantity", ""); }
+  }
+  function saveQty(id) {
+    var cur = findRow(id);
+    var input = document.getElementById("f-" + id + "-quantity");
+    if (!cur || !input || ro()) return;
+    var before = parseInt(cur.loggedQty, 10) || 0, after = parseInt(input.value, 10) || 0;
+    var sel = document.getElementById("f-" + id + "-line");
+    if (needsLine(cur) && after < before && input.value.trim() !== "" && sel && !sel.value) {
+      sel.classList.add("need");
+      setStatus("Choose Line 1 or Line 2 for the parts taken out, then press Enter.", "error");
+      sel.focus();
+      return;
+    }
+    cur.quantity = input.value;
+    input.classList.remove("dirty");
+    input.title = "";
+    clearTimeout(editTimers[cur.id]);
+    if (String(cur.loggedQty) === cur.quantity || cur.baseline || !needsLine(cur) || after >= before) {
+      // nothing taken out: plain save
+      writeRow(cur); updateTotal(cur);
+    }
+    commitQuantity(cur, false, sel ? sel.value : "");
+    if (sel && after >= before) { sel.value = ""; sel.classList.add("no-line"); sel.classList.remove("need"); }
+    var lineTd = sel && sel.parentNode;
+    if (!sel || !lineTd) { var tr = input.closest("tr"); if (tr) refreshLineCell(tr, cur); }
+  }
+  function makeLineCell(row) {
+    var td = document.createElement("td");
+    td.className = "col-line";
+    td.setAttribute("data-label", "Line");
+    if (!needsLine(row)) return td;
+    var sel = document.createElement("select");
+    sel.className = "line-sel no-line";
+    sel.id = "f-" + row.id + "-line";
+    sel.setAttribute("aria-label", "Line the parts were taken to");
+    sel.title = "Line the parts were taken to (needed when the quantity goes down)";
+    [["", "Line"], ["1", "Line 1"], ["2", "Line 2"]].forEach(function (o) {
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op);
+    });
+    sel.disabled = ro();
+    sel.addEventListener("change", function () {
+      sel.classList.toggle("no-line", !sel.value);
+      sel.classList.remove("need");
+      // back to the quantity so Enter saves
+      var q = document.getElementById("f-" + row.id + "-quantity");
+      if (q && q.classList.contains("dirty")) { q.focus(); setStatus("Press Enter to save the quantity", ""); }
+    });
+    td.appendChild(sel);
+    return td;
+  }
+  // a new part becomes a regular one after its first saved quantity: show its Line box
+  function refreshLineCell(tr, row) {
+    var old = tr.querySelector("td.col-line");
+    if (old && !old.firstChild && needsLine(row)) old.parentNode.replaceChild(makeLineCell(row), old);
   }
 
   var lockBar = document.getElementById("lockBar");
@@ -2166,6 +2287,7 @@
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
       tr.appendChild(makeCell(row, "quantity", "Quantity"));
+      tr.appendChild(makeLineCell(row));
       var minTd = makeCell(row, "min", "Min");
       var minIn = minTd.firstChild, wrapMin = document.createElement("div");
       wrapMin.className = "min-wrap";
@@ -2460,6 +2582,7 @@
           { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" },
           { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
+          { v: t.line ? "Line " + t.line : "", s: z("center", i) },
           { v: part ? priceVal(part.price) : "", s: z("money", i) },
           { v: part ? part.currency : "", s: z("center", i) },
           { v: txValue(t, part) === null ? "" : txValue(t, part), s: z("moneyBold", i) },
@@ -2468,7 +2591,7 @@
       var totals = [];
       var cols = [{ name: "Date", width: 14 }];
       if (withMachine) cols.push({ name: "Machine", width: 12 });
-      cols = cols.concat([{ name: "Name", width: 40 }, { name: "Reference", width: 22 }, { name: "Type", width: 10 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 11 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]);
+      cols = cols.concat([{ name: "Name", width: 40 }, { name: "Reference", width: 22 }, { name: "Type", width: 10 }, { name: "Quantity", width: 11 }, { name: "Line", width: 9 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 11 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]);
       return { name: name, xml: sheetXml({
         title: title, subtitle: "Transactions · " + label + " · " + list.length + (list.length === 1 ? " entry" : " entries") + " · " + stamp,
         tab: tab, rows: rows, totals: totals, columns: cols
@@ -2547,7 +2670,7 @@
         tr.push([{ v: txDate(t), s: z("center", i) }, { v: monthLabel(k), s: z("center", i) }, { v: t.machine, s: z("center", i) },
           { v: part && part.name ? part.name : t.name, s: z("text", i) }, { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" }, { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
-          { v: part ? priceVal(part.price) : "", s: z("money", i) }, { v: part ? part.currency : "", s: z("center", i) },
+          { v: t.line ? "Line " + t.line : "", s: z("center", i) }, { v: part ? priceVal(part.price) : "", s: z("money", i) }, { v: part ? part.currency : "", s: z("center", i) },
           { v: val === null ? "" : val, s: z("moneyBold", i) }, { v: t.after, s: z("center", i) }]);
       });
     });
@@ -2555,7 +2678,7 @@
       title: "UII \u2014 All transactions", subtitle: stamp + " \u00B7 " + tr.length + (tr.length === 1 ? " entry" : " entries") + " in every month and machine",
       tab: "1E7B45", rows: tr,
       columns: [{ name: "Date", width: 13 }, { name: "Month", width: 16 }, { name: "Machine", width: 11 }, { name: "Name", width: 34 }, { name: "Reference", width: 20 },
-        { name: "Type", width: 9 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]
+        { name: "Type", width: 9 }, { name: "Quantity", width: 11 }, { name: "Line", width: 9 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]
     }) });
 
     sheets.push(dataSheet(BACKUP_MARK, all));
@@ -2680,7 +2803,7 @@
           var d = get(row, h, ["date"]).slice(0, 10);
           var part = parts.find(function (x) { return x.machine === m && x.name === name && x.reference === ref; });
           txs.push({ id: uid() + txs.length, partId: part ? part.id : "", machine: m, name: name, reference: ref, change: change,
-            after: parseInt(get(row, h, ["stock after"]), 10) || 0, date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "", ts: Date.parse(d) || Date.now() });
+            after: parseInt(get(row, h, ["stock after"]), 10) || 0, line: get(row, h, ["line"]).replace(/\D/g, ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "", ts: Date.parse(d) || Date.now() });
         });
       });
     });
