@@ -100,6 +100,25 @@ end = len(ORDER) * BAR
 ped.append((end, 0))
 
 
+def bake_sustain(ns, to_bar_end):
+    # Many mobile piano games ignore CC64, so write the sustain into the durations:
+    # RH plays legato into the next RH note; LH rings to the end of its bar (pedal lift).
+    # A note never runs past the next strike of the same pitch.
+    ns.sort()
+    out = []
+    for i, (t, d, n, v) in enumerate(ns):
+        nxt_same = next((u for u, _, m, _ in ns[i + 1:] if m == n and u > t), end)
+        if to_bar_end:
+            target = (t // BAR + 1) * BAR
+        else:
+            target = next((u for u, *_ in ns[i + 1:] if u > t), t + d)
+        out.append((t, max(d, min(target, nxt_same) - t - 1), n, v))
+    return out
+
+
+rh, lh = bake_sustain(rh, False), bake_sustain(lh, True)
+
+
 def vlq(v):
     out = [v & 0x7F]
     v >>= 7

@@ -37,6 +37,25 @@ def thin(d, maxn, keep_top):
 
 R, L = thin(rh, 3, True), thin(lh, 3, False)
 
+
+def bake_sustain(ns, lh):
+    # Games often ignore the pedal: hold notes so the line doesn't sound chopped.
+    # RH: legato into the next RH onset (max 2 beats). LH: ring to bar end (max 2 beats).
+    # Never past the next strike of the same pitch.
+    ns.sort()
+    out = []
+    for i, (k0, k1, p, v) in enumerate(ns):
+        nxt_same = next((u for u, _, m, _ in ns[i + 1:] if m == p and u > k0), 10**9)
+        if lh:
+            target = (k0 // 16 + 1) * 16
+        else:
+            target = next((u for u, *_ in ns[i + 1:] if u > k0), k1)
+        out.append((k0, max(k1, min(target, nxt_same, k0 + 8)), p, v))
+    return out
+
+
+R, L = bake_sustain(R, False), bake_sustain(L, True)
+
 def vlq(v):
     o = [v & 0x7F]; v >>= 7
     while v: o.append((v & 0x7F) | 0x80); v >>= 7
