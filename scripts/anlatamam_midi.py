@@ -2,7 +2,7 @@
 
 Note-for-note from the sheet transcribed by Beytullah Alemdar (truongca.com/pdf/29357).
 Form: bars 1-4 intro, |: 5-15, 1st ending 16 :|, 2nd ending 17-18.
-Tempo q=55, 4/4, key Eb major / C minor (3 flats). Sheet has no dynamics marks;
+Sheet tempo q=55; played at q=64 (TEMPO). 4/4, key Eb major / C minor (3 flats). Sheet has no dynamics marks;
 velocities below are an interpretive choice. Pedal follows the sheet's per-bar brackets.
 Writes output/kara_sevda_anlatamam.mid (Type 1) and ..._type0.mid. No dependencies.
 """
@@ -10,6 +10,7 @@ import os
 import struct
 
 TPQ = 480
+TEMPO = 64
 BAR = 4 * TPQ
 NOTE = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 FLATS = {'B', 'E', 'A'}  # key signature
@@ -70,17 +71,20 @@ bars = {
     15: (TREM_D, arp('G2', 'D3', 'G3'), 88, 64, True),
     16: (whole('C6'),
          [(t, d, p(n)) for t, d in [(0, 1), (1, 1), (2, .5), (2.5, .5), (3, .5), (3.5, .5)]
-          for n in ('F2', 'F3')], 78, 58, True),
+          for n in ('F2', 'F3')], 86, 62, True),
     # 2nd ending: C6 whole tied to half (6 beats), bass F2+F3 tied over both bars
-    17: (whole('C6', beats=6), whole('F2', 'F3', beats=8), 70, 50, True),
-    18: ([(2, .125, p('D6')), (2.125, .125, p('C6')), (2.25, 1.5, p('E6'))], [], 62, 44, True),
+    17: (whole('C6', beats=6), whole('F2', 'F3', beats=8), 84, 60, True),
+    18: ([(2, .125, p('D6')), (2.125, .125, p('C6')), (2.25, 1.5, p('E6'))], [], 70, 44, True),
 }
 ORDER = [1, 2, 3, 4] + list(range(5, 17)) + list(range(5, 16)) + [17, 18]
 
 rh, lh, ped = [], [], []
+SECOND_PASS = 16  # index in ORDER where the repeat starts
 for i, b in enumerate(ORDER):
     start = i * BAR
     r, l, rv, lv, pedal = bars[b]
+    if SECOND_PASS <= i < SECOND_PASS + 11:  # repeat keeps building, never drops back
+        rv, lv = rv + 14, lv + 10
     for notes, v, dst in ((r, rv, rh), (l, lv, lh)):
         for t, d, n in notes:
             accent = 6 if t in (0, 2) else 0
@@ -134,7 +138,7 @@ def pedal(ch):
 conductor = [(0, 0, meta(0x03, b'Kara Sevda - Anlatamam (Toygar Isikli)')),
              (0, 0, meta(0x58, b'\x04\x02\x18\x08')),
              (0, 0, meta(0x59, b'\xFD\x00')),                       # 3 flats, major
-             (0, 0, meta(0x51, (60_000_000 // 55).to_bytes(3, 'big')))]
+             (0, 0, meta(0x51, (60_000_000 // TEMPO).to_bytes(3, 'big')))]
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'output')
 t1 = [track(list(conductor)), track(setup(0, 'Right Hand') + notes(rh, 0)),
