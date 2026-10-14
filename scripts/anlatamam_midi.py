@@ -2,7 +2,7 @@
 
 Note-for-note from the sheet transcribed by Beytullah Alemdar (truongca.com/pdf/29357).
 Form: bars 1-4 intro, |: 5-15, 1st ending 16 :|, 2nd ending 17-18.
-Sheet tempo q=55; played at q=64 (TEMPO). 4/4, key Eb major / C minor (3 flats). Sheet has no dynamics marks;
+Sheet tempo q=55; played at q=72 (TEMPO). 4/4, key Eb major / C minor (3 flats). Sheet has no dynamics marks;
 velocities below are an interpretive choice. Pedal follows the sheet's per-bar brackets.
 Writes output/kara_sevda_anlatamam.mid (Type 1) and ..._type0.mid. No dependencies.
 """
@@ -10,7 +10,7 @@ import os
 import struct
 
 TPQ = 480
-TEMPO = 64
+TEMPO = 72
 BAR = 4 * TPQ
 NOTE = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11}
 FLATS = {'B', 'E', 'A'}  # key signature
@@ -52,6 +52,9 @@ def whole(*names, beats=4):
     return [(0, beats, p(n)) for n in names]
 
 
+PULSE_F = [(t, d, p(n)) for t, d in [(0, 1), (1, 1), (2, .5), (2.5, .5), (3, .5), (3.5, .5)]
+           for n in ('F2', 'F3')]
+
 # (rh, lh, rh_vel, lh_vel, pedal)
 bars = {
     1: (INTRO_RH, whole('C3', 'C4'), 58, 44, False),
@@ -69,12 +72,14 @@ bars = {
     13: (TREM_C, arp('F2', 'C3', 'F3'), 86, 62, True),
     14: (TREM_C, arp('A2', 'E3', 'A3'), 86, 62, True),
     15: (TREM_D, arp('G2', 'D3', 'G3'), 88, 64, True),
-    16: (whole('C6'),
-         [(t, d, p(n)) for t, d in [(0, 1), (1, 1), (2, .5), (2.5, .5), (3, .5), (3.5, .5)]
-          for n in ('F2', 'F3')], 86, 62, True),
+    16: (whole('C6'), PULSE_F, 86, 62, True),
     # 2nd ending: C6 whole tied to half (6 beats), bass F2+F3 tied over both bars
-    17: (whole('C6', beats=6), whole('F2', 'F3', beats=8), 84, 60, True),
-    18: ([(2, .125, p('D6')), (2.125, .125, p('C6')), (2.25, 1.5, p('E6'))], [], 70, 44, True),
+    # 2nd ending: RH as written (C6 tied 6 beats, then D6-C6-Eb6).
+    # LH deviates from the sheet on request: instead of tied F whole notes it keeps
+    # bar 16's F pulse so the rhythm drives through to the last beat.
+    17: (whole('C6', beats=6), PULSE_F, 100, 70, True),
+    18: ([(2, .125, p('D6')), (2.125, .125, p('C6')), (2.25, 1.5, p('E6'))],
+         PULSE_F[:-2] + [(3.5, .5, p('F2')), (3.5, .5, p('F3'))], 106, 76, True),
 }
 ORDER = [1, 2, 3, 4] + list(range(5, 17)) + list(range(5, 16)) + [17, 18]
 
