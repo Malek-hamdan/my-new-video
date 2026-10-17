@@ -51,6 +51,12 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName(if (keyProps.isEmpty()) "debug" else "release")
+            // R8 renamed kotlin.coroutines.Continuation, which broke the plugins' suspend
+            // calls (NoSuchMethodError in shared_preferences). The app is small, so ship it
+            // unshrunk; the rules file keeps the names should shrinking be turned back on.
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
