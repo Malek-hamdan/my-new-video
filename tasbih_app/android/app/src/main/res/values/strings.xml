@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">تسبيح</string>
+    <string name="widget_large">تسبيح · كلمة اليوم</string>
+    <string name="widget_large_desc">جملة جديدة كل يوم، الستريك وزر «سبّح الآن»</string>
+    <string name="widget_counter">تسبيح · العدّاد</string>
+    <string name="widget_counter_desc">وين وصلت بالتسبيحة</string>
+    <string name="widget_verse">تسبيح · آية اليوم</string>
+    <string name="widget_verse_desc">آية عن الذكر بتتغيّر كل يوم</string>
+</resources>

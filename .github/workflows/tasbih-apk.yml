@@ -1,0 +1,90 @@
+name: Tasbih APK
+
+on:
+  push:
+    branches: [main, ccr-e32cf88f-efpcd3]
+    paths:
+      - 'tasbih_app/**'
+      - '.github/workflows/tasbih-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tasbih-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tasbih_app
+    env:
+      KEYSTORE_B64: ${{ secrets.TASBIH_KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.TASBIH_KEYSTORE_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.7
+          channel: stable
+          cache: true
+
+      # Every release must be signed with the same key, or Android refuses to
+      # install it over the previous one. Prefer the key stored in repository
+      # secrets; otherwise keep a generated key in the Actions cache.
+      - name: Signing key from secrets
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > android/app/release.jks
+          printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=tasbih\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android/key.properties
+
+      - name: Restore cached signing key
+        if: env.KEYSTORE_B64 == ''
+        uses: actions/cache@v4
+        with:
+          path: tasbih_app/android/app/ci.jks
+          key: tasbih-signing-key-v1
+
+      - name: Signing key from cache
+        if: env.KEYSTORE_B64 == ''
+        run: |
+          if [ ! -f android/app/ci.jks ]; then
+            keytool -genkeypair -v -keystore android/app/ci.jks -alias tasbih -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass tasbih-ci -keypass tasbih-ci -dname "CN=Tasbih"
+          fi
+          printf 'storeFile=ci.jks\nstorePassword=tasbih-ci\nkeyAlias=tasbih\nkeyPassword=tasbih-ci\n' > android/key.properties
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+      - name: Build APK
+        run: |
+          flutter build apk --release --build-number=${{ github.run_number }} \
+            --target-platform android-arm,android-arm64
+          cp build/app/outputs/flutter-apk/app-release.apk tasbih.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tasbih-apk
+          path: tasbih_app/tasbih.apk
+
+      - name: Publish as the "tasbih-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete tasbih-latest --yes --cleanup-tag || true
+          gh release create tasbih-latest tasbih.apk \
+            --target "$GITHUB_SHA" \
+            --title "تسبيح — آخر نسخة (${{ github.run_number }})" \
+            --notes "نزّل tasbih.apk على تلفونك وثبّته. النسخة رقم ${{ github.run_number }}."
