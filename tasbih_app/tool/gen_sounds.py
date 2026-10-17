@@ -17,7 +17,7 @@ SR = 44100
 rng = np.random.default_rng(7)
 
 
-def room_ir(rt60=0.42, length=0.6, dark=3800):
+def room_ir(rt60=0.65, length=0.9, dark=3800):
     n = int(SR * length)
     t = np.arange(n) / SR
     tail = rng.standard_normal(n) * np.exp(-6.91 * t / rt60)
@@ -49,7 +49,7 @@ def click(base, decay_ms, brightness, length=0.09):
     return out
 
 
-def finish(dry, ir, wet=0.22, tail=0.55):
+def finish(dry, ir, wet=0.38, tail=0.85):
     dry = np.concatenate([dry, np.zeros(int(SR * tail))])
     rev = fftconvolve(dry, ir)[: len(dry)]
     rev /= np.max(np.abs(rev)) + 1e-9
@@ -70,7 +70,7 @@ def main(out_dir):
     dry = click(base=1650, decay_ms=13, brightness=0.55, length=0.14)
     dry2 = np.concatenate([np.zeros(int(0.045 * SR)), click(base=1720, decay_ms=10, brightness=0.5, length=0.1) * 0.45])
     dry = np.pad(dry, (0, max(0, len(dry2) - len(dry)))) + np.pad(dry2, (0, max(0, len(dry) - len(dry2))))
-    wavfile.write(out / 'separator.wav', SR, finish(dry, ir, wet=0.3, tail=0.8))
+    wavfile.write(out / 'separator.wav', SR, finish(dry, ir, wet=0.45, tail=1.1))
 
 
 if __name__ == '__main__':
