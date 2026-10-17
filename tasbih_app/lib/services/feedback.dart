@@ -1,67 +1,63 @@
 import 'dart:math';
 
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
 import 'package:vibration/vibration.dart';
 
-/// Bead click sounds and vibration.
+/// Bead click sounds (native SoundPool, see TickPlayer.kt) and vibration.
 class BeadFeedback {
+  static const _channel = MethodChannel('tasbih/sound');
+  static const _tickCount = 5;
+
   final _rand = Random();
-  final List<AudioPlayer> _ticks = [];
-  final List<AudioPlayer> _separators = [];
-  int _next = 0;
-  int _nextSep = 0;
+  int _lastTick = 0;
   bool _amplitude = false;
-  bool _ready = false;
+  bool _vibrator = false;
+
+  /// Turned off from the speaker button on the tasbih screen.
+  bool soundOn = true;
+
+  /// Why sound isn't working, if it isn't. Shown when the speaker button is long-pressed.
+  String? soundError;
 
   Future<void> init() async {
     try {
-      // A short sound effect: don't pause the user's music or podcast.
-      await AudioPlayer.global.setAudioContext(
-        AudioContext(
-          android: const AudioContextAndroid(
-            contentType: AndroidContentType.sonification,
-            usageType: AndroidUsageType.assistanceSonification,
-            audioFocus: AndroidAudioFocus.none,
-          ),
-        ),
-      );
-      // Two players per variant so quick flicks can overlap.
-      for (var round = 0; round < 2; round++) {
-        for (var i = 1; i <= 5; i++) {
-          _ticks.add(await _player('sounds/tick_$i.wav'));
-        }
-        _separators.add(await _player('sounds/separator.wav'));
-      }
+      await _channel.invokeMethod('load', {
+        'names': [for (var i = 1; i <= _tickCount; i++) 'tick_$i', 'separator'],
+      });
+    } catch (e) {
+      soundError = '$e';
+    }
+    try {
+      _vibrator = await Vibration.hasVibrator();
       _amplitude = await Vibration.hasAmplitudeControl();
-      _ready = true;
     } catch (_) {
-      // No audio/vibration backend (e.g. tests): stay silent.
+      // No vibration backend (tests).
     }
   }
 
-  Future<AudioPlayer> _player(String asset) async {
-    final p = AudioPlayer();
-    await p.setPlayerMode(PlayerMode.lowLatency);
-    await p.setReleaseMode(ReleaseMode.stop);
-    await p.setSource(AssetSource(asset));
-    return p;
+  void _play(String name, double volume) {
+    if (!soundOn) return;
+    _channel
+        .invokeMethod<bool>('play', {'name': name, 'volume': volume})
+        .then((ok) {
+          if (ok == false) soundError ??= 'sound "$name" not loaded';
+        })
+        .catchError((Object e) {
+          soundError = '$e';
+        });
   }
 
   /// [strength] 0..1 from the bead's impact speed.
   void tick(double strength, {bool separator = false}) {
-    if (!_ready) return;
     final s = strength.clamp(0.0, 1.0);
-    final AudioPlayer p;
     if (separator) {
-      p = _separators[_nextSep++ % _separators.length];
+      _play('separator', 1.0);
     } else {
-      // Random variant, never the same player twice in a row.
-      _next = (_next + 1 + _rand.nextInt(_ticks.length - 1)) % _ticks.length;
-      p = _ticks[_next];
+      // Random variant, never the same one twice in a row.
+      _lastTick = (_lastTick + 1 + _rand.nextInt(_tickCount - 1)) % _tickCount;
+      _play('tick_${_lastTick + 1}', 0.45 + 0.55 * s);
     }
-    final volume = separator ? 1.0 : 0.45 + 0.55 * s;
-    p.stop().then((_) => p.setVolume(volume)).then((_) => p.resume()).catchError((_) {});
-
+    if (!_vibrator) return;
     if (separator) {
       Vibration.vibrate(duration: 38, amplitude: _amplitude ? 230 : -1);
     } else {
@@ -70,7 +66,7 @@ class BeadFeedback {
   }
 
   void complete() {
-    if (!_ready) return;
+    if (!_vibrator) return;
     Vibration.vibrate(pattern: [0, 40, 90, 40, 90, 70], intensities: [0, 200, 0, 200, 0, 255]);
   }
 }

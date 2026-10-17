@@ -33,6 +33,7 @@ class _TasbihScreenState extends State<TasbihScreen> {
     _id = store.current.id;
     _physics = BeadPhysics(total: store.current.total, count: store.progressOf(_id))..onLanded = _landed;
     store.addListener(_storeChanged);
+    widget.feedback.soundOn = store.soundOn;
     if (store.progressOf(_id) >= store.current.total) _completePhrase = _pickDonePhrase();
   }
 
@@ -105,6 +106,16 @@ class _TasbihScreenState extends State<TasbihScreen> {
     if (ok == true) store.resetProgress(store.current.id);
   }
 
+  void _toggleSound() {
+    store.soundOn = !store.soundOn;
+    widget.feedback.soundOn = store.soundOn;
+  }
+
+  void _showSoundError() {
+    final e = widget.feedback.soundError;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e ?? 'الصوت شغّال')));
+  }
+
   void _openList() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => ListScreen(store: store)));
   }
@@ -144,7 +155,19 @@ class _TasbihScreenState extends State<TasbihScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onLongPress: _showSoundError,
+                          child: IconButton(
+                            onPressed: _toggleSound,
+                            tooltip: store.soundOn ? 'اطفي الصوت' : 'شغّل الصوت',
+                            icon: Icon(
+                              store.soundOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                              color: store.soundOn ? Palette.cream : Palette.muted,
+                              size: 22,
+                            ),
+                          ),
+                        ),
                         StreakChip(days: store.streak),
                       ],
                     ),
@@ -196,10 +219,18 @@ class _TasbihScreenState extends State<TasbihScreen> {
                   Expanded(child: BeadString(physics: _physics)),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: _SavedCard(
-                      text: t.multiStage
-                          ? '${t.stages[stage].text} — $done من ${t.stages[stage].count}'
-                          : '$count من ${t.total}',
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SavedCard(
+                            text: t.multiStage
+                                ? '${t.stages[stage].text} — $done من ${t.stages[stage].count}'
+                                : '$count من ${t.total}',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _ResetButton(onTap: count > 0 ? _confirmReset : null),
+                      ],
                     ),
                   ),
                 ],
@@ -278,6 +309,35 @@ class _StagePills extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ResetButton extends StatelessWidget {
+  const _ResetButton({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: const Color(0xBF140C06),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: const BorderSide(color: Palette.line),
+    ),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.restart_alt_rounded, size: 20, color: onTap == null ? Palette.muted : Palette.gold),
+            Text('صفّر', style: TextStyle(fontSize: 10.5, color: onTap == null ? Palette.muted : Palette.cream)),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _SavedCard extends StatelessWidget {

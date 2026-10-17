@@ -76,6 +76,13 @@ class Store extends ChangeNotifier {
 
   Tasbih get current => byId(_lastId);
 
+  bool get soundOn => _prefs.getBool('sound') ?? true;
+
+  set soundOn(bool on) {
+    _prefs.setBool('sound', on);
+    notifyListeners();
+  }
+
   void select(String id) {
     _lastId = id;
     _save();
