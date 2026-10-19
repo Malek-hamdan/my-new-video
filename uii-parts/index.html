@@ -192,6 +192,15 @@
   .month:hover { color: var(--text); border-color: var(--border-strong); }
   .month[aria-current="true"] { color: #06101f; background: var(--accent); border-color: var(--accent); }
   .month .dot { display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; vertical-align: middle; }
+  /* Consumables: one list of often-used parts, outside the months */
+  .months-sep { flex: 0 0 1px; align-self: stretch; margin: 4px 6px; background: var(--border-strong); }
+  .month.cons { display: inline-flex; align-items: center; gap: 7px; color: #e4d4ff; border-color: rgba(176,132,255,0.5); background: rgba(150,100,255,0.12); }
+  .month.cons svg { width: 15px; height: 15px; flex: none; }
+  .month.cons:hover { color: #fff; border-color: rgba(190,150,255,0.85); }
+  .month.cons[aria-current="true"] { color: #14081f; background: #b78cff; border-color: #b78cff; }
+  body.cons-view .btn-arrival, body.cons-view .tx-filter, body.cons-view #lockBar, body.cons-view #copyBanner { display: none !important; }
+  th.col-cname { width: 50%; }
+  .result.cons-hit { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
 
   /* Search */
   .search-wrap { margin-bottom: 12px; }
@@ -845,7 +854,7 @@
     <div class="panel-foot">
       <button class="btn" id="addBottom" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        Add part
+        <span id="addBottomLabel">Add part</span>
       </button>
       <button class="btn btn-arrival" id="recvBottom" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 11l6 6 6-6M5 20h14"/></svg>
@@ -969,6 +978,12 @@
   var data = emptyData();
   // txList = [{id, partId, month, machine, name, reference, change, after, ts}], newest first
   var txList = [];
+  // consList = [{id, machine, name, reference, created}]: parts used often, one list outside the months
+  var CONS_KEY = "uii-consumables-v1", VIEW_KEY = "uii-spare-parts-view", CONS_TAB_KEY = "uii-consumables-tab";
+  var consList = [];
+  var consView = false;
+  var consActive = "BLM";
+  var consTimers = {};
   function openSheet() {
     if (!allParts[month]) allParts[month] = emptyData();
     if (!allTx[month]) allTx[month] = [];
@@ -1123,25 +1138,29 @@
       var rawTx = localStorage.getItem(TX_KEY);
       if (rawTx) { var arr = JSON.parse(rawTx); if (Array.isArray(arr)) txs = arr; }
     } catch (e) {}
-    return { parts: rows, transactions: txs, found: !!(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(TX_KEY)) };
+    var cons = [];
+    try { var rawC = JSON.parse(localStorage.getItem(CONS_KEY) || "null"); if (Array.isArray(rawC)) cons = rawC; } catch (e) {}
+    return { parts: rows, transactions: txs, consumables: cons, found: !!(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(TX_KEY) || localStorage.getItem(CONS_KEY)) };
   }
   function loadLocal() {
     return loadLocalData().then(function () { localReady = true; });
   }
   function loadLocalData() {
     return idbOpen().then(function (conn) {
-      if (!conn) { localBackend = "ls"; var l = readLegacyLocal(); buildFromLists(l.parts, l.transactions); return; }
+      if (!conn) { localBackend = "ls"; var l = readLegacyLocal(); setConsList(l.consumables); buildFromLists(l.parts, l.transactions); return; }
       idbConn = conn; localBackend = "idb";
-      return Promise.all([kvGet("parts"), kvGet("transactions"), kvGet("savedAt")]).then(function (v) {
+      return Promise.all([kvGet("parts"), kvGet("transactions"), kvGet("savedAt"), kvGet("consumables")]).then(function (v) {
         var rows = v[0], txs = v[1], savedAt = v[2] || 0;
+        setConsList(v[3]);
         if (!rows) {
           // first run with IndexedDB: move what was in localStorage over, then free that space
           var l = readLegacyLocal();
           rows = l.parts; txs = l.transactions;
+          setConsList(l.consumables);
           return migrateSnapshots().then(function () {
-            return kvPutMany({ parts: rows, transactions: txs, savedAt: Date.now() });
+            return kvPutMany({ parts: rows, transactions: txs, consumables: serializeCons(), savedAt: Date.now() });
           }).then(function () {
-            if (l.found) { try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(TX_KEY); } catch (e) {} }
+            if (l.found) { try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(TX_KEY); localStorage.removeItem(CONS_KEY); } catch (e) {} }
             buildFromLists(rows, txs);
           });
         }
@@ -1151,11 +1170,12 @@
           if (j && j.savedAt > savedAt && j.month) {
             rows = rows.filter(function (r) { return r.month !== j.month; }).concat(j.parts || []);
             txs = (txs || []).filter(function (t) { return t.month !== j.month; }).concat(j.transactions || []);
+            if (Array.isArray(j.consumables)) setConsList(j.consumables);
           }
         } catch (e) {}
         buildFromLists(rows, txs);
       });
-    }).catch(function () { localBackend = "ls"; var l = readLegacyLocal(); buildFromLists(l.parts, l.transactions); });
+    }).catch(function () { localBackend = "ls"; var l = readLegacyLocal(); setConsList(l.consumables); buildFromLists(l.parts, l.transactions); });
   }
   var idbChain = Promise.resolve(), idbPending = null;
   function saveLocal() {
@@ -1166,11 +1186,11 @@
       try {
         localStorage.setItem(JOURNAL_KEY, JSON.stringify({ savedAt: stamp, month: month,
           parts: all.parts.filter(function (r) { return r.month === month; }),
-          transactions: all.transactions.filter(function (t) { return t.month === month; }) }));
+          transactions: all.transactions.filter(function (t) { return t.month === month; }), consumables: all.consumables }));
       } catch (e) {}
       // only the latest state needs writing; collapse saves that pile up
       var first = !idbPending;
-      idbPending = { parts: all.parts, transactions: all.transactions, savedAt: stamp };
+      idbPending = { parts: all.parts, transactions: all.transactions, consumables: all.consumables, savedAt: stamp };
       if (first) idbChain = idbChain.then(function () {
         var job = idbPending; idbPending = null;
         return kvPutMany(job).then(function () { setStatus("Saved", "saved"); }, function () {
@@ -1182,6 +1202,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ parts: all.parts }));
       localStorage.setItem(TX_KEY, JSON.stringify(all.transactions));
+      localStorage.setItem(CONS_KEY, JSON.stringify(all.consumables));
       setStatus("Saved", "saved");
     } catch (e) {
       setStatus("Not saved: browser storage is full or blocked. Download a full backup now.", "error");
@@ -1226,6 +1247,12 @@
     editTimers[row.id] = setTimeout(function () { delete editTimers[row.id]; writeRow(findRow(row.id) || row); }, 400);
   }
   function flushWrites() {
+    Object.keys(consTimers).forEach(function (id) {
+      clearTimeout(consTimers[id]);
+      delete consTimers[id];
+      var c = findCons(id);
+      if (c) writeCons(c);
+    });
     Object.keys(editTimers).forEach(function (id) {
       clearTimeout(editTimers[id]);
       delete editTimers[id];
@@ -1378,15 +1405,35 @@
         dot.setAttribute("aria-label", "has entries");
         b.appendChild(dot);
       }
-      if (k === month) b.setAttribute("aria-current", "true");
+      if (k === month && !consView) b.setAttribute("aria-current", "true");
       b.addEventListener("click", function () { selectMonth(k); });
       monthsEl.appendChild(b);
     });
+
+    var sep = document.createElement("span");
+    sep.className = "months-sep";
+    sep.setAttribute("aria-hidden", "true");
+    monthsEl.appendChild(sep);
+    var cb = document.createElement("button");
+    cb.type = "button";
+    cb.className = "month cons";
+    cb.id = "consBtn";
+    cb.title = "Parts you use often, for every machine";
+    cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span>Consumables</span>';
+    if (consView) cb.setAttribute("aria-current", "true");
+    cb.addEventListener("click", openConsumables);
+    monthsEl.appendChild(cb);
+  }
+  // narrow screens: bring the Consumables button into view (sideways only)
+  function showConsBtn() {
+    var wrap = monthsEl.parentNode;
+    if (wrap && wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = wrap.scrollWidth;
   }
   function selectMonth(k) {
-    if (k === month) return;
+    if (k === month && !consView) return;
     flushWrites();
-    delete unlocked[month];
+    if (consView) leaveConsumables();
+    if (k !== month) delete unlocked[month];
     month = k;
     viewYear = parseInt(k.slice(0, 4), 10);
     try { localStorage.setItem(MONTH_KEY, k); } catch (e) {}
@@ -1400,6 +1447,7 @@
 
   function renderTabs() {
     tabsEl.innerHTML = "";
+    if (consView) { renderConsTabs(); return; }
     TABS.forEach(function (m) {
       if (m === TX) {
         var sep = document.createElement("span");
@@ -1425,6 +1473,16 @@
   }
 
   tabsEl.addEventListener("keydown", function (e) {
+    if (consView) {
+      var c = MACHINES.indexOf(consActive);
+      if (e.key === "ArrowRight") c = (c + 1) % MACHINES.length;
+      else if (e.key === "ArrowLeft") c = (c - 1 + MACHINES.length) % MACHINES.length;
+      else return;
+      e.preventDefault();
+      switchCons(MACHINES[c]);
+      document.getElementById("tab-" + consActive).focus();
+      return;
+    }
     var i = TABS.indexOf(active);
     if (e.key === "ArrowRight") i = (i + 1) % TABS.length;
     else if (e.key === "ArrowLeft") i = (i - 1 + TABS.length) % TABS.length;
@@ -1514,6 +1572,7 @@
     var raw = searchEl.value.trim();
     if (!raw) { resultsEl.hidden = true; resultsEl.innerHTML = ""; return; }
     var q = norm(raw);
+    if (consView) { renderConsSearch(raw, q); return; }
     var hits = [];
     MONTHS.forEach(function (k) {
       var p = allParts[k];
@@ -1616,6 +1675,7 @@
 
   function updateCounts() {
     renderMonths();
+    if (consView) { updateConsCounts(); return; }
     updateCopyBanner();
     if (searchEl.value.trim()) renderSearch();
     TABS.forEach(function (m) {
@@ -2259,6 +2319,11 @@
   unlockDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") closeUnlock(); });
 
   function renderRows(focusId) {
+    document.body.classList.toggle("cons-view", consView);
+    document.querySelector("#addTop span").textContent = consView ? "Add consumable" : "Add part";
+    document.getElementById("addBottomLabel").textContent = consView ? "Add consumable" : "Add part";
+    document.getElementById("addTop").title = consView ? "Add a part you use often to " + consActive + "." : "Add a part you already have in stock. Its starting quantity is not recorded as a transaction.";
+    if (consView) { renderConsumables(focusId); return; }
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
     updateLockBar();
     document.body.classList.toggle("tx-view", active === TX);
@@ -2331,6 +2396,7 @@
   // received = a part that just arrived: its first quantity is logged as In.
   // Otherwise the first quantity is starting stock and is not logged.
   function addRow(received) {
+    if (consView) { addCons(); return; }
     if (ro() || active === TX) return;
     var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency() }, active);
     data[active].push(row);
@@ -2371,6 +2437,304 @@
     var next = cells[cells.indexOf(e.target) + 1];
     if (next) next.focus(); else e.target.blur();
   });
+
+  // ---- Consumables: parts used often, by machine, outside the months ----
+  var CONS_HEAD = '<tr><th class="col-num">#</th><th class="col-cname">Name</th><th>Reference</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
+  function cleanCons(r) {
+    if (!r || MACHINES.indexOf(r.machine) === -1) return null;
+    return { id: String(r.id || uid()), machine: r.machine, name: String(r.name || ""), reference: String(r.reference || ""), created: Number(r.created) || Date.now() };
+  }
+  function setConsList(list) {
+    consList = (Array.isArray(list) ? list : []).map(cleanCons).filter(Boolean);
+    consList.sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); });
+  }
+  function consBody(r) { return { machine: r.machine, name: r.name, reference: r.reference, created: r.created }; }
+  function serializeCons() { return consList.map(function (r) { var b = consBody(r); b.id = r.id; return b; }); }
+  function consHasContent(r) { return (r.name + r.reference).trim() !== ""; }
+  function consOf(m) { return consList.filter(function (r) { return r.machine === m; }); }
+  function findCons(id) { for (var i = 0; i < consList.length; i++) if (consList[i].id === id) return consList[i]; return null; }
+  function writeCons(r) { saveDoc("consumables", r.id, consBody(r)); }
+  function scheduleCons(r) {
+    clearTimeout(consTimers[r.id]);
+    consTimers[r.id] = setTimeout(function () { delete consTimers[r.id]; var c = findCons(r.id); if (c) writeCons(c); }, 400);
+  }
+  // shared store: remove what is gone, write the rest
+  function syncConsDocs(oldIds) {
+    var keep = {};
+    consList.forEach(function (r) { keep[r.id] = 1; });
+    oldIds.forEach(function (id) { if (!keep[id]) deleteDoc("consumables", id); });
+    consList.forEach(writeCons);
+  }
+
+  function updateSearchPlaceholder() {
+    searchEl.placeholder = consView ? "Search consumables by name or reference" : "Search by reference or name, across all machines and months";
+  }
+  function openConsumables() {
+    if (consView) return;
+    flushWrites();
+    consView = true;
+    try { localStorage.setItem(VIEW_KEY, "cons"); } catch (e) {}
+    updateSearchPlaceholder();
+    renderMonths();
+    renderTabs();
+    renderRows();
+    renderSearch();
+    showConsBtn();
+  }
+  function leaveConsumables() {
+    consView = false;
+    try { localStorage.setItem(VIEW_KEY, ""); } catch (e) {}
+    updateSearchPlaceholder();
+    renderSearch();
+  }
+  function switchCons(m) {
+    consActive = m;
+    try { localStorage.setItem(CONS_TAB_KEY, m); } catch (e) {}
+    renderTabs();
+    renderRows();
+  }
+  function renderConsTabs() {
+    MACHINES.forEach(function (m) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab";
+      b.id = "tab-" + m;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", m === consActive ? "true" : "false");
+      b.setAttribute("aria-controls", "panel");
+      b.tabIndex = m === consActive ? 0 : -1;
+      b.innerHTML = '<span></span><span class="count"></span>';
+      b.firstChild.textContent = m;
+      b.lastChild.textContent = consOf(m).length;
+      b.addEventListener("click", function () { switchCons(m); });
+      tabsEl.appendChild(b);
+    });
+  }
+  function consDupIds() {
+    var seen = {}, dup = {};
+    consOf(consActive).forEach(function (r) {
+      var k = norm(r.reference);
+      if (!k) return;
+      if (seen[k]) { dup[seen[k]] = 1; dup[r.id] = 1; } else seen[k] = r.id;
+    });
+    return dup;
+  }
+  function updateConsCounts() {
+    copyBanner.hidden = true;
+    if (searchEl.value.trim()) renderSearch();
+    MACHINES.forEach(function (m) {
+      var c = document.querySelector("#tab-" + m + " .count");
+      if (c) c.textContent = consOf(m).length;
+    });
+    var n = consOf(consActive).length;
+    metaEl.textContent = "Parts you use often · " + n + (n === 1 ? " part" : " parts");
+    var dup = consDupIds(), d = Object.keys(dup).length;
+    consOf(consActive).forEach(function (r) {
+      var el = document.getElementById("c-" + r.id + "-reference");
+      if (!el) return;
+      el.classList.toggle("dup", !!dup[r.id]);
+      el.title = dup[r.id] ? "Another consumable on " + consActive + " has the same reference" : "";
+    });
+    if (d) {
+      var w = document.createElement("span");
+      w.className = "warn";
+      w.textContent = " · ⚠ " + d + " parts share a reference";
+      metaEl.appendChild(w);
+    }
+    emptyEl.hidden = n !== 0;
+  }
+  function makeConsCell(row, field, label) {
+    var td = document.createElement("td");
+    td.setAttribute("data-label", label);
+    var input = document.createElement("textarea");
+    input.className = "cell wrap";
+    input.rows = 1;
+    input.id = "c-" + row.id + "-" + field;
+    input.value = row[field];
+    input.placeholder = label;
+    input.setAttribute("aria-label", label);
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.dir = "auto";
+    input.readOnly = readOnly;
+    input.addEventListener("input", function () {
+      if (/\n/.test(input.value)) input.value = input.value.replace(/\n/g, " ");
+      fitSoon(input);
+      var cur = findCons(row.id) || row;
+      cur[field] = input.value;
+      if (field === "reference") { clearTimeout(dupTimer); dupTimer = setTimeout(updateCounts, 300); }
+      scheduleCons(cur);
+    });
+    td.appendChild(input);
+    return td;
+  }
+  function renderConsumables(focusId) {
+    panelEl.setAttribute("aria-labelledby", "tab-" + consActive);
+    lockBar.hidden = true;
+    document.body.classList.remove("locked", "tx-view", "sum-view");
+    document.getElementById("summary").hidden = true;
+    document.getElementById("thead").innerHTML = CONS_HEAD;
+    emptyEl.querySelector("strong").textContent = "No consumables yet";
+    emptyEl.querySelector("span").textContent = "Use “Add consumable” for a part you use often on " + consActive + ".";
+    titleEl.textContent = "Consumables · " + consActive;
+    rowsEl.innerHTML = "";
+    consOf(consActive).forEach(function (row, i) {
+      var tr = document.createElement("tr");
+      tr.setAttribute("data-id", row.id);
+      var num = document.createElement("td");
+      num.className = "col-num";
+      num.textContent = i + 1;
+      tr.appendChild(num);
+      tr.appendChild(makeConsCell(row, "name", "Name"));
+      tr.appendChild(makeConsCell(row, "reference", "Reference"));
+      var act = document.createElement("td");
+      act.className = "col-act";
+      if (!readOnly) act.appendChild(deleteButton("Delete consumable " + (i + 1), function () {
+        return consHasContent(findCons(row.id) || row);
+      }, function () { deleteCons(row.id); }));
+      tr.appendChild(act);
+      rowsEl.appendChild(tr);
+      if (row.id === focusId) {
+        var first = tr.querySelector(".cell");
+        setTimeout(function () {
+          first.focus();
+          tr.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }, 0);
+      }
+    });
+    fitAll(rowsEl.querySelectorAll("textarea.wrap"));
+    updateCounts();
+  }
+  function addCons() {
+    if (readOnly) return;
+    var row = cleanCons({ id: uid(), machine: consActive, created: Date.now() });
+    consList.push(row);
+    writeCons(row);
+    renderRows(row.id);
+  }
+  function deleteCons(id) {
+    var idx = consList.findIndex(function (r) { return r.id === id; });
+    if (idx === -1 || readOnly) return;
+    clearTimeout(consTimers[id]);
+    delete consTimers[id];
+    consList.splice(idx, 1);
+    deleteDoc("consumables", id);
+    renderRows();
+  }
+  function renderConsSearch(raw, q) {
+    var hits = consList.filter(function (r) {
+      return consHasContent(r) && (norm(r.reference).indexOf(q) !== -1 || norm(r.name).indexOf(q) !== -1);
+    });
+    resultsEl.innerHTML = "";
+    resultsEl.hidden = false;
+    if (!hits.length) {
+      resultsEl.innerHTML = '<div class="results-none"><strong></strong><span>No consumable with this reference or name on any machine.</span></div>';
+      resultsEl.querySelector("strong").textContent = "Not found: “" + raw + "”";
+      return;
+    }
+    hits.sort(function (a, b) { return MACHINES.indexOf(a.machine) - MACHINES.indexOf(b.machine); });
+    var machinesHit = {};
+    hits.forEach(function (r) { machinesHit[r.machine] = 1; });
+    var head = document.createElement("div");
+    head.className = "results-head";
+    head.innerHTML = "<strong></strong> · <span></span>";
+    head.firstChild.textContent = hits.length + (hits.length === 1 ? " consumable found" : " consumables found");
+    head.lastChild.textContent = "in " + Object.keys(machinesHit).join(", ");
+    resultsEl.appendChild(head);
+    hits.slice(0, 60).forEach(function (r) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "result cons-hit";
+      var first = document.createElement("div");
+      var nm = document.createElement("div"); nm.className = "r-name"; nm.dir = "auto";
+      nm.appendChild(highlight(r.name || "(no name)", raw));
+      var tags = document.createElement("div"); tags.className = "r-tags";
+      [[r.machine, "chip"], ["Consumable", "chip chip-month"]].forEach(function (t) {
+        var c = document.createElement("span"); c.className = t[1]; c.textContent = t[0]; tags.appendChild(c);
+      });
+      first.appendChild(nm); first.appendChild(tags);
+      b.appendChild(first);
+      var refBox = document.createElement("div");
+      var rk = document.createElement("span"); rk.className = "r-k"; rk.textContent = "Reference";
+      var rv = document.createElement("span"); rv.className = "r-v r-ref"; rv.dir = "auto";
+      rv.appendChild(highlight(r.reference || "—", raw));
+      refBox.appendChild(rk); refBox.appendChild(rv);
+      b.appendChild(refBox);
+      var go = document.createElement("span"); go.className = "r-go"; go.textContent = "Open →";
+      b.appendChild(go);
+      b.addEventListener("click", function () { openCons(r); });
+      resultsEl.appendChild(b);
+    });
+  }
+  function openCons(r) {
+    if (consActive !== r.machine) switchCons(r.machine);
+    var tr = rowsEl.querySelector('tr[data-id="' + r.id + '"]');
+    if (!tr) return;
+    tr.scrollIntoView({ block: "center", behavior: "smooth" });
+    tr.classList.remove("flash");
+    void tr.offsetWidth;
+    tr.classList.add("flash");
+  }
+  // shared store updates; rows with an edit still waiting keep their local text
+  function applyCons(snap) {
+    var next = [];
+    snap.docs.forEach(function (d) {
+      var v = d.data() || {};
+      var row = cleanCons({ id: d.id, machine: v.machine, name: v.name, reference: v.reference, created: v.created });
+      if (!row) return;
+      var local = consTimers[d.id] && findCons(d.id);
+      next.push(local || row);
+    });
+    var before = consOf(consActive).map(function (r) { return r.id; }).join(",");
+    setConsList(next);
+    if (!consView) return;
+    var after = consOf(consActive).map(function (r) { return r.id; }).join(",");
+    if (before !== after) {
+      var focused = document.activeElement;
+      var keep = focused && focused.id && focused.classList.contains("cell") ? focused.id : null;
+      renderRows();
+      if (keep) { var el = document.getElementById(keep); if (el) el.focus(); }
+      return;
+    }
+    consOf(consActive).forEach(function (row) {
+      ["name", "reference"].forEach(function (f) {
+        var el = document.getElementById("c-" + row.id + "-" + f);
+        if (el && el !== document.activeElement && el.value !== row[f]) { el.value = row[f]; fitHeight(el); }
+      });
+    });
+    updateCounts();
+  }
+  function restoreConsumables(list, label) {
+    flushWrites();
+    takeSnapshot("pre-" + Date.now(), "pre", label).then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
+      var oldIds = consList.map(function (r) { return r.id; });
+      setConsList(list);
+      if (!db) saveLocal(); else syncConsDocs(oldIds);
+      backupDlg.hidden = true;
+      renderMonths(); renderTabs(); renderRows();
+      setStatus("Restored " + label, "saved");
+    });
+  }
+  // Excel: one sheet per machine (or one with a Machine column), plus a hidden copy for Restore
+  var CONS_MARK = "UII-CONS-v1";
+  function consSheet(name, title, list, withMachine, stamp) {
+    function z(n, i) { return n + (i % 2 ? "Z" : ""); }
+    var rows = list.map(function (r, i) {
+      var cells = withMachine ? [{ v: r.machine, s: z("center", i) }] : [];
+      return cells.concat([{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) }]);
+    });
+    var cols = (withMachine ? [{ name: "Machine", width: 12 }] : []).concat([{ name: "Name", width: 48 }, { name: "Reference", width: 28 }]);
+    return { name: name, xml: sheetXml({
+      title: title, subtitle: "Consumables · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
+      tab: "6D3FC0", rows: rows, columns: cols
+    }) };
+  }
+  function buildConsWorkbook() {
+    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    var sheets = MACHINES.map(function (m) { return consSheet(m, "UII — " + m + " consumables", consOf(m).filter(consHasContent), false, stamp); });
+    sheets.push(dataSheet(CONS_MARK, { app: "UII parts", kind: "consumables", savedAt: Date.now(), consumables: serializeCons() }));
+    return packXlsx(sheets);
+  }
 
   // ---- Apply snapshots from the shared store without disturbing typing ----
   function applyParts(snap) {
@@ -2635,7 +2999,7 @@
     });
     ov.forEach(function (r, i) { r.forEach(function (c) { c.s = c.s.replace(/Z$/, "") + (i % 2 ? "Z" : ""); }); });
     var sheets = [{ name: "Overview", xml: sheetXml({
-      title: "UII \u2014 Full backup", subtitle: stamp + " \u00B7 " + all.parts.length + " parts \u00B7 " + all.transactions.length + " transactions \u00B7 all months",
+      title: "UII \u2014 Full backup", subtitle: stamp + " \u00B7 " + all.parts.length + " parts \u00B7 " + all.transactions.length + " transactions \u00B7 all months \u00B7 " + all.consumables.length + " consumables",
       tab: "1F3864", rows: ov,
       columns: [{ name: "Month", width: 20 }].concat(MACHINES.map(function (m) { return { name: m + " parts", width: 13 }; }),
         [{ name: "In (pcs)", width: 11 }, { name: "Out (pcs)", width: 11 }, { name: "Transactions", width: 14 }])
@@ -2681,6 +3045,7 @@
         { name: "Type", width: 9 }, { name: "Quantity", width: 11 }, { name: "Line", width: 9 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]
     }) });
 
+    sheets.push(consSheet("Consumables", "UII \u2014 Consumables", consList.filter(consHasContent), true, stamp));
     sheets.push(dataSheet(BACKUP_MARK, all));
     return packXlsx(sheets);
   }
@@ -2754,7 +3119,7 @@
       if (rows) {
         var nums = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
         var vals = nums.map(function (n) { return rows[n][0] || ""; });
-        if (vals[0] === BACKUP_MARK || vals[0] === MONTH_MARK) return JSON.parse(vals.slice(1).join(""));
+        if (vals[0] === BACKUP_MARK || vals[0] === MONTH_MARK || vals[0] === CONS_MARK) return JSON.parse(vals.slice(1).join(""));
       }
       return readMonthSheets(sheetRows);
     });
@@ -2868,9 +3233,15 @@
   function exportFilename() { return "UII-" + monthLabel(month).replace(" ", "-") + ".xlsx"; }
   exportBtn.addEventListener("click", function () {
     flushWrites();
+    if (consView) { saveFile("UII-Consumables.xlsx", buildConsWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export"); return; }
     saveFile(exportFilename(), buildWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export");
   });
   function updateExportLabel() {
+    if (consView) {
+      exportBtn.title = "Download the consumables list as an Excel file";
+      document.getElementById("exportLabel").textContent = "Export Consumables to Excel";
+      return;
+    }
     exportBtn.title = "Download " + monthLabel(month) + " as an Excel file";
     document.getElementById("exportLabel").textContent = "Export " + MONTH_NAMES[parseInt(month.slice(5), 10) - 1].slice(0, 3) + " " + month.slice(0, 4) + " to Excel";
   }
@@ -2959,10 +3330,10 @@
       MACHINES.forEach(function (m) { allParts[k][m].forEach(function (r) { var b = rowBody(r); b.id = r.id; parts.push(b); }); });
     });
     Object.keys(allTx).forEach(function (k) { allTx[k].forEach(function (t) { var b = txBody(t); b.id = t.id; txs.push(b); }); });
-    return { app: "UII parts", version: 1, savedAt: Date.now(), parts: parts, transactions: txs };
+    return { app: "UII parts", version: 1, savedAt: Date.now(), parts: parts, transactions: txs, consumables: serializeCons() };
   }
   function hasAnyData() {
-    return Object.keys(allParts).some(function (k) { return MACHINES.some(function (m) { return allParts[k][m].length; }); });
+    return consList.length > 0 || Object.keys(allParts).some(function (k) { return MACHINES.some(function (m) { return allParts[k][m].length; }); });
   }
   // Replace everything with a saved copy
   function applyAll(snap) {
@@ -2984,8 +3355,12 @@
     snap.transactions.forEach(function (t) { var tx = cleanTx(t); (allTx[tx.month] = allTx[tx.month] || []).push(tx); });
     Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
     openSheet();
+    // backups made before Consumables existed leave the list as it is
+    var oldCons = consList.map(function (r) { return r.id; });
+    if (Array.isArray(snap.consumables)) setConsList(snap.consumables);
     if (!db) { saveLocal(); }
     else {
+      if (Array.isArray(snap.consumables)) syncConsDocs(oldCons);
       curP.forEach(function (id) { if (!keepP[id]) deleteDoc("parts", id); });
       curT.forEach(function (id) { if (!keepT[id]) deleteDoc("transactions", id); });
       snap.parts.forEach(function (r) { var b = Object.assign({}, r); delete b.id; saveDoc("parts", r.id, b); });
@@ -3256,6 +3631,14 @@
     var reading = isJson ? f.text().then(function (t) { return JSON.parse(t); }) : f.arrayBuffer().then(readBackupXlsx);
     reading.then(function (snap) {
       if (!snap || snap.app !== "UII parts") throw new Error("not a backup");
+      if (snap.kind === "consumables") {
+        if (!Array.isArray(snap.consumables)) throw new Error("not a backup");
+        var nc = snap.consumables.filter(consHasContent).length;
+        askCode("Consumables file " + f.name + " (" + nc + (nc === 1 ? " part" : " parts") + "). It replaces the consumables list. The months are not touched.", function () {
+          restoreConsumables(snap.consumables, f.name);
+        });
+        return;
+      }
       // months that have parts in this file
       var counts = {};
       snap.parts.forEach(function (r) { if ((r.name + r.reference + r.quantity).trim()) counts[r.month] = (counts[r.month] || 0) + 1; });
@@ -3306,15 +3689,21 @@
     if (TABS.indexOf(savedTab) !== -1) active = savedTab;
     var savedMonth = localStorage.getItem(MONTH_KEY);
     if (MONTHS.indexOf(savedMonth) !== -1) month = savedMonth;
+    consView = localStorage.getItem(VIEW_KEY) === "cons";
+    var savedCons = localStorage.getItem(CONS_TAB_KEY);
+    if (MACHINES.indexOf(savedCons) !== -1) consActive = savedCons;
   } catch (e) {}
+  updateSearchPlaceholder();
   openSheet();
 
   var useClaude = window.claude && typeof window.claude.use === "function";
   renderMonths();
   renderTabs();
   renderRows();
+  if (consView) showConsBtn();
   if (!useClaude) loadLocal().then(function () {
     renderMonths(); renderTabs(); renderRows();
+    if (consView) showConsBtn();
     maybeDailySnapshot(); updateReminder();
   });
 
@@ -3341,6 +3730,7 @@
       function ready() { if (gotParts && gotTx) maybeDailySnapshot(); }
       db.collection("parts").onSnapshot(function (snap) { applyParts(snap); if (!snap.metadata || !snap.metadata.fromCache) { gotParts = true; ready(); } }, lost);
       db.collection("transactions").onSnapshot(function (snap) { applyTx(snap); if (!snap.metadata || !snap.metadata.fromCache) { gotTx = true; ready(); } }, lost);
+      db.collection("consumables").onSnapshot(applyCons, lost);
       loadLastBackup();
     });
   }
