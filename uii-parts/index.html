@@ -1869,10 +1869,12 @@
     ["USD", "EUR", ""].forEach(function (c) { if (bag[c]) parts.push(money(Math.round(bag[c] * 100) / 100, c)); });
     return parts.join(" + ") || "—";
   }
-  function monthStats(k) {
+  // upTo ("YYYY-MM-DD"): only count transactions dated up to that day
+  function monthStats(k, upTo) {
     var st = { all: { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0 } };
     MACHINES.forEach(function (m) { st[m] = { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0, used: {} }; });
     (allTx[k] || []).forEach(function (t) {
+      if (upTo && txDate(t) > upTo) return;
       var s = st[t.machine];
       if (!s) return;
       var part = partIn(k, t.partId), p = part ? unitPrice(part) : null, cur = part ? part.currency : "";
@@ -1899,8 +1901,16 @@
     var idx = MONTHS.indexOf(month);
     var prevKey = idx > 0 ? MONTHS[idx - 1] : null;
     var cur = monthStats(month);
-    var prev = prevKey ? monthStats(prevKey) : null;
-    var hasPrev = prev && prev.all.n > 0;
+    var prevFull = prevKey ? monthStats(prevKey) : null;
+    var hasPrev = prevFull && prevFull.all.n > 0;
+    // The month running now is compared with the same days of the month before
+    var partial = month === CURRENT_MONTH, today = new Date().getDate();
+    var daysIn = new Date(parseInt(month.slice(0, 4), 10), parseInt(month.slice(5), 10), 0).getDate();
+    if (partial && today >= daysIn) partial = false;
+    var prev = hasPrev && partial ? monthStats(prevKey, prevKey + "-" + pad(today)) : prevFull;
+    var prevName = prevKey ? monthLabel(prevKey).split(" ")[0] : "";
+    var prevSpan = partial ? prevName + " 1\u2013" + today : prevName;
+    var prevLong = partial ? prevName + " 1\u2013" + today : prevKey ? monthLabel(prevKey) : "";
     metaEl.textContent = monthLabel(month) + " · " + cur.all.n + (cur.all.n === 1 ? " transaction" : " transactions");
     box.innerHTML = "";
 
@@ -1925,10 +1935,10 @@
       cmp.className = "sum-cmp";
       if (hasPrev && prev[m].outQty > 0) {
         var d = pct(s.outQty, prev[m].outQty);
-        cmp.innerHTML = "Used vs " + monthLabel(prevKey).split(" ")[0] + ": <b></b>";
+        cmp.innerHTML = "Used vs " + prevSpan + ": <b></b>";
         cmp.lastChild.textContent = (d > 0 ? "+" : "") + d + "% (" + s.outQty + " vs " + prev[m].outQty + ")";
       } else if (hasPrev) {
-        cmp.textContent = "Nothing used in " + monthLabel(prevKey) + " to compare";
+        cmp.textContent = "Nothing used in " + prevLong + " to compare";
       } else {
         cmp.textContent = "No earlier month to compare yet";
       }
@@ -1941,13 +1951,15 @@
     var notes = [];
     function note(kind, text, fix) { notes.push([kind, text, fix]); }
     if (!cur.all.n) note("info", "No parts came in or went out in " + monthLabel(month) + " yet.", "Changes to quantities on the machine tabs show up here.");
+    if (partial && hasPrev) note("info", monthLabel(month) + " is not finished yet (day " + today + " of " + daysIn + "). It is compared with " + prevLong + ", the same days of " + monthLabel(prevKey) + ".",
+      "Check again at the end of the month for the full picture.");
     MACHINES.forEach(function (m) {
       var s = cur[m], p = prev ? prev[m] : null;
       if (hasPrev && p.outQty > 0 && s.outQty >= p.outQty * 1.3 && s.outQty - p.outQty >= 3) {
-        note("warn", m + " used " + pct(s.outQty, p.outQty) + "% more parts than in " + monthLabel(prevKey) + " (" + s.outQty + " vs " + p.outQty + ").",
+        note("warn", m + " used " + pct(s.outQty, p.outQty) + "% more parts than in " + prevLong + " (" + s.outQty + " vs " + p.outQty + ")" + (partial ? " so far." : "."),
           "Check " + m + " for a fault that wears parts faster, and order its parts earlier than usual.");
       } else if (hasPrev && p.outQty >= 3 && s.outQty <= p.outQty * 0.7) {
-        note("good", m + " used " + Math.abs(pct(s.outQty, p.outQty)) + "% fewer parts than in " + monthLabel(prevKey) + " (" + s.outQty + " vs " + p.outQty + ").", "No action needed.");
+        note("good", m + " used " + Math.abs(pct(s.outQty, p.outQty)) + "% fewer parts than in " + prevLong + " (" + s.outQty + " vs " + p.outQty + ")" + (partial ? " so far." : "."), partial ? "Fewer so far. Check again at the end of the month." : "No action needed.");
       }
       if (s.outQty > s.inQty && s.outQty > 0) {
         note("warn", m + ": more parts went out (" + s.outQty + ") than came in (" + s.inQty + "), so its stock is going down.", "Plan the next order for " + m + ".");
