@@ -2920,11 +2920,11 @@
     spanRow(1, { v: spec.title, s: "title_" + th }, 38);
     spanRow(2, { v: spec.subtitle, s: "sub_" + th }, 22);
     row(3, [], 8);
-    row(HEAD_ROW, spec.columns.map(function (c) { return { v: c.name, s: "head_" + th }; }), 28);
+    row(HEAD_ROW, spec.columns.map(function (c) { return { v: c.name, s: "head_" + th }; }), 32);
     var r = HEAD_ROW + 1;
-    spec.rows.forEach(function (cells) { row(r++, cells, 22); });
+    spec.rows.forEach(function (cells) { row(r++, cells, 26); });
     var lastData = r - 1;
-    (spec.totals || []).forEach(function (cells) { row(r++, cells, 24); });
+    (spec.totals || []).forEach(function (cells) { row(r++, cells, 28); });
 
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
     out += '<sheetPr><tabColor rgb="FF' + XL_THEMES[th][0] + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
