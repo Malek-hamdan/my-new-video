@@ -2842,7 +2842,7 @@
   xf("subtitle", 2, 0, 0, "left");
   xf("header", 3, 2, 1, "center", true);
   [["", 0], ["Z", 3]].forEach(function (z) {
-    xf("text" + z[0], 0, z[1], 1, "left", true);
+    xf("text" + z[0], 0, z[1], 1, "center", true);
     xf("center" + z[0], 0, z[1], 1, "center");
     xf("qtyPos" + z[0], 4, z[1], 1, "center");
     xf("qtyNeg" + z[0], 5, z[1], 1, "center");
@@ -2859,7 +2859,7 @@
   // a part at 0: light red row whatever the zebra
   XL_FILLS.push(solid("FDECEA"), solid("F2F4F7"));
   var FILL_ZERO = XL_FILLS.length - 2, FILL_HEAD = XL_FILLS.length - 1;
-  xf("textZero", 0, FILL_ZERO, 1, "left", true);
+  xf("textZero", 0, FILL_ZERO, 1, "center", true);
   xf("centerZero", 0, FILL_ZERO, 1, "center");
   xf("qtyZero", 5, FILL_ZERO, 1, "center");
   xf("moneyZero", 0, FILL_ZERO, 1, "center", false, 4);
@@ -2923,7 +2923,6 @@
     row(HEAD_ROW, spec.columns.map(function (c) { return { v: c.name, s: "head_" + th }; }), 32);
     var r = HEAD_ROW + 1;
     spec.rows.forEach(function (cells) { row(r++, cells, 26); });
-    var lastData = r - 1;
     (spec.totals || []).forEach(function (cells) { row(r++, cells, 28); });
 
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
@@ -2932,7 +2931,6 @@
     out += '<sheetFormatPr defaultRowHeight="18"/>';
     out += "<cols>" + spec.columns.map(function (c, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.width + '" customWidth="1"/>'; }).join("") + "</cols>";
     out += "<sheetData>" + lines.join("") + "</sheetData>";
-    if (lastData > HEAD_ROW) out += '<autoFilter ref="A' + HEAD_ROW + ":" + last + lastData + '"/>';
     out += '<mergeCells count="2"><mergeCell ref="A1:' + last + '1"/><mergeCell ref="A2:' + last + '2"/></mergeCells>';
     out += '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>';
     out += '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
