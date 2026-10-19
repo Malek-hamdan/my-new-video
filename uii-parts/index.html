@@ -2899,7 +2899,7 @@
 
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
     out += '<sheetPr><tabColor rgb="FF' + spec.tab + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
-    out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="' + HEAD_ROW + '" topLeftCell="A' + (HEAD_ROW + 1) + '" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+    out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>';
     out += '<sheetFormatPr defaultRowHeight="18"/>';
     out += "<cols>" + spec.columns.map(function (c, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.width + '" customWidth="1"/>'; }).join("") + "</cols>";
     out += "<sheetData>" + lines.join("") + "</sheetData>";
@@ -2922,17 +2922,15 @@
       var list = data[m].filter(hasContent);
       var rows = list.map(function (r, i) {
         return [{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) }, { v: numOrText(r.min), s: z("center", i) },
-          { v: isLow(r) ? "Order" : "", s: isLow(r) ? "typeOut" : z("center", i) },
+          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) },
           { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) },
-          { v: totalOf(r) === null ? "" : totalOf(r), s: z("moneyBold", i) },
-          { v: r.date, s: z("center", i) }];
+          { v: totalOf(r) === null ? "" : totalOf(r), s: z("moneyBold", i) }];
       });
       var totals = [];
       return { name: m, xml: sheetXml({
         title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
         tab: "1F3864", rows: rows, totals: totals,
-        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 12 }, { name: "Min", width: 9 }, { name: "Status", width: 11 }, { name: "Unit price", width: 14 }, { name: "Currency", width: 11 }, { name: "Total price", width: 16 }, { name: "Date", width: 15 }]
+        columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 12 }, { name: "Unit price", width: 14 }, { name: "Currency", width: 11 }, { name: "Total price", width: 16 }]
       }) };
     }
 
