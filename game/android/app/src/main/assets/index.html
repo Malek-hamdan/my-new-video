@@ -117,6 +117,12 @@ const MOVER_HW = 0.42;   // half width of a sliding wall
 // the Mighty Level starts at full speed in hard mode
 const speedAt = z => Math.min(24, (S.mighty ? 17 : 9) + z * 0.016);
 const LEVEL_LEN = 3000, MIGHTY_LEVEL = 10;
+// lasers from level 10 (and in the Mighty Level): a low fence to jump (some blink off and on)
+// and a tall beam that sweeps across the lanes, which has to be dodged
+const LASER_LEVEL = 10, LASER_Y = 0.45;
+const lasersOn = () => S.mighty || S.level >= LASER_LEVEL;
+const laserLit = l => l.type !== 'fence' || !l.blink || Math.sin(time * l.w + l.ph) > -0.2;
+const sweepX = l => Math.sin(time * l.w + l.ph) * 2.2;
 const HARD_SCORE = 5000, HARD_SPEED = 7;   // hard mode starts at 5000 points; extra speed once fully hard (9000+)
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
@@ -155,6 +161,7 @@ const sfx = {
   jump() { tone(300, 0.22, 'sine', 0.25, 700); },
   boost() { tone(200, 0.5, 'sawtooth', 0.15, 1200); tone(400, 0.4, 'sine', 0.2, 1600); },
   land(v) { const k = Math.min(1, (v || 3) / 12); tone(90, 0.2, 'sine', 0.3 + 0.4 * k, 38); noise(0.12 + 0.12 * k, 0.2 + 0.4 * k, 260); },
+  zap() { tone(1800, 0.35, 'sawtooth', 0.15, 120); noise(0.4, 0.4, 3000); },
   crash() { noise(0.6, 0.6, 900); tone(160, 0.4, 'sawtooth', 0.2, 40); },
   fall() { tone(600, 1.0, 'triangle', 0.2, 80); },
   power() { [520, 780, 1040, 1560].forEach((f, i) => tone(f, 0.12, 'triangle', 0.14, null, i * 0.06)); },
@@ -194,7 +201,12 @@ function makeRow(i) {
   gen.gap = Math.max(3, Math.round(v * (0.9 - diff * 0.2 - 0.15 * h) / ROW) + ri(0, 1));
   const kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
-  if (z > 120 && kind < 0.08) {
+  if (lasersOn() && Math.random() < 0.3) {
+    if (Math.random() < 0.5) {
+      row.laser = { type: 'fence', blink: Math.random() < 0.5, w: rand(2.2, 3), ph: rand(0, 6), gone: false };
+      gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 / ROW) + 2);   // room to land after jumping it
+    } else row.laser = { type: 'sweep', w: rand(1.6, 2.4) * (1 + 0.3 * h), ph: rand(0, 6), gone: false };
+  } else if (z > 120 && kind < 0.08) {
     // jump pad in front of a wide gap
     row.cells[gen.safe] = PAD;
     for (let k = 0; k < 3; k++) gen.queue.push(r => r.cells.fill(HOLE));   // a well-timed normal jump also clears it
@@ -292,7 +304,7 @@ function revive() {
   const b = ball, i = Math.floor(b.z / ROW);
   if (b.fall) b.z = b.hole.z0 + 0.1;
   // clear a short stretch so the comeback is not an instant loss
-  for (let j = Math.max(0, i - 2); j < i + 8; j++) { const r = rowAt(j); r.cells.fill(FLOOR); r.movers = []; r.dirty = true; }
+  for (let j = Math.max(0, i - 2); j < i + 8; j++) { const r = rowAt(j); r.cells.fill(FLOOR); r.movers = []; r.laser = null; r.dirty = true; }
   Object.assign(b, { y: 0, vy: 0, air: false, fall: false, dead: false, hole: null, shield: 3 });
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
   $('over').classList.add('hidden');
@@ -453,7 +465,8 @@ function update(dt) {
     } else if (b.air) {
       b.vy -= (b.vy > 0 ? 22 : 32) * dt; b.y += b.vy * dt;   // drops faster than it rises: feels heavy
       const under = rowAt(Math.floor(b.z / ROW)).cells[clamp(Math.floor(b.x + HALF), 0, COLS - 1)];
-      if (under !== FLOOR) b.cleared = true;
+      const overRow = rowAt(Math.floor(b.z / ROW));
+      if (under !== FLOOR || (overRow.laser && overRow.laser.type === 'fence')) b.cleared = true;
       // coming down near the top of a box lands on it instead of crashing
       if (b.vy <= 0 && b.y <= BLOCK_H && b.y > BLOCK_H - BOX_STEP && onBox()) {
         const v = -b.vy; b.y = BLOCK_H; b.vy = 0; b.air = false; b.bounced = false; thud(v);
@@ -499,6 +512,22 @@ function update(dt) {
         sfx.crash(); buzz([60, 40, 120]); say('Crash! 💥', '#ffd60a'); end(false);
         return true;
       });
+      // lasers: the fence hits a ball below its beam while lit; the sweeping beam hits at any height
+      for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
+        const r = rowAt(j), l = r.laser;
+        if (b.dead || !l || l.gone || Math.abs(b.z - (j * ROW + 1)) > R * 0.8) continue;
+        const hit = l.type === 'fence' ? laserLit(l) && b.y < LASER_Y + 0.03 : Math.abs(b.x - sweepX(l)) < R * 0.8 + 0.05;
+        if (!hit) continue;
+        if (b.shield > 0) {
+          l.gone = true; r.dirty = true; b.shield = 0; S.shake = 0.2;
+          burst(b.x, LASER_Y, j * ROW + 1, [0xff3355, 0xffffff, 0xff9e00], 30, 4);
+          sfx.crash(); buzz(60); say('Shield saved you! 🛡️', '#80ffdb');
+          continue;
+        }
+        b.dead = true; S.shake = 0.5;
+        burst(b.x, b.y + R, b.z, [0xff3355, 0xffffff, 0xff9e00, 0x4cc9f0], 40, 4);
+        sfx.zap(); buzz([40, 30, 40, 30, 120]); say('Zapped! ⚡', '#ff3355'); end(false);
+      }
       // gems and power-ups
       const reach = b.magnet > 0 ? [i, i + 1, i + 2, i + 3] : [i, i + 1];
       for (const j of reach) {
@@ -548,8 +577,9 @@ function update(dt) {
         S.level++; S.levelZ += LEVEL_LEN; sfx.level();
         if (!S.mighty && S.level >= MIGHTY_LEVEL && !S.mightyOpen) {
           S.mightyOpen = true; save('rb_mighty', '1');
-          say(`Level ${S.level}!\nMighty Level unlocked 💀`, '#ff3355'); buzz([80, 60, 80, 60, 160]);
-        } else say(`Level ${S.level}!\n${LEVEL_WORDS[(S.level - 2) % LEVEL_WORDS.length]}`, '#80ffdb');
+          say(`Level ${S.level}!\nMighty Level unlocked 💀\nLasers ahead ⚡`, '#ff3355'); buzz([80, 60, 80, 60, 160]);
+        } else if (S.level === LASER_LEVEL) say(`Level ${S.level}!\nLasers ahead ⚡`, '#ff3355');
+        else say(`Level ${S.level}!\n${LEVEL_WORDS[(S.level - 2) % LEVEL_WORDS.length]}`, '#80ffdb');
       }
       hud();
     }
@@ -690,6 +720,18 @@ function initWorld() {
   MAT.archA = new THREE.MeshBasicMaterial({ color: 0x4cc9f0 });
   MAT.archB = new THREE.MeshBasicMaterial({ color: 0xf72585 });
   GEO.part = new THREE.BoxGeometry(0.09, 0.09, 0.09);
+  GEO.beamH = new THREE.CylinderGeometry(0.035, 0.035, 5.5, 8); GEO.beamH.rotateZ(Math.PI / 2);
+  GEO.beamHGlow = new THREE.CylinderGeometry(0.13, 0.13, 5.5, 12); GEO.beamHGlow.rotateZ(Math.PI / 2);
+  GEO.beamV = new THREE.CylinderGeometry(0.06, 0.06, 3.1, 8);
+  GEO.beamVGlow = new THREE.CylinderGeometry(0.24, 0.24, 3.1, 12);
+  GEO.post = new THREE.CylinderGeometry(0.07, 0.1, 1, 10);
+  GEO.gantry = new THREE.BoxGeometry(5.8, 0.14, 0.14);
+  GEO.emitter = new THREE.SphereGeometry(0.11, 12, 8);
+  MAT.beam = new THREE.MeshBasicMaterial({ color: 0xff2a3a });
+  MAT.beamGlow = new THREE.MeshBasicMaterial({ color: 0xff3355, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+  MAT.beamOff = new THREE.MeshBasicMaterial({ color: 0xff2a3a, transparent: true, opacity: 0.15, depthWrite: false });
+  MAT.post = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, metalness: 0.6, roughness: 0.3 });
+  MAT.emitter = new THREE.MeshBasicMaterial({ color: 0xff5566 });
 
   // the ball: beach-ball segments make the roll easy to see
   const ballTex = canvasTex(256, 128, (g, w, h) => {
@@ -808,6 +850,17 @@ function buildRow(i) {
     m.add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge));
     grp.add(m); row.moverMeshes.push([mv, m]);
   }
+  if (row.laser && !row.laser.gone) {
+    const l = row.laser, add = (geo, mat, x, y) => { const m = new THREE.Mesh(geo, mat); Wp(x, y, zc, m.position); grp.add(m); return m; };
+    if (l.type === 'fence') {
+      for (const sx of [-1, 1]) { add(GEO.post, MAT.post, sx * 2.75, 0.5); add(GEO.emitter, MAT.emitter, sx * 2.75, LASER_Y); }
+      row.laserMesh = [add(GEO.beamH, MAT.beam, 0, LASER_Y), add(GEO.beamHGlow, MAT.beamGlow, 0, LASER_Y)];
+    } else {
+      for (const sx of [-1, 1]) { const p = add(GEO.post, MAT.post, sx * 2.85, 1.55); p.scale.y = 3.1; }
+      add(GEO.gantry, MAT.post, 0, 3.1);
+      row.laserMesh = [add(GEO.beamV, MAT.beam, 0, 1.55), add(GEO.beamVGlow, MAT.beamGlow, 0, 1.55), add(GEO.emitter, MAT.emitter, 0, 3.0)];
+    }
+  } else row.laserMesh = null;
   if (row.tunnel) {
     const a = new THREE.Mesh(GEO.arch, row.hard ? (i % 2 ? MAT.archHardA : MAT.archHardB) : (i % 2 ? MAT.archA : MAT.archB));
     Wp(0, -0.6, zc, a.position); grp.add(a);
@@ -838,7 +891,13 @@ function render() {
     const r = rows[i];
     for (const m of r.spin) { m.rotation.y = time * 2.5 + i; }
     for (const [mv, m] of r.moverMeshes) Wp(moverX(mv), BLOCK_H / 2 - 0.04, i * ROW + 1, m.position);
+    if (r.laserMesh) {
+      const l = r.laser, [beam, glow, emitter] = r.laserMesh;
+      if (l.type === 'fence') { const lit = laserLit(l); beam.material = lit ? MAT.beam : MAT.beamOff; glow.visible = lit; }
+      else { const x = sweepX(l); Wp(x, 1.55, i * ROW + 1, beam.position); Wp(x, 1.55, i * ROW + 1, glow.position); Wp(x, 3.0, i * ROW + 1, emitter.position); }
+    }
   }
+  MAT.beamGlow.opacity = 0.3 + 0.1 * Math.sin(time * 40);   // a little flicker
   for (const g of pulled) if (g.mesh) Wp(g.x, g.y, g.z, g.mesh.position);
 
   // ball
@@ -899,6 +958,7 @@ function warmUp() {
   add(new THREE.Mesh(GEO.hour, MAT.slow)); add(new THREE.Mesh(GEO.gem, MAT.gold));
   add(new THREE.Mesh(GEO.arch, MAT.archHardA)); add(new THREE.Mesh(GEO.arch, MAT.archHardB));
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
+  for (const [g, m] of [[GEO.beamH, MAT.beam], [GEO.beamHGlow, MAT.beamGlow], [GEO.beamH, MAT.beamOff], [GEO.post, MAT.post], [GEO.emitter, MAT.emitter], [GEO.gantry, MAT.post]]) add(new THREE.Mesh(g, m));
   add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
   grp.traverse(o => { if (o.isMesh) o.castShadow = true; });
