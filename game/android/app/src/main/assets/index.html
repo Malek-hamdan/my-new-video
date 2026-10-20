@@ -106,7 +106,7 @@ const sfx = {
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
 // ---------- state ----------
-const S = { phase: 'menu', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250 };
+const S = { phase: 'menu', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250, combo: 0 };
 let ball, rows, camX, parts, gen, cam, time = 0;
 
 function makeRow(i) {
@@ -146,7 +146,7 @@ function rowAt(i) {
 
 function reset() {
   ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, hole: null };
-  rows = []; gen = { safe: 2, gap: 2, lastPower: 0 }; cam = { back: CAM_BACK, h: CAM_H, pan: 0 }; camX = 0; parts = []; S.gems = 0; S.nextMilestone = 250;
+  rows = []; gen = { safe: 2, gap: 2, lastPower: 0 }; cam = { back: CAM_BACK, h: CAM_H, pan: 0 }; camX = 0; parts = []; S.gems = 0; S.nextMilestone = 250; S.combo = 0;
 }
 
 function hud() {
@@ -159,6 +159,7 @@ function hud() {
 let msgTimer;
 function say(text, color) {
   const m = $('msg'); m.textContent = text; m.style.color = color || '#fff';
+  m.classList.remove('show'); void m.offsetWidth;   // restart the pop animation
   m.classList.add('show'); clearTimeout(msgTimer);
   msgTimer = setTimeout(() => m.classList.remove('show'), 1000);
 }
@@ -191,7 +192,7 @@ let touch = null;
 const keys = {};
 function jump() {
   if (S.phase !== 'play' || ball.air || ball.fall) return;
-  ball.air = true; ball.vy = 7.2; sfx.jump(); buzz(12);
+  ball.air = true; ball.vy = 7.2; ball.cleared = false; sfx.jump(); buzz(12);
 }
 cv.addEventListener('pointerdown', e => {
   ac();
@@ -225,6 +226,18 @@ document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? 
 function burst(x, y, z, cols, n, sp) {
   for (let i = 0; i < n; i++)
     parts.push({ x, y, z, vx: rand(-sp, sp), vy: rand(0, sp * 1.4), vz: rand(-sp, sp) + ball.speed * 0.5, c: cols[i % cols.length], life: rand(0.5, 1) });
+}
+
+// praise grows with each obstacle cleared in a row; a jump over nothing resets it
+const PRAISE = [['Nice!', '#80ffdb'], ['Great!', '#4cc9f0'], ['Awesome!', '#ffd60a'], ['Amazing!', '#f72585'], ['Unstoppable! 🔥', '#ff9e00']];
+const LEVEL_WORDS = ['Awesome! 🚀', 'On fire! 🔥', 'Incredible! ⚡', 'Legendary! 👑', 'Unreal! 🌟'];
+function landed() {
+  if (!ball.cleared) { S.combo = 0; return; }
+  ball.cleared = false;
+  const [word, color] = PRAISE[Math.min(S.combo, PRAISE.length - 1)];
+  S.combo++;
+  say(S.combo > 1 ? `${word} x${S.combo}` : word, color);
+  tone(880 + S.combo * 110, 0.12, 'triangle', 0.12);
 }
 
 function overHole() {
@@ -264,10 +277,12 @@ function update(dt) {
       b.rot += 6 * dt;
     } else if (b.air) {
       b.vy -= 22 * dt; b.y += b.vy * dt;
+      const under = rowAt(Math.floor(b.z / ROW)).cells[clamp(Math.floor(b.x + HALF), 0, COLS - 1)];
+      if (under !== FLOOR) b.cleared = true;
       if (b.y <= 0) {
         const row = rowAt(Math.floor(b.z / ROW)), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
         if (row.cells[c] === HOLE) { b.y = 0; b.air = false; overHole(); }
-        else { b.y = 0; b.vy = 0; b.air = false; sfx.land(); }
+        else { b.y = 0; b.vy = 0; b.air = false; sfx.land(); landed(); }
       }
     }
     if (S.phase === 'play' && !b.dead) {
@@ -316,7 +331,10 @@ function update(dt) {
         }
       }
       if (b.shield > 0) b.shield = Math.max(0, b.shield - dt);
-      if (b.z >= S.nextMilestone) { say(S.nextMilestone + ' m! 🚀', '#80ffdb'); sfx.level(); S.nextMilestone += 250; }
+      if (b.z >= S.nextMilestone) {
+        const lvl = S.nextMilestone / 250 + 1;
+        say(`Level ${lvl}! ${LEVEL_WORDS[(lvl - 2) % LEVEL_WORDS.length]}`, '#80ffdb'); sfx.level(); S.nextMilestone += 250;
+      }
       hud();
     }
   }
