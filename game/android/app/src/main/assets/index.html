@@ -15,6 +15,8 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
 h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc9f0,#f72585);-webkit-background-clip:text;background-clip:text;color:transparent}
 .btn{background:linear-gradient(180deg,#4cc9f0,#3a86ff);color:#fff;border:0;border-radius:18px;font-size:26px;font-weight:900;padding:14px 52px;box-shadow:0 6px 0 #2457b3;font-family:inherit}
 .btn:active{transform:translateY(3px);box-shadow:0 3px 0 #2457b3}
+.btn.alt{background:linear-gradient(180deg,#ff5fa2,#f72585);box-shadow:0 6px 0 #a0105a;font-size:22px;padding:12px 30px}
+.btn:disabled{filter:grayscale(1);opacity:.5}
 .overlay p{margin:0;font-size:17px;opacity:.92;line-height:1.8}
 .big{font-size:64px;font-weight:900;line-height:1}
 #msg{position:fixed;left:0;right:0;top:30%;text-align:center;font-size:min(40px,9vw);white-space:pre-line;line-height:1.25;font-weight:900;color:#fff;text-shadow:0 4px 14px #000;pointer-events:none;opacity:0;transform:scale(.6);transition:transform .25s cubic-bezier(.2,1.6,.4,1),opacity .3s}
@@ -24,7 +26,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <body>
 <canvas id="c"></canvas>
 <div id="hud">
-  <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span><span id="shield"></span></div>
+  <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span><span id="shield"></span><span id="magnet"></span></div>
   <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
 </div>
 <div id="msg"></div>
@@ -41,7 +43,9 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <h1 id="overTitle">Game Over</h1>
   <div class="big" id="finalScore">0</div>
   <p id="finalInfo"></p>
+  <button class="btn alt" id="cont">Second Chance ❤️</button>
   <button class="btn" id="again">Play Again</button>
+  <p id="bank"></p>
 </div>
 
 <script>
@@ -106,8 +110,8 @@ const sfx = {
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
 // ---------- state ----------
-const S = { phase: 'menu', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250, combo: 0 };
-let ball, rows, camX, parts, gen, cam, time = 0;
+const S = { phase: 'menu', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250, combo: 0, bank: +(load('rb_bank') || 0), banked: 0, continues: 0 };
+let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function makeRow(i) {
   const cells = new Array(COLS).fill(FLOOR), gems = [];
@@ -118,8 +122,9 @@ function makeRow(i) {
   if (gen.gap > 0) {
     // calm row: drift the safe path and maybe lay a line of gems on it
     if (Math.random() < 0.35) gen.safe = clamp(gen.safe + (Math.random() < 0.5 ? -1 : 1), 0, COLS - 1);
-    if (i * ROW > 300 && i - gen.lastPower > 70 && Math.random() < 0.05) {
-      power = { k: gen.safe, type: 'shield' }; gen.lastPower = i;
+    if (i * ROW > 150 && i - gen.lastPower > 60 && Math.random() < 0.05) {
+      const type = i * ROW > 300 && Math.random() < 0.5 ? 'shield' : 'magnet';
+      power = { k: gen.safe, type }; gen.lastPower = i;
     } else if (Math.random() < 0.3) gems.push(gen.safe);
     return { cells, gems, power };
   }
@@ -145,13 +150,14 @@ function rowAt(i) {
 }
 
 function reset() {
-  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, hole: null };
-  rows = []; gen = { safe: 2, gap: 2, lastPower: 0 }; cam = { back: CAM_BACK, h: CAM_H, pan: 0 }; camX = 0; parts = []; S.gems = 0; S.nextMilestone = 250; S.combo = 0;
+  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null };
+  rows = []; gen = { safe: 2, gap: 2, lastPower: 0 }; cam = { back: CAM_BACK, h: CAM_H, pan: 0 }; camX = 0; parts = []; pulled = []; S.gems = 0; S.banked = 0; S.continues = 0; S.nextMilestone = 250; S.combo = 0;
 }
 
 function hud() {
   $('dist').textContent = Math.floor(ball.z) + ' m';
   $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
+  $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
   $('gems').textContent = '💎 ' + S.gems;
   $('best').textContent = '🏆 ' + S.best;
   $('mute').textContent = muted ? '🔇' : '🔊';
@@ -171,6 +177,22 @@ function start() {
   $('menu').classList.add('hidden'); $('over').classList.add('hidden');
   hud();
 }
+const contCost = () => 20 * 2 ** S.continues;   // 20, 40, 80... per run
+function revive() {
+  const cost = contCost();
+  if (S.phase !== 'over' || S.bank < cost) return;
+  S.bank -= cost; save('rb_bank', S.bank); S.continues++;
+  const b = ball, i = Math.floor(b.z / ROW);
+  if (b.fall) b.z = b.hole.z0 + 0.1;
+  // clear a short stretch so the comeback is not an instant loss
+  for (let j = Math.max(0, i - 2); j < i + 8; j++) { rowAt(j).cells.fill(FLOOR); }
+  Object.assign(b, { y: 0, vy: 0, air: false, fall: false, dead: false, hole: null, shield: 3 });
+  cam = { back: CAM_BACK, h: CAM_H, pan: 0 };
+  $('over').classList.add('hidden');
+  S.phase = 'play'; S.combo = 0;
+  sfx.power(); buzz([20, 30, 20]); say('Second chance! ❤️', '#ff5fa2');
+  hud();
+}
 function end(fell) {
   if (S.phase !== 'play') return;
   S.phase = 'ending';
@@ -182,6 +204,12 @@ function end(fell) {
     $('overTitle').textContent = fell ? 'You Fell!' : 'Crashed!';
     $('finalScore').textContent = sc;
     $('finalInfo').innerHTML = `${Math.floor(ball.z)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + S.best);
+    // gems from every run go to a saved bank, which pays for second chances
+    S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
+    const cost = contCost();
+    $('cont').textContent = `Second Chance ❤️  ${cost} 💎`;
+    $('cont').disabled = S.bank < cost;
+    $('bank').textContent = S.bank >= cost ? `You have ${S.bank} 💎` : `You have ${S.bank} 💎 (need ${cost})`;
     $('over').classList.remove('hidden');
     hud();
   }, fell ? 1500 : 800);
@@ -219,6 +247,7 @@ addEventListener('keydown', e => { keys[e.key] = true; if (e.key === 'ArrowUp' |
 addEventListener('keyup', e => { keys[e.key] = false; });
 $('play').onclick = start;
 $('again').onclick = start;
+$('cont').onclick = revive;
 $('mute').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); hud(); };
 document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? AC.suspend() : AC.resume(); });
 
@@ -312,10 +341,12 @@ function update(dt) {
         if (b.dead) break;
       }
       // gems
-      for (const j of [i, i + 1]) {
+      const reach = b.magnet > 0 ? [i, i + 1, i + 2, i + 3] : [i, i + 1];
+      for (const j of reach) {
         const r2 = rowAt(j);
         r2.gems = r2.gems.filter(k => {
           const gx = k - HALF + 0.5, gz = j * ROW + 1;
+          if (b.magnet > 0) { pulled.push({ x: gx, y: 0.6, z: gz }); return false; }
           if (Math.abs(gx - b.x) < 0.65 && Math.abs(gz - b.z) < 0.7 && b.y < 1.2) {
             S.gems++; sfx.gem(); buzz(8);
             burst(gx, 0.6, gz, ['#80ffdb', '#fff', '#4cc9f0'], 12, 2.5);
@@ -325,12 +356,23 @@ function update(dt) {
         });
         const pw = r2.power;
         if (pw && Math.abs(pw.k - HALF + 0.5 - b.x) < 0.7 && Math.abs(j * ROW + 1 - b.z) < 0.8 && b.y < 1.4) {
-          r2.power = null; b.shield = 15;
-          sfx.power(); buzz([20, 30, 20]); say('Shield! 🛡️', '#80ffdb');
+          r2.power = null;
+          if (pw.type === 'magnet') { b.magnet = 10; say('Magnet! 🧲', '#ff5fa2'); }
+          else { b.shield = 15; say('Shield! 🛡️', '#80ffdb'); }
+          sfx.power(); buzz([20, 30, 20]);
           burst(b.x, 0.6, b.z + 0.5, ['#80ffdb', '#fff', '#4cc9f0'], 20, 3);
         }
       }
       if (b.shield > 0) b.shield = Math.max(0, b.shield - dt);
+      if (b.magnet > 0) b.magnet = Math.max(0, b.magnet - dt);
+      // gems caught by the magnet fly into the ball
+      pulled = pulled.filter(g => {
+        const k = Math.min(1, dt * 9);
+        g.x += (b.x - g.x) * k; g.y += (b.y + R - g.y) * k; g.z += (b.z - g.z) * k;
+        if (Math.hypot(g.x - b.x, g.z - b.z) > 0.35) return true;
+        S.gems++; sfx.gem(); buzz(8);
+        return false;
+      });
       if (b.z >= S.nextMilestone) {
         const lvl = S.nextMilestone / 250 + 1;
         say(`Level ${lvl}!\n${LEVEL_WORDS[(lvl - 2) % LEVEL_WORDS.length]}`, '#80ffdb'); sfx.level(); S.nextMilestone += 250;
@@ -432,23 +474,36 @@ function drawRowObjects(i) {
     const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 1.8);
     g.addColorStop(0, 'rgba(128,255,219,.6)'); g.addColorStop(1, 'rgba(128,255,219,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r * 1.8, 0, 7); ctx.fill();
-    ctx.fillStyle = '#80ffdb'; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, r * 0.15);
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r * 0.85, sy - r * 0.6); ctx.lineTo(sx + r * 0.7, sy + r * 0.3);
-    ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r * 0.7, sy + r * 0.3); ctx.lineTo(sx - r * 0.85, sy - r * 0.6);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (row.power.type === 'magnet') drawMagnet(sx, sy, r);
+    else {
+      ctx.fillStyle = '#80ffdb'; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, r * 0.15);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r * 0.85, sy - r * 0.6); ctx.lineTo(sx + r * 0.7, sy + r * 0.3);
+      ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r * 0.7, sy + r * 0.3); ctx.lineTo(sx - r * 0.85, sy - r * 0.6);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
     ctx.globalAlpha = 1;
   }
-  for (const k of row.gems) {
-    const gz = i * ROW + 1, gx = k - HALF + 0.5, bob = 0.55 + Math.sin(time * 4 + i) * 0.08;
-    const [sx, sy, sc] = proj(gx, bob, gz);
-    const s = 0.22 * sc, w = s * (0.55 + 0.45 * Math.abs(Math.cos(time * 3 + i)));
-    ctx.globalAlpha = 1 - fog;
-    ctx.fillStyle = '#80ffdb'; ctx.beginPath();
-    ctx.moveTo(sx, sy - s); ctx.lineTo(sx + w, sy); ctx.lineTo(sx, sy + s); ctx.lineTo(sx - w, sy); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(sx, sy - s); ctx.lineTo(sx + w * 0.4, sy); ctx.lineTo(sx, sy); ctx.closePath(); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+  for (const k of row.gems) drawGem(k - HALF + 0.5, 0.55 + Math.sin(time * 4 + i) * 0.08, i * ROW + 1, fog, i);
+}
+
+function drawGem(x, y, z, fog, seed) {
+  const [sx, sy, sc] = proj(x, y, z);
+  const s = 0.22 * sc, w = s * (0.55 + 0.45 * Math.abs(Math.cos(time * 3 + seed)));
+  ctx.globalAlpha = 1 - fog;
+  ctx.fillStyle = '#80ffdb'; ctx.beginPath();
+  ctx.moveTo(sx, sy - s); ctx.lineTo(sx + w, sy); ctx.lineTo(sx, sy + s); ctx.lineTo(sx - w, sy); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(sx, sy - s); ctx.lineTo(sx + w * 0.4, sy); ctx.lineTo(sx, sy); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawMagnet(sx, sy, r) {
+  // horseshoe magnet: red body, white tips
+  ctx.lineCap = 'butt'; ctx.lineWidth = r * 0.55;
+  ctx.strokeStyle = '#f72585';
+  ctx.beginPath(); ctx.arc(sx, sy, r * 0.65, 0, Math.PI); ctx.lineTo(sx - r * 0.65, sy - r * 0.55); ctx.moveTo(sx + r * 0.65, sy); ctx.lineTo(sx + r * 0.65, sy - r * 0.55); ctx.stroke();
+  ctx.strokeStyle = '#fff';
+  ctx.beginPath(); ctx.moveTo(sx - r * 0.65, sy - r * 0.55); ctx.lineTo(sx - r * 0.65, sy - r * 0.95); ctx.moveTo(sx + r * 0.65, sy - r * 0.55); ctx.lineTo(sx + r * 0.65, sy - r * 0.95); ctx.stroke();
 }
 
 function drawBall() {
@@ -484,6 +539,13 @@ function drawBall() {
     ctx.beginPath(); ctx.ellipse(cx, yy, r * Math.cos(Math.asin(clamp(Math.sin(a), -1, 1))), r * 0.25 * Math.cos(a), 0, 0, Math.PI); ctx.stroke();
   }
   ctx.restore();
+  // magnet aura: spinning dashed ring, blinking in its last 2 seconds
+  if (b.magnet > 0 && (b.magnet > 2 || Math.sin(time * 20) > 0)) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(time * 3);
+    ctx.strokeStyle = 'rgba(255,95,162,.85)'; ctx.lineWidth = Math.max(2, r * 0.1); ctx.setLineDash([r * 0.35, r * 0.25]);
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.75, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
   // shield bubble, blinking in its last 3 seconds
   if (b.shield > 0 && (b.shield > 3 || Math.sin(time * 20) > 0)) {
     ctx.strokeStyle = 'rgba(128,255,219,.9)'; ctx.lineWidth = Math.max(2, r * 0.12);
@@ -494,6 +556,7 @@ function drawBall() {
 }
 
 function drawParts() {
+  for (const g of pulled) drawGem(g.x, g.y, g.z, 0, 0);
   for (const p of parts) {
     if (p.z <= camZ + 0.5) continue;
     const [sx, sy, sc] = proj(p.x, p.y, p.z);
@@ -531,7 +594,7 @@ function frame(now) {
 }
 addEventListener('resize', layout);
 layout(); reset();
-$('menuBest').textContent = S.best ? 'Best: ' + S.best : '';
+$('menuBest').textContent = (S.best ? 'Best: ' + S.best + '   ' : '') + (S.bank ? '💎 ' + S.bank : '');
 hud();
 requestAnimationFrame(frame);
 })();
