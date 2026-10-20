@@ -987,6 +987,16 @@
       </div>
     </div>
   </div>
+  <div class="confirm" id="txDelDlg" hidden role="dialog" aria-modal="true" aria-labelledby="txDelTitle">
+    <div class="confirm-card">
+      <strong id="txDelTitle">Delete this transaction?</strong>
+      <p id="txDelText"></p>
+      <div class="confirm-actions">
+        <button class="btn" id="txDelNo" type="button">Cancel</button>
+        <button class="btn btn-primary" id="txDelYes" type="button">Delete and fix the stock</button>
+      </div>
+    </div>
+  </div>
   <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="confirm-card">
       <strong id="confirmTitle">Big change in quantity</strong>
@@ -1911,7 +1921,7 @@
 
       var act = document.createElement("td");
       act.className = "col-act";
-      act.appendChild(deleteButton("Delete transaction " + (i + 1), function () { return true; }, function () { deleteTx(t.id); }));
+      act.appendChild(deleteButton("Delete transaction " + (i + 1), function () { return false; }, function () { deleteTx(t.id); }));
       tr.appendChild(act);
       rowsEl.appendChild(tr);
     });
@@ -2073,14 +2083,48 @@
     updateCounts();
   }
 
+  // Removing a transaction also takes its change back off the part's stock
+  function reverseTx(t) {
+    var list = allTx[t.month] || [], idx = list.findIndex(function (x) { return x.id === t.id; });
+    if (idx === -1) return "gone";
+    var part = partIn(t.month, t.partId);
+    if (part) {
+      var now = /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : 0, back = now - t.change;
+      if (back < 0) return "Can't put it back: " + (part.name || part.reference) + " has only " + now + " now.";
+      part.quantity = String(back);
+      part.loggedQty = part.quantity;
+      clearTimeout(editTimers[part.id]);
+      delete editTimers[part.id];
+      writeRow(part);
+    }
+    list.splice(idx, 1);
+    deleteDoc("transactions", t.id);
+    return "";
+  }
+  var txDelDlg = document.getElementById("txDelDlg"), txDelPending = null;
   function deleteTx(id) {
     if (ro()) return;
-    var idx = txList.findIndex(function (t) { return t.id === id; });
-    if (idx === -1) return;
-    txList.splice(idx, 1);
-    deleteDoc("transactions", id);
-    renderTransactions();
+    var t = txList.find(function (x) { return x.id === id; });
+    if (!t) return;
+    var part = partIn(t.month, t.partId), now = part && /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : null;
+    var what = (t.change > 0 ? "In +" : "Out \u2212") + Math.abs(t.change) + " \u00B7 " + (part && part.name ? part.name : t.name || t.reference) + " \u00B7 " + t.machine + (t.line ? " \u00B7 Line " + t.line : "") + ".";
+    document.getElementById("txDelText").textContent = what + (part && now !== null
+      ? " " + (t.change < 0 ? Math.abs(t.change) + (t.change === -1 ? " goes" : " go") + " back into stock" : t.change + (t.change === 1 ? " comes" : " come") + " off the stock") + ": " + now + " \u2192 " + (now - t.change) + "."
+      : " The part is no longer on the list, so only the transaction is removed.");
+    txDelPending = t;
+    txDelDlg.hidden = false;
+    document.getElementById("txDelYes").focus();
   }
+  document.getElementById("txDelNo").addEventListener("click", function () { txDelDlg.hidden = true; txDelPending = null; });
+  txDelDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { txDelDlg.hidden = true; txDelPending = null; } });
+  document.getElementById("txDelYes").addEventListener("click", function () {
+    var t = txDelPending; txDelDlg.hidden = true; txDelPending = null;
+    if (!t) return;
+    var res = reverseTx(t);
+    if (res && res !== "gone") { setStatus(res, "error"); return; }
+    renderTransactions();
+    setStatus("Transaction deleted and stock fixed", "saved");
+  });
 
   function lastCurrency() {
     try { var c = localStorage.getItem(CUR_KEY); return CURRENCIES.indexOf(c) !== -1 ? c : ""; } catch (e) { return ""; }
