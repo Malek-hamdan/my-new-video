@@ -8,7 +8,8 @@
 html,body{margin:0;height:100%;background:#07051a;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;font-family:system-ui,"Segoe UI",Tahoma,sans-serif}
 canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
 #hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;color:#fff;font-weight:800;font-size:20px;text-shadow:0 2px 6px #000c;pointer-events:none}
-#hud .grp{display:flex;gap:14px;align-items:center}
+#hud .grp{display:flex;gap:14px;align-items:center;white-space:nowrap}
+#powers{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 46px);display:flex;justify-content:center;gap:14px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 6px #000c;pointer-events:none}
 #mute{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
 .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(11,8,32,.82);color:#fff;text-align:center;gap:16px;padding:24px}
 .hidden{display:none!important}
@@ -32,9 +33,10 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <body>
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
-  <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span><span id="shield"></span><span id="magnet"></span></div>
+  <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span></div>
   <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
 </div>
+<div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span></div>
 <div id="msg"></div>
 
 <div id="loading" class="overlay">
@@ -80,6 +82,7 @@ const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
 const speedAt = z => Math.min(24, 9 + z * 0.016);
+const HARD_SCORE = 5000, HARD_SPEED = 7;   // hard mode starts at 5000 points; extra speed once fully hard (9000+)
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
@@ -125,7 +128,7 @@ const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e)
 
 // ---------- state ----------
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250, combo: 0,
-  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0 };
+  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power: null, movers: [], tunnel: false, group: null, dirty: false }; }
@@ -133,7 +136,8 @@ function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power
 function makeRow(i) {
   const row = newRow();
   if (gen.tunnelLeft > 0) { row.tunnel = true; gen.tunnelLeft--; }
-  else if (i * ROW > 350 && Math.random() < 0.012) gen.tunnelLeft = ri(25, 40);
+  else if (i * ROW > 350 && Math.random() < 0.012 + 0.02 * S.hard) gen.tunnelLeft = ri(25, 40);
+  row.hard = S.hard > 0;
   if (i < 12) return row;
   if (gen.queue.length) { gen.queue.shift()(row); return row; }
   const diff = clamp((i - 12) / 350, 0, 1), z = i * ROW;
@@ -141,15 +145,15 @@ function makeRow(i) {
   if (gen.gap > 0) {
     // calm row: drift the safe path and maybe lay a gem or a power-up on it
     if (Math.random() < 0.35) gen.safe = clamp(gen.safe + (Math.random() < 0.5 ? -1 : 1), 0, COLS - 1);
-    if (z > 150 && i - gen.lastPower > 60 && Math.random() < 0.05) {
-      const type = z > 300 && Math.random() < 0.5 ? 'shield' : 'magnet';
-      row.power = { k: gen.safe, type }; gen.lastPower = i;
+    // power-ups come more often the further you get: every ~120 m at first, every ~36 m from 2 km on
+    if (z > 150 && i - gen.lastPower > Math.max(18, 60 - z * 0.02) && Math.random() < 0.05 + Math.min(0.07, z / 20000)) {
+      row.power = { k: gen.safe, type: pickPower(z) }; gen.lastPower = i;
     } else if (Math.random() < 0.3) row.gems.push(gen.safe);
     return row;
   }
   // space obstacles by time, not distance, so faster runs still leave time to react
-  const v = speedAt(z);
-  gen.gap = Math.max(3, Math.round(v * (0.9 - diff * 0.2) / ROW) + ri(0, 1));
+  const v = speedAt(z) + HARD_SPEED * S.hard, h = S.hard;
+  gen.gap = Math.max(3, Math.round(v * (0.9 - diff * 0.2 - 0.15 * h) / ROW) + ri(0, 1));
   const kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
   if (z > 120 && kind < 0.08) {
@@ -159,13 +163,14 @@ function makeRow(i) {
     gen.gap = Math.max(3, Math.ceil(v * 1.05 / ROW) - 4 + Math.round(v * 0.6 / ROW));
   } else if (z > 200 && kind < 0.22) {
     // sliding walls sweep across the lanes
-    const n = diff > 0.5 && Math.random() < 0.5 ? 2 : 1;
-    for (let k = 0; k < n; k++) row.movers.push({ c: rand(-1, 1), amp: rand(1.2, 2), w: rand(1.3, 2.2), ph: rand(0, 6), gone: false });
-  } else if (diff > 0.08 && kind < 0.32 + diff * 0.1) {
+    const n = h > 0 ? ri(2, 3) : diff > 0.5 && Math.random() < 0.5 ? 2 : 1;
+    for (let k = 0; k < n; k++) row.movers.push({ c: rand(-1, 1), amp: rand(1.2, 2), w: rand(1.3, 2.2) * (1 + 0.6 * h), ph: rand(0, 6), gone: false });
+  } else if (diff > 0.08 && kind < 0.32 + diff * 0.1 + h * 0.1) {
     row.cells.fill(HOLE);                                         // full gap: must jump
+    if (h > 0.5 && Math.random() < 0.4) gen.queue.push(r => r.cells.fill(HOLE));   // hard mode: a double-length gap
     gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 / ROW) + 2);   // room to land after the jump
   } else if (kind < 0.66) {
-    const n = clamp(ri(1, 2) + Math.round(diff * 2), 1, 4), o = others();
+    const n = clamp(ri(1, 2) + Math.round(diff * 2) + (h > 0 ? 1 : 0), 1, 4), o = others();
     for (let k = 0; k < n; k++) row.cells[o[k]] = BLOCK;
   } else {
     const n = clamp(ri(2, 3) + Math.round(diff), 2, 4), o = others();
@@ -173,6 +178,12 @@ function makeRow(i) {
   }
   if (row.cells[gen.safe] === FLOOR && !row.movers.length && Math.random() < 0.5) row.gems.push(gen.safe);
   return row;
+}
+function pickPower(z) {
+  const opts = [['magnet', 35], ['double', z > 200 ? 20 : 0], ['shield', z > 300 ? 30 : 0], ['slow', z > 500 ? 15 : 0]];
+  let r = Math.random() * opts.reduce((a, o) => a + o[1], 0);
+  for (const [t, w] of opts) { if ((r -= w) < 0) return t; }
+  return 'magnet';
 }
 function rowAt(i) {
   i = Math.max(0, i);   // the ball's edge can poke behind the start line
@@ -185,18 +196,20 @@ const CAM_BACK = 5.4, CAM_H = 3.1;
 function reset() {
   if (rows) for (const r of rows) dropRow(r);
   for (const g of pulled || []) scene.remove(g.mesh);
-  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false };
+  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0 };
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
-  S.gems = 0; S.banked = 0; S.continues = 0; S.nextMilestone = 250; S.combo = 0;
+  S.gems = 0; S.banked = 0; S.continues = 0; S.nextMilestone = 250; S.combo = 0; S.hard = 0;
 }
 
 function hud() {
   $('dist').textContent = Math.floor(ball.z) + ' m';
   $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
   $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
+  $('slow').textContent = ball.slow > 0 ? '🐢 ' + Math.ceil(ball.slow) : '';
+  $('double').textContent = ball.double > 0 ? '✖️2 ' + Math.ceil(ball.double) : '';
   $('gems').textContent = '💎 ' + S.gems;
   $('best').textContent = '🏆 ' + S.best;
   $('mute').textContent = muted ? '🔇' : '🔊';
@@ -211,7 +224,7 @@ function score() { return Math.floor(ball.z) + S.gems * 10; }
 function start() {
   ac(); reset();
   S.phase = 'play';
-  $('menu').classList.add('hidden'); $('over').classList.add('hidden'); $('hud').classList.remove('hidden');
+  $('menu').classList.add('hidden'); $('over').classList.add('hidden'); $('hud').classList.remove('hidden'); $('powers').classList.remove('hidden');
   hud();
 }
 const contCost = () => 20 * 2 ** S.continues;   // 20, 40, 80... per run
@@ -319,7 +332,7 @@ function onBox() {
 // heavy landing: the rubbery ball squashes and wobbles a little, the camera dips gently and a few sparks kick up, scaled by impact
 function thud(v) {
   const b = ball, p = Math.min(1, v / 12);
-  b.defV += 8 + 6 * p;
+  b.defV += 22 + 16 * p;   // up to 15% flatter on a hard landing
   cam.joltV -= 0.3 + 0.8 * p;
   S.shake = Math.max(S.shake, 0.02 + 0.05 * p);
   sfx.land(v); buzz(Math.round(20 + 45 * p));
@@ -349,7 +362,8 @@ function update(dt) {
   if (S.phase === 'play' || S.phase === 'ending') {
     const b = ball;
     if (!b.dead && !b.fall) {
-      b.speed = speedAt(b.z);
+      b.slowF += ((b.slow > 0 ? 0.6 : 1) - b.slowF) * Math.min(1, dt * 4);
+      b.speed = (speedAt(b.z) + HARD_SPEED * S.hard) * b.slowF;
       b.z += b.speed * dt;
       b.rot += b.speed * dt / R;
       if (keys.ArrowLeft) b.x -= 6 * dt;
@@ -377,7 +391,7 @@ function update(dt) {
           const v = -b.vy; b.y = 0; b.vy = 0; b.air = false;
           // like a real ball it keeps bouncing, each hop smaller, until it settles
           if (b.bounced) {
-            sfx.land(v * 0.4); b.defV += v * 1.2;
+            sfx.land(v * 0.4); b.defV += v * 2.5;
             if (v > 1.5) { b.air = true; b.vy = v * 0.4; } else b.bounced = false;
           } else {
             thud(v); landed();
@@ -419,7 +433,7 @@ function update(dt) {
           const gx = k - HALF + 0.5, gz = j * ROW + 1;
           if (b.magnet > 0) { pulled.push({ x: gx, y: 0.6, z: gz, mesh: takeGemMesh(r2, k) }); return false; }
           if (Math.abs(gx - b.x) < 0.65 && Math.abs(gz - b.z) < 0.7 && b.y < 1.2) {
-            S.gems++; sfx.gem(); buzz(8);
+            S.gems += b.double > 0 ? 2 : 1; sfx.gem(); buzz(8);
             hideGemMesh(r2, k);
             burst(gx, 0.6, gz, [0x80ffdb, 0xffffff, 0x4cc9f0], 12, 2.5);
             return false;
@@ -430,6 +444,8 @@ function update(dt) {
         if (pw && Math.abs(pw.k - HALF + 0.5 - b.x) < 0.7 && Math.abs(j * ROW + 1 - b.z) < 0.8 && b.y < 1.4) {
           r2.power = null; if (r2.powerMesh) r2.powerMesh.visible = false;
           if (pw.type === 'magnet') { b.magnet = 10; say('Magnet! 🧲', '#ff5fa2'); }
+          else if (pw.type === 'slow') { b.slow = 6; say('Slow motion! 🐢', '#9fd8ff'); }
+          else if (pw.type === 'double') { b.double = 10; say('Double gems! ✖️2', '#ffd60a'); }
           else { b.shield = 15; say('Shield! 🛡️', '#80ffdb'); }
           sfx.power(); buzz([20, 30, 20]);
           burst(b.x, 0.6, b.z + 0.5, [0x80ffdb, 0xffffff, 0x4cc9f0], 20, 3);
@@ -437,12 +453,20 @@ function update(dt) {
       }
       if (b.shield > 0) b.shield = Math.max(0, b.shield - dt);
       if (b.magnet > 0) b.magnet = Math.max(0, b.magnet - dt);
+      if (b.slow > 0) b.slow = Math.max(0, b.slow - dt);
+      if (b.double > 0) b.double = Math.max(0, b.double - dt);
+      // past 5000 points the game turns hard, and keeps getting harder up to 9000
+      const sc = score();
+      if (sc >= HARD_SCORE) {
+        if (!S.hard) { say('HARD MODE 💀', '#ff3355'); sfx.level(); buzz([80, 60, 80]); }
+        S.hard = Math.max(S.hard, 0.35 + 0.65 * clamp((sc - HARD_SCORE) / 4000, 0, 1));
+      }
       // gems caught by the magnet fly into the ball
       pulled = pulled.filter(g => {
         const k = Math.min(1, dt * 9);
         g.x += (b.x - g.x) * k; g.y += (b.y + R - g.y) * k; g.z += (b.z - g.z) * k;
         if (Math.hypot(g.x - b.x, g.z - b.z) > 0.35) return true;
-        S.gems++; sfx.gem(); buzz(8);
+        S.gems += b.double > 0 ? 2 : 1; sfx.gem(); buzz(8);
         if (g.mesh) scene.remove(g.mesh);
         return false;
       });
@@ -477,6 +501,7 @@ function update(dt) {
 }
 
 // ---------- 3D ----------
+let FOG_N, FOG_H;
 let renderer, scene, camera, hemi, sun, ballMesh, ballGroup, ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite;
 const GEO = {}, MAT = {};
 let partPool = [];
@@ -506,8 +531,8 @@ function layout() {
 }
 
 function initWorld() {
-  const FOG = 0x3a1078;
-  scene.fog = new THREE.Fog(FOG, 28, VIEW);
+  FOG_N = new THREE.Color(0x3a1078); FOG_H = new THREE.Color(0x4a0c24);
+  scene.fog = new THREE.Fog(FOG_N.clone(), 28, VIEW);
   scene.background = canvasTex(4, 512, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, '#07051a'); gr.addColorStop(0.3, '#1d0b52'); gr.addColorStop(0.46, '#5a1291');
@@ -559,6 +584,12 @@ function initWorld() {
     }) });
   GEO.gem = new THREE.OctahedronGeometry(0.2); GEO.gem.scale(1, 1.35, 1);
   MAT.gem = new THREE.MeshStandardMaterial({ color: 0x80ffdb, emissive: 0x1f8a70, roughness: 0.15, metalness: 0.4, flatShading: true });
+  GEO.hour = new THREE.ConeGeometry(0.17, 0.24, 12); GEO.hour.translate(0, -0.12, 0);   // tip at the centre
+  MAT.slow = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: 0x2a6a9a, roughness: 0.2 });
+  MAT.gold = new THREE.MeshStandardMaterial({ color: 0xffd60a, emissive: 0x8a6a00, roughness: 0.15, metalness: 0.5, flatShading: true });
+  MAT.railHard = new THREE.MeshBasicMaterial({ color: 0xff3355, side: THREE.DoubleSide });
+  MAT.archHardA = new THREE.MeshBasicMaterial({ color: 0xff3355 });
+  MAT.archHardB = new THREE.MeshBasicMaterial({ color: 0xff9e00 });
   GEO.shield = new THREE.IcosahedronGeometry(0.27, 0);
   MAT.shield = new THREE.MeshStandardMaterial({ color: 0x80ffdb, emissive: 0x2aa88a, roughness: 0.2, flatShading: true });
   GEO.magnet = new THREE.TorusGeometry(0.2, 0.075, 8, 20, Math.PI);
@@ -618,7 +649,7 @@ function buildRow(i) {
   const row = rowAt(i), grp = new THREE.Group(), next = rowAt(i + 1), prev = i > 0 ? rows[i - 1] : null;
   const z0 = i * ROW, z1 = z0 + ROW, D = 0.6;
   const pos = [], col = [], rail = [];
-  const cA = new THREE.Color(0x3d2aa8), cB = new THREE.Color(0x2b1c82), cS = new THREE.Color(0x1e1250);
+  const cA = new THREE.Color(row.hard ? 0x8a1a3a : 0x3d2aa8), cB = new THREE.Color(row.hard ? 0x661030 : 0x2b1c82), cS = new THREE.Color(row.hard ? 0x3a0818 : 0x1e1250);
   const tA = new THREE.Color(0x2a1d70), tB = new THREE.Color(0x221760);
   const P = (x, y, z) => Wp(x, y, z);
   const quad = (a, b, c, d, color) => {
@@ -647,7 +678,7 @@ function buildRow(i) {
   }
   if (rail.length) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3));
-    grp.add(new THREE.Mesh(g, MAT.rail));
+    grp.add(new THREE.Mesh(g, row.hard ? MAT.railHard : MAT.rail));
   }
   const zc = z0 + 1;
   row.spin = []; row.gemMeshes = {}; row.moverMeshes = []; row.powerMesh = null;
@@ -669,7 +700,12 @@ function buildRow(i) {
   if (row.power) {
     const g = new THREE.Group();
     if (row.power.type === 'shield') g.add(new THREE.Mesh(GEO.shield, MAT.shield));
-    else {
+    else if (row.power.type === 'slow') {
+      const top = new THREE.Mesh(GEO.hour, MAT.slow); top.rotation.x = Math.PI;   // hourglass: two cones tip to tip
+      g.add(top, new THREE.Mesh(GEO.hour, MAT.slow));
+    } else if (row.power.type === 'double') {
+      const gm = new THREE.Mesh(GEO.gem, MAT.gold); gm.scale.setScalar(1.6); g.add(gm);
+    } else {
       g.add(new THREE.Mesh(GEO.magnet, MAT.magnet));
       for (const s of [-1, 1]) { const t = new THREE.Mesh(GEO.tip, MAT.tip); t.position.set(s * 0.2, -0.05, 0); g.add(t); }
       g.rotation.z = Math.PI;
@@ -683,7 +719,7 @@ function buildRow(i) {
     grp.add(m); row.moverMeshes.push([mv, m]);
   }
   if (row.tunnel) {
-    const a = new THREE.Mesh(GEO.arch, i % 2 ? MAT.archA : MAT.archB);
+    const a = new THREE.Mesh(GEO.arch, row.hard ? (i % 2 ? MAT.archHardA : MAT.archHardB) : (i % 2 ? MAT.archA : MAT.archB));
     Wp(0, -0.6, zc, a.position); grp.add(a);
   }
   row.group = grp; row.dirty = false; row.index = i;
@@ -747,6 +783,7 @@ function render() {
   sun.target.position.copy(ballGroup.position);
   sun.position.copy(ballGroup.position).add(new THREE.Vector3(3, 12, 5));
   hemi.intensity = 0.8 - 0.45 * S.dark;
+  scene.fog.color.lerpColors(FOG_N, FOG_H, Math.min(1, S.hard * 2));
   sun.intensity = 0.85 - 0.5 * S.dark;
   renderer.render(scene, camera);
 }
@@ -769,6 +806,8 @@ function warmUp() {
   add(new THREE.Mesh(GEO.box, MAT.box)); add(new THREE.Mesh(GEO.box, MAT.mover));
   add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge)); add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge));
   add(new THREE.Mesh(GEO.pad, MAT.pad)); add(new THREE.Mesh(GEO.gem, MAT.gem)); add(new THREE.Mesh(GEO.shield, MAT.shield));
+  add(new THREE.Mesh(GEO.hour, MAT.slow)); add(new THREE.Mesh(GEO.gem, MAT.gold));
+  add(new THREE.Mesh(GEO.arch, MAT.archHardA)); add(new THREE.Mesh(GEO.arch, MAT.archHardB));
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
   add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
