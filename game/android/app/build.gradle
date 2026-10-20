@@ -10,12 +10,29 @@ android {
         applicationId 'com.malek.rollingball'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '1.0'
+        // CI passes its run number, so every build installs as an update over the last one
+        versionCode((System.getenv('VERSION_CODE') ?: '1') as int)
+        versionName "1.${versionCode}"
+    }
+
+    // The upload key lives only in GitHub secrets (see game/SIGNING.md); CI writes it to a file
+    // and points RB_KEYSTORE at it. Local builds without it fall back to the debug key.
+    signingConfigs {
+        upload {
+            if (System.getenv('RB_KEYSTORE')) {
+                storeFile file(System.getenv('RB_KEYSTORE'))
+                storePassword System.getenv('RB_STORE_PASSWORD')
+                keyAlias 'upload'
+                keyPassword System.getenv('RB_STORE_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
-        release { minifyEnabled false }
+        release {
+            minifyEnabled false
+            signingConfig System.getenv('RB_KEYSTORE') ? signingConfigs.upload : signingConfigs.debug
+        }
     }
 
     compileOptions {

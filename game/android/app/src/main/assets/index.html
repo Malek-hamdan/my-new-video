@@ -10,7 +10,7 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
 #hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;color:#fff;font-weight:800;font-size:20px;text-shadow:0 2px 6px #000c;pointer-events:none}
 #hud .grp{display:flex;gap:14px;align-items:center;white-space:nowrap}
 #powers{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 54px);display:flex;justify-content:center;gap:14px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 6px #000c;pointer-events:none}
-#mute{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
+#mute,#pause{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
 .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(11,8,32,.82);color:#fff;text-align:center;gap:16px;padding:24px}
 .hidden{display:none!important}
 h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc9f0,#f72585);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -49,7 +49,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
   <div class="grp"><span id="lvl">Lv 1</span><span id="dist">0 m</span><span id="gems">💎 0</span></div>
-  <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
+  <div class="grp"><span id="best">🏆 0</span><button id="pause">⏸</button><button id="mute">🔊</button></div>
 </div>
 <div id="lvbar" class="hidden"><i></i></div>
 <div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span></div>
@@ -66,6 +66,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <div class="big">🔵</div>
   <h1>Rolling Ball</h1>
   <button class="btn" id="play">Play</button>
+  <button class="btn small hidden" id="playFresh">Start from Level 1</button>
   <button class="btn mighty" id="playMighty">💀 Mighty Level</button>
   <p id="mightyNote"></p>
   <button class="btn small" id="openSettings">⚙️ Settings</button>
@@ -81,6 +82,13 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <button class="btn" id="again">Play Again</button>
   <button class="btn small" id="home">Menu</button>
   <p id="bank"></p>
+</div>
+
+<div id="paused" class="overlay hidden">
+  <div class="big">⏸</div>
+  <h1>Paused</h1>
+  <button class="btn" id="resume">Resume</button>
+  <button class="btn small" id="pauseMenu">Menu</button>
 </div>
 
 <div id="settings" class="overlay hidden">
@@ -123,7 +131,7 @@ const LASER_LEVEL = 10, LASER_Y = 0.45;
 const lasersOn = () => S.mighty || S.level >= LASER_LEVEL;
 const laserLit = l => l.type !== 'fence' || !l.blink || Math.sin(time * l.w + l.ph) > -0.2;
 const sweepX = l => Math.sin(time * l.w + l.ph) * 2.2;
-const HARD_SCORE = 5000, HARD_SPEED = 7;   // hard mode starts at 5000 points; extra speed once fully hard (9000+)
+const HARD_AT = 5000, HARD_SPEED = 7;   // hard mode starts 5000 m down the track; extra speed once fully hard (9000 m+)
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
@@ -172,7 +180,7 @@ const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vi
 
 // ---------- state ----------
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), bestMighty: +(load('rb_best_mighty') || 0), mightyOpen: load('rb_mighty') === '1',
-  mighty: false, level: 1, levelZ: 0, shake: 0, combo: 0,
+  mighty: false, level: 1, levelZ: 0, startZ: 0, savedLevel: Math.max(1, +(load('rb_level') || 1)), shake: 0, combo: 0,
   bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
@@ -183,7 +191,7 @@ function makeRow(i) {
   if (gen.tunnelLeft > 0) { row.tunnel = true; gen.tunnelLeft--; }
   else if (i * ROW > 350 && Math.random() < 0.012 + 0.02 * S.hard) gen.tunnelLeft = ri(25, 40);
   row.hard = S.hard > 0;
-  if (i < 12) return row;
+  if (i * ROW < S.startZ + (S.startZ ? 60 : 24)) return row;   // a calm stretch where each run starts (longer when resuming at speed)
   if (gen.queue.length) { gen.queue.shift()(row); return row; }
   const diff = S.mighty ? 1 : clamp((i - 12) / 350, 0, 1), z = i * ROW;
   gen.gap--;
@@ -246,13 +254,13 @@ const CAM_BACK = 5.4, CAM_H = 3.1;
 function reset() {
   if (rows) for (const r of rows) dropRow(r);
   for (const g of pulled || []) scene.remove(g.mesh);
-  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0 };
+  ball = { x: 0, y: 0, z: S.startZ, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0 };
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
   S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0;
-  S.hard = S.mighty ? 1 : 0; S.level = S.mighty ? MIGHTY_LEVEL : 1; S.levelZ = 0;
+  S.hard = S.mighty ? 1 : clamp01Hard(S.startZ); S.level = S.mighty ? MIGHTY_LEVEL : 1 + Math.round(S.startZ / LEVEL_LEN); S.levelZ = S.startZ;
 }
 
 function hud() {
@@ -272,25 +280,32 @@ function say(text, color) {
   m.classList.remove('show'); void m.offsetWidth;   // restart the pop animation
   m.classList.add('show'); S.msgT = 1;
 }
-function score() { return Math.floor(ball.z) + S.gems * 10; }
+// only the distance covered in this run counts, so starting from a saved level gives no free points
+function score() { return Math.floor(ball.z - S.startZ) + S.gems * 10; }
+const clamp01Hard = z => z >= HARD_AT ? 0.35 + 0.65 * clamp((z - HARD_AT) / 4000, 0, 1) : 0;
 
-function start(mighty) {
+function start(mighty, fresh) {
   if (typeof mighty === 'boolean') S.mighty = mighty;   // Play Again keeps the current mode
   if (S.mighty && !S.mightyOpen) return;
+  // normal runs start at the furthest level reached so far, unless asked to start over
+  S.startZ = S.mighty || fresh ? 0 : (S.savedLevel - 1) * LEVEL_LEN;
   ac(); reset();
   S.phase = 'play';
   for (const id of ['menu', 'over']) $(id).classList.add('hidden');
   for (const id of ['hud', 'powers', 'lvbar']) $(id).classList.remove('hidden');
   if (S.mighty) say('MIGHTY LEVEL 💀', '#ff3355');
+  else if (S.startZ > 0) say(`Level ${S.level}`, '#80ffdb');
   hud();
 }
 function goMenu() {
-  S.mighty = false; reset(); S.phase = 'menu';
+  S.mighty = false; S.startZ = 0; reset(); S.phase = 'menu';
   $('msg').classList.remove('show'); S.msgT = 0;
   for (const id of ['over', 'hud', 'powers', 'lvbar']) $(id).classList.add('hidden');
   menuUI(); $('menu').classList.remove('hidden');
 }
 function menuUI() {
+  $('play').textContent = S.savedLevel > 1 ? `▶ Play · Level ${S.savedLevel}` : 'Play';
+  $('playFresh').classList.toggle('hidden', S.savedLevel <= 1);
   $('playMighty').disabled = !S.mightyOpen;
   $('playMighty').textContent = S.mightyOpen ? '💀 Mighty Level' : '🔒 Mighty Level';
   $('mightyNote').textContent = S.mightyOpen ? 'Full speed, hard mode from the start' : `Reach Level ${MIGHTY_LEVEL} to unlock`;
@@ -325,7 +340,7 @@ function showOver(fell) {
   $('overIcon').textContent = fell ? '🕳️' : '💥';
   $('overTitle').textContent = fell ? 'You Fell!' : 'Crashed!';
   $('finalScore').textContent = sc;
-  $('finalInfo').innerHTML = `${Math.floor(ball.z)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + best);
+  $('finalInfo').innerHTML = `Level ${S.level} · ${Math.floor(ball.z - S.startZ)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + best);
   // gems from every run go to a saved bank, which pays for second chances
   S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
   const cost = contCost();
@@ -366,6 +381,7 @@ cv.addEventListener('pointercancel', up);
 addEventListener('keydown', e => { keys[e.key] = true; if (e.key === 'ArrowUp' || e.key === ' ') jump(); });
 addEventListener('keyup', e => { keys[e.key] = false; });
 $('play').onclick = () => start(false);
+$('playFresh').onclick = () => start(false, true);
 $('playMighty').onclick = () => start(true);
 $('again').onclick = () => start();
 $('home').onclick = goMenu;
@@ -384,7 +400,30 @@ $('setClose').onclick = () => { $('settings').classList.add('hidden'); $('menu')
 $('setSound').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); settingsUI(); hud(); if (!muted) sfx.gem(); };
 $('setVibe').onclick = () => { vibeOff = !vibeOff; save('rb_vibe', vibeOff ? '0' : '1'); settingsUI(); buzz(40); };
 for (const b of $('setQuality').children) b.onclick = () => { quality = b.dataset.q; save('rb_quality', quality); applyQuality(); settingsUI(); };
-document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? AC.suspend() : AC.resume(); });
+function pause() {
+  if (S.phase !== 'play') return;
+  S.phase = 'paused'; touch = null;
+  $('paused').classList.remove('hidden');
+}
+function resume() {
+  if (S.phase !== 'paused') return;
+  $('paused').classList.add('hidden');
+  S.phase = 'play'; ac();
+}
+$('pause').onclick = pause;
+$('resume').onclick = resume;
+$('pauseMenu').onclick = () => { $('paused').classList.add('hidden'); goMenu(); };
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pause();   // a call or the home button never costs a run
+  if (AC) document.hidden ? AC.suspend() : AC.resume();
+});
+// Android back button (called by the app): pause, then back to the menu, then leave the game
+window.onBack = () => {
+  if (S.phase === 'play') { pause(); return 'stay'; }
+  if (!$('settings').classList.contains('hidden')) { $('setClose').click(); return 'stay'; }
+  if (S.phase === 'paused' || S.phase === 'over') { $('paused').classList.add('hidden'); goMenu(); return 'stay'; }
+  return 'exit';
+};
 
 // ---------- rules ----------
 // praise grows with each obstacle cleared in a row; a jump over nothing resets it
@@ -561,11 +600,10 @@ function update(dt) {
       if (b.magnet > 0) b.magnet = Math.max(0, b.magnet - dt);
       if (b.slow > 0) b.slow = Math.max(0, b.slow - dt);
       if (b.double > 0) b.double = Math.max(0, b.double - dt);
-      // past 5000 points the game turns hard, and keeps getting harder up to 9000
-      const sc = score();
-      if (sc >= HARD_SCORE) {
+      // 5000 m down the track the game turns hard, and keeps getting harder up to 9000 m
+      if (b.z >= HARD_AT) {
         if (!S.hard) { say('HARD MODE 💀', '#ff3355'); sfx.level(); buzz([80, 60, 80]); }
-        S.hard = Math.max(S.hard, 0.35 + 0.65 * clamp((sc - HARD_SCORE) / 4000, 0, 1));
+        S.hard = Math.max(S.hard, clamp01Hard(b.z));
       }
       // gems caught by the magnet fly into the ball
       pulled = pulled.filter(g => {
@@ -578,6 +616,8 @@ function update(dt) {
       });
       if (b.z - S.levelZ >= LEVEL_LEN) {
         S.level++; S.levelZ += LEVEL_LEN; sfx.level();
+        if (!S.mighty && S.level > S.savedLevel) { S.savedLevel = S.level; save('rb_level', S.level); }
+        S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
         if (!S.mighty && S.level >= MIGHTY_LEVEL && !S.mightyOpen) {
           S.mightyOpen = true; save('rb_mighty', '1');
           say(`Level ${S.level}!\nMighty Level unlocked 💀\nLasers ahead ⚡`, '#ff3355'); buzz([80, 60, 80, 60, 160]);
