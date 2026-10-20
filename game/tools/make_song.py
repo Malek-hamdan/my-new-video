@@ -40,12 +40,23 @@ frames = librosa.onset.onset_detect(onset_envelope=flux, sr=sr, hop_length=256, 
 notes = librosa.frames_to_time(frames, sr=sr, hop_length=256)
 note_strength = flux[frames] / flux[frames].max()
 
+# fast runs: stretches where the melody plays quick notes (gaps under 0.22 s, at least 4 in a row);
+# Beat Hop lays a trail of small tiles there so the ball bounces on every note
+quick = librosa.frames_to_time(librosa.onset.onset_detect(onset_envelope=flux, sr=sr, hop_length=256, delta=0.08, wait=3), sr=sr, hop_length=256)
+runs, cur = [], [quick[0]]
+for a, b in zip(quick, quick[1:]):
+    if b - a < 0.22: cur.append(b)
+    else:
+        if len(cur) >= 4: runs.append([round(float(t), 3) for t in cur])
+        cur = [b]
+if len(cur) >= 4: runs.append([round(float(t), 3) for t in cur])
+
 subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vn', '-t', f'{end:.2f}', '-af', f'afade=t=out:st={end - 0.3:.2f}:d=0.3',
                 '-ac', '2', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k', mp3], check=True)
 audio = base64.b64encode(open(mp3, 'rb').read()).decode()
 song = {'n': n, 'end': round(end, 3), 'tempo': round(float(np.atleast_1d(tempo)[0]), 1),
         'beats': [round(b, 3) for b in beats], 'strength': strength,
-        'notes': [round(float(t), 3) for t in notes], 'noteStrength': note_strength.round(2).tolist()}
+        'notes': [round(float(t), 3) for t in notes], 'noteStrength': note_strength.round(2).tolist(), 'runs': runs}
 with open(out, 'w') as f:
     f.write('(window.SONGS = window.SONGS || [])[%d] = Object.assign(%s, {audio: "%s"});\n' % (n - 1, json.dumps(song), audio))
-print(f'song{n}.js: {end:.1f} s, {song["tempo"]} BPM, {len(beats)} beats, {len(notes)} melody notes, {os.path.getsize(out) // 1024} KB')
+print(f'song{n}.js: {end:.1f} s, {song["tempo"]} BPM, {len(beats)} beats, {len(notes)} melody notes, {len(runs)} fast runs ({sum(map(len, runs))} notes), {os.path.getsize(out) // 1024} KB')
