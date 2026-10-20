@@ -185,7 +185,7 @@ const CAM_BACK = 5.4, CAM_H = 3.1;
 function reset() {
   if (rows) for (const r of rows) dropRow(r);
   for (const g of pulled || []) scene.remove(g.mesh);
-  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, squash: 0, bounced: false };
+  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false };
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
@@ -316,10 +316,10 @@ function onBox() {
   return boxesNear((x0, x1, j) => b.x > x0 - R * 0.3 && b.x < x1 + R * 0.3 && b.z + R > j * ROW + 0.3 && b.z - R < j * ROW + ROW - 0.3);
 }
 
-// heavy landing: the ball squashes a little, the camera dips gently and a few sparks kick up, scaled by impact
+// heavy landing: the rubbery ball squashes and wobbles a little, the camera dips gently and a few sparks kick up, scaled by impact
 function thud(v) {
   const b = ball, p = Math.min(1, v / 12);
-  b.squash = Math.max(b.squash, 0.25 + 0.35 * p);
+  b.defV += 8 + 6 * p;
   cam.joltV -= 0.3 + 0.8 * p;
   S.shake = Math.max(S.shake, 0.02 + 0.05 * p);
   sfx.land(v); buzz(Math.round(20 + 45 * p));
@@ -377,7 +377,7 @@ function update(dt) {
           const v = -b.vy; b.y = 0; b.vy = 0; b.air = false;
           // like a real ball it keeps bouncing, each hop smaller, until it settles
           if (b.bounced) {
-            sfx.land(v * 0.4); b.squash = Math.max(b.squash, Math.min(0.25, v * 0.06));
+            sfx.land(v * 0.4); b.defV += v * 1.2;
             if (v > 1.5) { b.air = true; b.vy = v * 0.4; } else b.bounced = false;
           } else {
             thud(v); landed();
@@ -465,7 +465,8 @@ function update(dt) {
   }
   S.dark += ((rowAt(Math.floor(ball.z / ROW)).tunnel ? 1 : 0) - S.dark) * Math.min(1, dt * 2);
   S.shake = Math.max(0, S.shake - dt);
-  ball.squash = Math.max(0, ball.squash - dt * 4.5);
+  // rubber: the squash springs back past round and wobbles out (positive = flattened, negative = stretched)
+  ball.defV += (-300 * ball.def - 14 * ball.defV) * dt; ball.def += ball.defV * dt;
   cam.joltV += (-70 * cam.jolt - 10 * cam.joltV) * dt; cam.jolt += cam.joltV * dt;   // spring back after a landing
   for (const p of parts) {
     p.vy -= 12 * dt; p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
@@ -715,9 +716,11 @@ function render() {
   for (const g of pulled) if (g.mesh) Wp(g.x, g.y, g.z, g.mesh.position);
 
   // ball
-  const sq = b.squash * b.squash;
-  Wp(b.x, b.y + R * (1 - 0.18 * sq), b.z, ballGroup.position);
-  ballGroup.scale.set(1 + 0.12 * sq, 1 - 0.18 * sq, 1 + 0.12 * sq);
+  // very slight stretch along the jump while in the air, plus the landing wobble
+  const stretch = b.air && !b.fall ? Math.min(0.05, Math.abs(b.vy) * 0.006) : 0;
+  const sy = clamp(1 - 0.16 * b.def + stretch, 0.85, 1.08), sxz = clamp(1 + 0.09 * b.def - stretch * 0.5, 0.95, 1.1);
+  Wp(b.x, b.y + R * sy, b.z, ballGroup.position);
+  ballGroup.scale.set(sxz, sy, sxz);
   ballMesh.rotation.set(-b.rot, 0, 0);
   ballMesh.visible = !b.dead;
   ballLight.position.copy(ballGroup.position).y += 0.7;
