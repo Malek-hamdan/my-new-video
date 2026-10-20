@@ -234,9 +234,9 @@ function placeObstacle(i, safe, lv, h) {
   const row = rows[i], kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== safe).sort(() => Math.random() - 0.5);
   if (lv.n >= 2 && kind < 0.08) {
-    row.cells[safe] = PAD;                                   // jump pad over a wide gap
-    for (let k = 1; k <= 4; k++) rows[i + k].cells.fill(HOLE);
-    return 1.6 + 8 / lv.speed;
+    row.cells[safe] = PAD;                                   // jump pad over a wide gap (a well-timed jump also clears it)
+    for (let k = 1; k <= 3; k++) rows[i + k].cells.fill(HOLE);
+    return 1.6 + 6 / lv.speed;
   }
   if (lv.n >= 2 && kind < 0.22) {
     const n = h > 0 ? ri(2, 3) : Math.random() < 0.3 + 0.1 * lv.n ? 2 : 1;   // sliding walls
