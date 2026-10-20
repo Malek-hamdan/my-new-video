@@ -10,15 +10,13 @@ canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
 #hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;color:#fff;font-weight:800;font-size:20px;text-shadow:0 2px 6px #000c;pointer-events:none}
 #hud .grp{display:flex;gap:14px;align-items:center;white-space:nowrap}
 #powers{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 46px);display:flex;justify-content:center;gap:14px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 6px #000c;pointer-events:none}
-#hud .tog{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
+#mute{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
 .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(11,8,32,.82);color:#fff;text-align:center;gap:16px;padding:24px}
 .hidden{display:none!important}
 h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc9f0,#f72585);-webkit-background-clip:text;background-clip:text;color:transparent}
 .btn{background:linear-gradient(180deg,#4cc9f0,#3a86ff);color:#fff;border:0;border-radius:18px;font-size:26px;font-weight:900;padding:14px 52px;box-shadow:0 6px 0 #2457b3;font-family:inherit}
 .btn:active{transform:translateY(3px);box-shadow:0 3px 0 #2457b3}
 .btn.alt{background:linear-gradient(180deg,#ff5fa2,#f72585);box-shadow:0 6px 0 #a0105a;font-size:22px;padding:12px 30px}
-.btn.hop{background:linear-gradient(180deg,#d9ff5a,#2ec4b6);color:#10202a;box-shadow:0 6px 0 #178a80}
-.btn.small{font-size:18px;padding:8px 26px;background:#ffffff22;box-shadow:none}
 .btn:disabled{filter:grayscale(1);opacity:.5}
 .overlay p{margin:0;font-size:17px;opacity:.92;line-height:1.8}
 .big{font-size:64px;font-weight:900;line-height:1}
@@ -36,7 +34,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
   <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span></div>
-  <div class="grp"><span id="best">🏆 0</span><button id="music" class="tog hidden">🎵</button><button id="mute" class="tog">🔊</button></div>
+  <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
 </div>
 <div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span></div>
 <div id="msg"></div>
@@ -51,8 +49,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <div id="menu" class="overlay hidden">
   <div class="big">🔵</div>
   <h1>Rolling Ball</h1>
-  <button class="btn" id="play">🔵 Rolling Ball</button>
-  <button class="btn hop" id="playHop">🎵 Beat Hop</button>
+  <button class="btn" id="play">Play</button>
   <p id="menuBest"></p>
 </div>
 
@@ -63,7 +60,6 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <p id="finalInfo"></p>
   <button class="btn alt" id="cont">Second Chance ❤️</button>
   <button class="btn" id="again">Play Again</button>
-  <button class="btn small" id="home">Menu</button>
   <p id="bank"></p>
 </div>
 
@@ -92,7 +88,7 @@ const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
 
 let W, H, THREE;
-let lowQ = load('rb_lowq') === '1';
+let lowQ = load('rb_lowq2') === '1';   // new key: earlier builds may have saved a low-quality choice
 
 // ---------- audio ----------
 let AC = null, muted = load('rb_mute') === '1';
@@ -128,50 +124,11 @@ const sfx = {
   power() { [520, 780, 1040, 1560].forEach((f, i) => tone(f, 0.12, 'triangle', 0.14, null, i * 0.06)); },
   level() { [660, 880, 1100].forEach((f, i) => tone(f, 0.15, 'triangle', 0.15, null, i * 0.09)); },
 };
-// Music (Beat Hop): each level plays one song, and the song's clock drives the ball, so tiles placed on
-// the beats are landed on the beats. Without audio the same clock just runs on frame time.
-let musicOff = load('rb_music') === '0';
-const M = { src: null, gain: null, filter: null, t0: 0, pos0: 0, fpos: 0, rate: 1, on: false, song: -1, dark: false };
-function musicSetup() {
-  const a = ac(); if (!a || M.gain) return;
-  M.filter = a.createBiquadFilter(); M.filter.type = 'lowpass'; M.filter.frequency.value = 18000;
-  M.gain = a.createGain(); M.gain.gain.value = musicOff ? 0 : 0.6;
-  M.filter.connect(M.gain).connect(a.destination);
-}
-function musicStart(idx, pos) {
-  musicStop();
-  M.song = idx; M.fpos = pos; M.pos0 = pos; M.on = false;
-  const a = ac(), song = window.SONGS && SONGS[idx];
-  if (!a || !song || !song.buf || window.__dtClock) return;
-  musicSetup();
-  M.gain.gain.cancelScheduledValues(a.currentTime); M.gain.gain.setValueAtTime(musicOff ? 0 : 0.6, a.currentTime);
-  const s = a.createBufferSource(); s.buffer = song.buf; s.playbackRate.value = M.rate; s.connect(M.filter);
-  M.t0 = a.currentTime + 0.05; s.start(M.t0, Math.max(0, pos));
-  M.src = s; M.on = true;
-}
-function musicPos(dt) {
-  if (M.on && AC && AC.state === 'running') return M.pos0 + Math.max(0, AC.currentTime - M.t0) * M.rate;
-  M.fpos += dt * M.rate; return M.fpos;
-}
-function musicRate(r) {
-  const p = musicPos(0);
-  M.rate = r; M.pos0 = M.fpos = p;
-  if (M.on) { M.t0 = Math.max(AC.currentTime, M.t0); M.src.playbackRate.setValueAtTime(r, AC.currentTime); }
-}
-function musicStop(fade) {
-  if (!M.src) return;
-  const s = M.src, now = AC.currentTime; M.src = null; M.on = false;
-  if (fade) { M.gain.gain.setTargetAtTime(0, now, 0.08); s.stop(now + 0.5); } else s.stop();
-}
-function musicTunnel(on) {
-  if (!M.filter || on === M.dark) return;
-  M.dark = on; M.filter.frequency.setTargetAtTime(on ? 900 : 18000, AC.currentTime, 0.25);
-}
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
 // ---------- state ----------
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250, combo: 0,
-  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, pulse: 0 };
+  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power: null, movers: [], tunnel: false, group: null, dirty: false }; }
@@ -243,20 +200,18 @@ function reset() {
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
-  if (typeof hopClear === 'function') hopClear();
   parts = [];
   S.gems = 0; S.banked = 0; S.continues = 0; S.nextMilestone = 250; S.combo = 0; S.hard = 0;
 }
 
 function hud() {
-  $('dist').textContent = mode === 'hop' ? '⭐ ' + HOP.points : Math.floor(ball.z) + ' m';
+  $('dist').textContent = Math.floor(ball.z) + ' m';
   $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
   $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
   $('slow').textContent = ball.slow > 0 ? '🐢 ' + Math.ceil(ball.slow) : '';
   $('double').textContent = ball.double > 0 ? '✖️2 ' + Math.ceil(ball.double) : '';
   $('gems').textContent = '💎 ' + S.gems;
-  $('best').textContent = '🏆 ' + (mode === 'hop' ? HOP.best : S.best);
-  $('music').style.opacity = musicOff ? 0.35 : 1;
+  $('best').textContent = '🏆 ' + S.best;
   $('mute').textContent = muted ? '🔇' : '🔊';
 }
 function say(text, color) {
@@ -264,33 +219,19 @@ function say(text, color) {
   m.classList.remove('show'); void m.offsetWidth;   // restart the pop animation
   m.classList.add('show'); S.msgT = 1;
 }
-function score() { return (mode === 'hop' ? HOP.points : Math.floor(ball.z)) + S.gems * 10; }
+function score() { return Math.floor(ball.z) + S.gems * 10; }
 
-// two games share the engine: 'roll' (Rolling Ball) and 'hop' (Beat Hop)
-let mode = 'roll';
-function start(m) {
-  if (typeof m === 'string') mode = m;   // Play Again keeps the current game
+function start() {
   ac(); reset();
-  if (mode === 'hop') hopStart();
   S.phase = 'play';
-  $('menu').classList.add('hidden'); $('over').classList.add('hidden'); $('hud').classList.remove('hidden');
-  $('powers').classList.toggle('hidden', mode !== 'roll'); $('music').classList.toggle('hidden', mode !== 'hop');
+  $('menu').classList.add('hidden'); $('over').classList.add('hidden'); $('hud').classList.remove('hidden'); $('powers').classList.remove('hidden');
   hud();
-}
-function goMenu() {
-  musicStop(); reset(); mode = 'roll'; S.phase = 'menu';
-  for (const id of ['over', 'hud', 'powers']) $(id).classList.add('hidden');
-  menuText(); $('menu').classList.remove('hidden');
-}
-function menuText() {
-  $('menuBest').innerHTML = [S.best && '🔵 Best: ' + S.best, HOP.best && '🎵 Best: ' + HOP.best, S.bank && '💎 ' + S.bank].filter(Boolean).join('<br>');
 }
 const contCost = () => 20 * 2 ** S.continues;   // 20, 40, 80... per run
 function revive() {
   const cost = contCost();
   if (S.phase !== 'over' || S.bank < cost) return;
   S.bank -= cost; save('rb_bank', S.bank); S.continues++;
-  if (mode === 'hop') return hopRevive();
   const b = ball, i = Math.floor(b.z / ROW);
   if (b.fall) b.z = b.hole.z0 + 0.1;
   // clear a short stretch so the comeback is not an instant loss
@@ -305,18 +246,16 @@ function revive() {
 function end(fell) {
   if (S.phase !== 'play') return;
   S.phase = 'ending'; S.endT = fell ? 1.6 : 0.9; S.endFell = fell;
-  musicStop(true);
 }
 function showOver(fell) {
   S.phase = 'over';
   $('msg').classList.remove('show'); S.msgT = 0;
-  const sc = score(), best = mode === 'hop' ? HOP.best : S.best, rec = sc > best;
-  if (rec && mode === 'hop') { HOP.best = sc; save('rb_best_hop', sc); }
-  else if (rec) { S.best = sc; save('rb_best', sc); }
+  const sc = score(), rec = sc > S.best;
+  if (rec) { S.best = sc; save('rb_best', sc); }
   $('overIcon').textContent = fell ? '🕳️' : '💥';
-  $('overTitle').textContent = mode === 'hop' ? 'Missed!' : fell ? 'You Fell!' : 'Crashed!';
+  $('overTitle').textContent = fell ? 'You Fell!' : 'Crashed!';
   $('finalScore').textContent = sc;
-  $('finalInfo').innerHTML = (mode === 'hop' ? `${HOP.points} ⭐` : `${Math.floor(ball.z)} m`) + ` + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + best);
+  $('finalInfo').innerHTML = `${Math.floor(ball.z)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + S.best);
   // gems from every run go to a saved bank, which pays for second chances
   S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
   const cost = contCost();
@@ -356,17 +295,10 @@ cv.addEventListener('pointerup', up);
 cv.addEventListener('pointercancel', up);
 addEventListener('keydown', e => { keys[e.key] = true; if (e.key === 'ArrowUp' || e.key === ' ') jump(); });
 addEventListener('keyup', e => { keys[e.key] = false; });
-$('play').onclick = () => start('roll');
-$('playHop').onclick = () => start('hop');
-$('again').onclick = () => start();
-$('home').onclick = goMenu;
+$('play').onclick = start;
+$('again').onclick = start;
 $('cont').onclick = revive;
 $('mute').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); hud(); };
-$('music').onclick = () => {
-  musicOff = !musicOff; save('rb_music', musicOff ? '0' : '1');
-  if (M.gain) M.gain.gain.setTargetAtTime(musicOff ? 0 : 0.6, AC.currentTime, 0.05);
-  hud();
-};
 document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? AC.suspend() : AC.resume(); });
 
 // ---------- rules ----------
@@ -427,8 +359,7 @@ function update(dt) {
   if (S.msgT > 0) { S.msgT -= dt; if (S.msgT <= 0) $('msg').classList.remove('show'); }
   if (S.phase === 'ending') { S.endT -= dt; if (S.endT <= 0) showOver(S.endFell); }
   if (S.phase === 'menu' || S.phase === 'loading') { ball.z += 6 * dt; ball.rot += 6 * dt / R; ball.x = Math.sin(time * 0.8) * 1.2; }
-  if (mode === 'hop' && (S.phase === 'play' || S.phase === 'ending')) hopUpdate(dt);
-  if (mode === 'roll' && (S.phase === 'play' || S.phase === 'ending')) {
+  if (S.phase === 'play' || S.phase === 'ending') {
     const b = ball;
     if (!b.dead && !b.fall) {
       b.slowF += ((b.slow > 0 ? 0.6 : 1) - b.slowF) * Math.min(1, dt * 4);
@@ -474,8 +405,9 @@ function update(dt) {
     if (S.phase === 'play' && !b.dead) {
       const i = Math.floor(b.z / ROW), row = rowAt(i), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
       if (!b.air && !b.fall && row.cells[c] === HOLE) overHole();
-      if (!b.air && !b.fall && b.y === 0 && row.cells[c] === PAD && b.z - i * ROW > 0.3) {
-        b.air = true; b.vy = 11; b.cleared = true;
+      // the jump pad launches the ball the moment it reaches it: rolling, mid-bounce, or passing over after a tap
+      if (!b.fall && b.y < 1.6 && row.cells[c] === PAD && b.padRow !== i && b.z - i * ROW > 0.05) {
+        b.padRow = i; b.air = true; b.vy = Math.max(b.vy, 11); b.cleared = true; b.bounced = false;
         sfx.boost(); buzz(30); say('Boost! 🚀', '#ffd60a');
       }
       // boxes and sliding walls: hit from the front or side unless riding over the top
@@ -556,8 +488,7 @@ function update(dt) {
     const k = Math.min(1, dt * 2.5);
     cam.back += (2.6 - cam.back) * k; cam.h += (4.2 - cam.h) * k;
   }
-  S.dark += ((mode === 'roll' && rowAt(Math.floor(ball.z / ROW)).tunnel ? 1 : 0) - S.dark) * Math.min(1, dt * 2);
-  S.pulse = Math.max(0, S.pulse - dt * 4);
+  S.dark += ((rowAt(Math.floor(ball.z / ROW)).tunnel ? 1 : 0) - S.dark) * Math.min(1, dt * 2);
   S.shake = Math.max(0, S.shake - dt);
   // rubber: the squash springs back past round and wobbles out (positive = flattened, negative = stretched)
   ball.defV += (-300 * ball.def - 14 * ball.defV) * dt; ball.def += ball.defV * dt;
@@ -581,12 +512,13 @@ function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c);
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return t;
 }
 
 function initRenderer() {
-  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: !lowQ, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowQ ? 1 : 2));
+  renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowQ ? 2 : 3));
   renderer.shadowMap.enabled = !lowQ;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   scene = new THREE.Scene();
@@ -602,7 +534,7 @@ function layout() {
 
 function initWorld() {
   FOG_N = new THREE.Color(0x3a1078); FOG_H = new THREE.Color(0x4a0c24);
-  scene.fog = new THREE.Fog(FOG_N.clone(), 28, VIEW);
+  scene.fog = new THREE.Fog(FOG_N.clone(), 40, VIEW);
   scene.background = canvasTex(4, 512, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, '#07051a'); gr.addColorStop(0.3, '#1d0b52'); gr.addColorStop(0.46, '#5a1291');
@@ -613,7 +545,7 @@ function initWorld() {
   scene.add(hemi);
   sun = new THREE.DirectionalLight(0xffffff, 0.85);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 });
   scene.add(sun, sun.target);
 
@@ -670,9 +602,6 @@ function initWorld() {
   MAT.archA = new THREE.MeshBasicMaterial({ color: 0x4cc9f0 });
   MAT.archB = new THREE.MeshBasicMaterial({ color: 0xf72585 });
   GEO.part = new THREE.BoxGeometry(0.09, 0.09, 0.09);
-  GEO.tile = new THREE.BoxGeometry(1, 0.24, 1);
-  GEO.tileEdges = new THREE.EdgesGeometry(GEO.tile);
-  MAT.tileHit = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 });
 
   // the ball: beach-ball segments make the roll easy to see
   const ballTex = canvasTex(256, 128, (g, w, h) => {
@@ -813,17 +742,14 @@ function hideGemMesh(r, k) { const m = r.gemMeshes && r.gemMeshes[k]; if (m) m.v
 
 function render() {
   const b = ball;
-  if (mode === 'hop') renderHop();
-  else {
-    const first = Math.max(0, Math.floor((b.z - 10) / ROW)), last = Math.floor((b.z + VIEW) / ROW);
-    for (const r of rows) if (r.group && (r.index < first || r.index > last || r.dirty)) dropRow(r);
-    for (let i = first; i <= last; i++) { const r = rowAt(i); if (!r.group) buildRow(i); }
-    // animate pickups and sliding walls in view
-    for (let i = first; i <= last; i++) {
-      const r = rows[i];
-      for (const m of r.spin) { m.rotation.y = time * 2.5 + i; }
-      for (const [mv, m] of r.moverMeshes) Wp(moverX(mv), BLOCK_H / 2 - 0.04, i * ROW + 1, m.position);
-    }
+  const first = Math.max(0, Math.floor((b.z - 10) / ROW)), last = Math.floor((b.z + VIEW) / ROW);
+  for (const r of rows) if (r.group && (r.index < first || r.index > last || r.dirty)) dropRow(r);
+  for (let i = first; i <= last; i++) { const r = rowAt(i); if (!r.group) buildRow(i); }
+  // animate pickups and sliding walls in view
+  for (let i = first; i <= last; i++) {
+    const r = rows[i];
+    for (const m of r.spin) { m.rotation.y = time * 2.5 + i; }
+    for (const [mv, m] of r.moverMeshes) Wp(moverX(mv), BLOCK_H / 2 - 0.04, i * ROW + 1, m.position);
   }
   for (const g of pulled) if (g.mesh) Wp(g.x, g.y, g.z, g.mesh.position);
 
@@ -832,12 +758,11 @@ function render() {
   const stretch = b.air && !b.fall ? Math.min(0.15, Math.abs(b.vy) * 0.017) : 0;
   const sy = clamp(1 - 0.16 * b.def + stretch, 0.85, 1.15), sxz = clamp(1 + 0.09 * b.def - stretch * 0.5, 0.92, 1.1);
   Wp(b.x, b.y + R * sy, b.z, ballGroup.position);
-  const beat = 1 + 0.04 * S.pulse;
-  ballGroup.scale.set(sxz * beat, sy * beat, sxz * beat);
+  ballGroup.scale.set(sxz, sy, sxz);
   ballMesh.rotation.set(-b.rot, 0, 0);
   ballMesh.visible = !b.dead;
   ballLight.position.copy(ballGroup.position).y += 0.7;
-  ballLight.intensity = b.dead ? 0 : (1.4 + 1.6 * S.pulse) * clamp(1 + b.y / 4, 0, 1);
+  ballLight.intensity = b.dead ? 0 : 1.4 * clamp(1 + b.y / 4, 0, 1);
   const blink = (t, edge) => t > 0 && (t > edge || Math.sin(time * 20) > 0);
   shieldMesh.visible = shieldWire.visible = !b.dead && blink(b.shield, 3);
   shieldMesh.position.copy(ballGroup.position); shieldWire.position.copy(ballGroup.position);
@@ -861,174 +786,8 @@ function render() {
   sun.position.copy(ballGroup.position).add(new THREE.Vector3(3, 12, 5));
   hemi.intensity = 0.8 - 0.45 * S.dark;
   scene.fog.color.lerpColors(FOG_N, FOG_H, Math.min(1, S.hard * 2));
-  // beat pulse (Beat Hop): tile edges and the ball flash with the music
-  for (const m of Object.values(glowMats)) m.color.copy(m.base).multiplyScalar(0.55 + 0.75 * S.pulse);
-  ballMesh.material.emissiveIntensity = 1 + 3 * S.pulse;
   sun.intensity = 0.85 - 0.5 * S.dark;
   renderer.render(scene, camera);
-}
-
-// ---------- Beat Hop ----------
-// A second game: the ball hops forward from tile to tile, landing on the notes of the song's melody.
-// Steer it over the next tile; miss one and it falls. Each song is a level.
-const THEMES = [
-  { a: 0x3d2aa8, b: 0x2b1c82, rail: 0x4cc9f0 },   // purple
-  { a: 0x1f5fa8, b: 0x174a86, rail: 0x80ffdb },   // blue
-  { a: 0x1f7a52, b: 0x165c3e, rail: 0xd9ff5a },   // green
-  { a: 0x9a521c, b: 0x7a3f14, rail: 0xffd60a },   // orange
-];
-const HOP = { tiles: [], live: [], k: 0, lv: null, points: 0, perfect: 0, falling: false, best: +(load('rb_best_hop') || 0) };
-
-function hopLevel(n, z0, a0) {
-  const songs = (window.SONGS || []).filter(Boolean), song = songs.length ? songs[(n - 1) % songs.length] : null;
-  // without song data, fall back to a steady 82 BPM for 55 s
-  const beats = song ? song.beats : Array.from({ length: 75 }, (_, k) => 0.4 + k * 0.73);
-  return { n, z0, a0, song: song ? song.n - 1 : -1, end: song ? song.end : 55, beats, bi: 0, next: null,
-    strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1),
-    notes: song && song.notes || [], noteStrength: song && song.noteStrength || [],
-    runs: (song && song.runs || []).filter(r => r.length >= 8),   // the longer fast passages
-    speed: 8 + 1.2 * (n - 1),                    // later levels are faster,
-    w: Math.max(0.75, 1.3 - 0.1 * (n - 1)),      // with narrower tiles
-    shift: Math.min(2.6, 1.2 + 0.3 * (n - 1)),   // that jump further sideways
-    theme: THEMES[(n - 1) % THEMES.length] };
-}
-// tiles follow the melody (piano notes), so fast passages mean fast hops; stretches with no
-// notes fall back to the beat
-function hopTimes(lv) {
-  const inRun = t => lv.runs.some(r => t > r[0] - 0.15 && t < r[r.length - 1] + 0.15);
-  const out = lv.notes.map((t, k) => ({ t, s: lv.noteStrength[k] })).filter(n => !inRun(n.t));
-  lv.beats.forEach((b, k) => { if (!lv.notes.some(t => Math.abs(t - b) < 0.45) && !inRun(b)) out.push({ t: b, s: lv.strength[k] }); });
-  // fast passages: a tile on every quick note
-  for (const r of lv.runs) for (const t of r) out.push({ t, s: 0, fast: true });
-  return out.sort((p, q) => p.t - q.t);
-}
-// one tile per note; "a" is the absolute time (all earlier songs plus this song's position)
-function hopTiles(lv) {
-  let prev = HOP.tiles[HOP.tiles.length - 1], x = prev.x, vx = 0;
-  for (const { t: b, s, fast } of hopTimes(lv)) {
-    const T = lv.a0 + b - prev.a;
-    if (b > lv.end - 0.3 || T < (fast ? 0.07 : 0.22)) continue;
-    if (fast) {
-      // a winding trail of small tiles: drift with some momentum so it snakes
-      vx = clamp(vx + rand(-0.12, 0.12), -0.22, 0.22);
-      if (Math.abs(x + vx) > 2) vx = -vx;
-      x += vx;
-    } else x = clamp(x + rand(-1, 1) * lv.shift * clamp(T / 0.7, 0.25, 1.2), -2.2, 2.2);   // quick notes only shift a little
-    prev = { a: lv.a0 + b, z: lv.z0 + b * lv.speed, x, w: fast ? 0.7 : lv.w, fast, theme: lv.theme, gem: s > 0.6 && Math.random() < 0.5,
-      hit: false, dip: 0, dipV: 0, flash: 0, mesh: null };
-    HOP.tiles.push(prev);
-  }
-}
-function hopQueue(lv) { lv.next = hopLevel(lv.n + 1, lv.z0 + lv.end * lv.speed, lv.a0 + lv.end); hopTiles(lv.next); }
-function hopStart() {
-  HOP.tiles = [{ a: 0, z: 0, x: 0, w: 2.4, theme: THEMES[0], start: true, hit: true, dip: 0, dipV: 0, flash: 0, mesh: null }];
-  HOP.k = 0; HOP.points = 0; HOP.perfect = 0; HOP.falling = false;
-  HOP.lv = hopLevel(1, 0, 0); hopTiles(HOP.lv); hopQueue(HOP.lv);
-  ball.air = true;
-  musicRate(1); musicStart(HOP.lv.song, 0);
-}
-function hopClear() {
-  for (const t of HOP.live) { scene.remove(t.mesh); t.mesh = null; }
-  HOP.live = []; HOP.tiles = [];
-}
-function landTile(t, dx) {
-  t.hit = true; t.dipV = -2.5; t.flash = 0.15;
-  const perfect = dx < 0.2;
-  HOP.points += perfect ? 2 : 1;
-  HOP.perfect = perfect ? HOP.perfect + 1 : 0;
-  if (HOP.perfect === 1 || (HOP.perfect && HOP.perfect % 5 === 0)) {
-    const c = PRAISE[Math.min(Math.floor(HOP.perfect / 5), PRAISE.length - 1)][1];
-    say(HOP.perfect > 1 ? `Perfect! x${HOP.perfect}` : 'Perfect!', c);
-  }
-  if (t.gem) {
-    S.gems++; sfx.gem(); if (t.gemMesh) t.gemMesh.visible = false;
-    burst(t.x, 0.7, t.z, [0x80ffdb, 0xffffff, 0x4cc9f0], 10, 2);
-  }
-  ball.defV += 16; cam.joltV -= 0.25;
-  tone(330 + 30 * Math.min(HOP.perfect, 10), 0.08, 'sine', 0.12); buzz(10);
-  burst(t.x, 0.05, t.z, [t.theme.rail, 0xffffff], 6, 1.2);
-}
-function hopUpdate(dt) {
-  const b = ball, lv = HOP.lv;
-  if (keys.ArrowLeft) b.x -= 6 * dt;
-  if (keys.ArrowRight) b.x += 6 * dt;
-  b.x = clamp(b.x, -HALF + R, HALF - R);
-  for (const t of HOP.live) {
-    t.dipV += (-120 * t.dip - 10 * t.dipV) * dt; t.dip += t.dipV * dt;
-    if (t.flash > 0) t.flash -= dt;
-  }
-  if (S.phase !== 'play') {
-    if (HOP.falling) { b.vy -= 22 * dt; b.y += b.vy * dt; b.z += lv.speed * 0.5 * dt; }
-    return;
-  }
-  const pos = musicPos(dt), A = lv.a0 + pos;
-  while (lv.bi < lv.beats.length && lv.beats[lv.bi] <= pos) { S.pulse = 0.4 + 0.6 * lv.strength[lv.bi]; lv.bi++; }
-  if (pos >= lv.end) {
-    // the song is over: next level, next song
-    const nx = lv.next; HOP.lv = nx; hopQueue(nx);
-    musicStart(nx.song, A - nx.a0);
-    say(`Level ${nx.n}!\n${LEVEL_WORDS[(nx.n - 2) % LEVEL_WORDS.length]}`, '#80ffdb'); sfx.level();
-    return;
-  }
-  let t0 = HOP.tiles[HOP.k], t1 = HOP.tiles[HOP.k + 1];
-  if (A >= t1.a) {
-    const dx = Math.abs(b.x - t1.x);
-    if (dx > t1.w / 2 + R * 0.6) {
-      HOP.falling = true; b.fall = true; b.air = false; b.z = t1.z; b.y = 0; b.vy = -2;
-      sfx.fall(); buzz(200); say('Missed! 🕳️', '#f72585'); end(true);
-      return;
-    }
-    landTile(t1, dx); HOP.k++; t0 = t1; t1 = HOP.tiles[HOP.k + 1];
-  }
-  // a parabola from this tile to the next, timed so it touches down exactly on the next beat
-  const T = t1.a - t0.a, u = clamp((A - t0.a) / T, 0, 1);
-  const Hh = T < 0.2 ? 0.12 + T * 1.5 : clamp(0.3 + T * 2.4, 0.5, 2.6);   // quick notes, low hops; fast runs, tiny bounces
-  const nz = t0.z + (t1.z - t0.z) * u;
-  if (nz > b.z) b.rot += (nz - b.z) / R;
-  b.z = nz; b.y = Hh * 4 * u * (1 - u); b.vy = Hh * 4 * (1 - 2 * u) / T;
-  hud();
-}
-function hopRevive() {
-  const t = HOP.tiles[HOP.k + 1], lv = HOP.lv;
-  HOP.k++; t.hit = true; HOP.falling = false; HOP.perfect = 0;
-  Object.assign(ball, { x: t.x, y: 0, vy: 0, z: t.z, fall: false, dead: false, air: true });
-  lv.bi = lv.beats.findIndex(x => x > t.a - lv.a0); if (lv.bi < 0) lv.bi = lv.beats.length;
-  musicRate(1); musicStart(lv.song, t.a - lv.a0);   // the song picks up at the tile you missed
-  cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
-  $('over').classList.add('hidden');
-  S.phase = 'play';
-  sfx.power(); buzz([20, 30, 20]); say('Second chance! ❤️', '#ff5fa2');
-  hud();
-}
-
-// tile meshes exist only near the ball
-const tileMats = {}, glowMats = {};
-function tileMat(th) { return tileMats[th.a] || (tileMats[th.a] = new THREE.MeshStandardMaterial({ color: th.a, emissive: th.b, emissiveIntensity: 0.6, roughness: 0.4, metalness: 0.2 })); }
-function glowLine(color) {
-  if (!glowMats[color]) { glowMats[color] = new THREE.LineBasicMaterial({ color }); glowMats[color].base = new THREE.Color(color); }
-  return glowMats[color];
-}
-function renderHop() {
-  const b = ball;
-  for (let k = Math.max(0, HOP.k - 2); k < HOP.tiles.length; k++) {
-    const t = HOP.tiles[k];
-    if (t.z > b.z + VIEW) break;
-    if (!t.mesh && t.z > b.z - 10) {
-      const g = new THREE.Group(), depth = t.start ? 3 : t.fast ? 0.55 : 1.25;
-      t.box = new THREE.Mesh(GEO.tile, tileMat(t.theme)); t.box.scale.set(t.w, 1, depth); t.box.receiveShadow = true;
-      const e = new THREE.LineSegments(GEO.tileEdges, glowLine(t.fast ? 0xff5fa2 : t.theme.rail)); e.scale.set(t.w, 1, depth);
-      g.add(t.box, e);
-      if (t.gem && !t.hit) { t.gemMesh = new THREE.Mesh(GEO.gem, MAT.gem); t.gemMesh.position.y = 0.85; g.add(t.gemMesh); }
-      t.mesh = g; scene.add(g); HOP.live.push(t);
-    }
-  }
-  HOP.live = HOP.live.filter(t => {
-    if (t.z < b.z - 12) { scene.remove(t.mesh); t.mesh = null; return false; }
-    Wp(t.x, -0.12 + t.dip, t.z, t.mesh.position);
-    t.box.material = t.flash > 0 ? MAT.tileHit : tileMat(t.theme);
-    if (t.gemMesh) t.gemMesh.rotation.y = time * 2.5;
-    return true;
-  });
 }
 
 // ---------- loading ----------
@@ -1052,9 +811,6 @@ function warmUp() {
   add(new THREE.Mesh(GEO.hour, MAT.slow)); add(new THREE.Mesh(GEO.gem, MAT.gold));
   add(new THREE.Mesh(GEO.arch, MAT.archHardA)); add(new THREE.Mesh(GEO.arch, MAT.archHardB));
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
-  for (const th of THEMES) { add(new THREE.Mesh(GEO.tile, tileMat(th))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(th.rail))); }
-  add(new THREE.LineSegments(GEO.tileEdges, glowLine(0xff5fa2)));
-  add(new THREE.Mesh(GEO.tile, MAT.tileHit));
   add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
   grp.traverse(o => { if (o.isMesh) o.castShadow = true; });
@@ -1074,8 +830,8 @@ function frame(now) {
     if (perf.n === 70) {
       perf.done = true;
       if (perf.sum / 60 > 24) {
-        lowQ = true; save('rb_lowq', '1');
-        renderer.setPixelRatio(1); renderer.shadowMap.enabled = false;
+        lowQ = true; save('rb_lowq2', '1');
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.shadowMap.enabled = false;
         scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
         layout();
       }
@@ -1093,17 +849,6 @@ async function boot() {
     await loadScript('three.min.js');
     THREE = window.THREE;
   } catch (e) { $('loadTxt').textContent = 'Could not load the game files.'; return; }
-  // songs: song1.js, song2.js... as many as are bundled; each is decoded once up front
-  for (let n = 1; n <= 9; n++) { try { await loadScript('song' + n + '.js'); } catch (e) { break; } setProgress(15 + n * 5, 'Loading music…'); }
-  const a = ac();
-  for (const song of (window.SONGS || []).filter(Boolean)) {
-    try {
-      const bin = atob(song.audio), u8 = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-      song.buf = await a.decodeAudioData(u8.buffer);
-    } catch (e) { song.buf = null; }
-    song.audio = null;
-  }
   setProgress(35, 'Starting 3D…'); await nextFrame();
   try { initRenderer(); } catch (e) { $('loadTxt').textContent = 'Sorry, 3D is not supported on this phone.'; return; }
   setProgress(50, 'Building world…'); await nextFrame();
@@ -1115,7 +860,7 @@ async function boot() {
   setProgress(100, 'Ready!');
   while (performance.now() - t0 < 1200) await nextFrame();
   S.phase = 'menu';
-  menuText();
+  $('menuBest').textContent = (S.best ? 'Best: ' + S.best + '   ' : '') + (S.bank ? '💎 ' + S.bank : '');
   $('menu').classList.remove('hidden');
   $('loading').classList.add('fade');
   setTimeout(() => $('loading').classList.add('hidden'), 450);
