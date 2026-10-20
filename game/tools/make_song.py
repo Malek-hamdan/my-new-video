@@ -3,7 +3,8 @@
     python make_song.py <input> <n>     ->  ../android/app/src/main/assets/song<n>.js
 
 Finds where the music actually stops (trailing silence is cut), detects the beat
-times and their strength, and embeds a 128 kbps MP3 as base64 so the WebView can
+times and their strength, and the melody notes (piano register onsets, which Beat Hop
+puts its tiles on), and embeds a 128 kbps MP3 as base64 so the WebView can
 load it from file:// without fetch. Needs ffmpeg and librosa.
 """
 import base64, json, os, subprocess, sys, tempfile
@@ -29,11 +30,22 @@ et = librosa.times_like(env, sr=sr)
 strength = np.array([env[np.argmin(abs(et - b))] for b in beats])
 strength = (strength / strength.max()).round(2).tolist()
 
+# melody notes: onsets of the harmonic part in the piano register (250-3000 Hz)
+yh, _ = librosa.effects.hpss(y[:int(end * sr)], margin=2.0)
+mag = np.abs(librosa.stft(yh, n_fft=2048, hop_length=256))
+band = mag[(librosa.fft_frequencies(sr=sr, n_fft=2048) > 250) & (librosa.fft_frequencies(sr=sr, n_fft=2048) < 3000)]
+flux = np.concatenate([[0], np.maximum(0, np.diff(np.log1p(band), axis=1)).sum(0)])
+flux /= flux.max()
+frames = librosa.onset.onset_detect(onset_envelope=flux, sr=sr, hop_length=256, delta=0.15, wait=5)
+notes = librosa.frames_to_time(frames, sr=sr, hop_length=256)
+note_strength = flux[frames] / flux[frames].max()
+
 subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vn', '-t', f'{end:.2f}', '-af', f'afade=t=out:st={end - 0.3:.2f}:d=0.3',
                 '-ac', '2', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k', mp3], check=True)
 audio = base64.b64encode(open(mp3, 'rb').read()).decode()
 song = {'n': n, 'end': round(end, 3), 'tempo': round(float(np.atleast_1d(tempo)[0]), 1),
-        'beats': [round(b, 3) for b in beats], 'strength': strength}
+        'beats': [round(b, 3) for b in beats], 'strength': strength,
+        'notes': [round(float(t), 3) for t in notes], 'noteStrength': note_strength.round(2).tolist()}
 with open(out, 'w') as f:
     f.write('(window.SONGS = window.SONGS || [])[%d] = Object.assign(%s, {audio: "%s"});\n' % (n - 1, json.dumps(song), audio))
-print(f'song{n}.js: {end:.1f} s, {song["tempo"]} BPM, {len(beats)} beats, {os.path.getsize(out) // 1024} KB')
+print(f'song{n}.js: {end:.1f} s, {song["tempo"]} BPM, {len(beats)} beats, {len(notes)} melody notes, {os.path.getsize(out) // 1024} KB')
