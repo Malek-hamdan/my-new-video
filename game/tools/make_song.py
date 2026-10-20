@@ -1,0 +1,39 @@
+"""Turn an audio (or video) file into a song file the game can load.
+
+    python make_song.py <input> <n>     ->  ../android/app/src/main/assets/song<n>.js
+
+Finds where the music actually stops (trailing silence is cut), detects the beat
+times and their strength, and embeds a 128 kbps MP3 as base64 so the WebView can
+load it from file:// without fetch. Needs ffmpeg and librosa.
+"""
+import base64, json, os, subprocess, sys, tempfile
+
+import librosa
+import numpy as np
+
+src, n = sys.argv[1], int(sys.argv[2])
+out = os.path.join(os.path.dirname(__file__), '..', 'android', 'app', 'src', 'main', 'assets', f'song{n}.js')
+tmp = tempfile.mkdtemp()
+wav, mp3 = os.path.join(tmp, 'a.wav'), os.path.join(tmp, 'a.mp3')
+subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vn', '-ac', '1', '-ar', '22050', wav], check=True)
+
+y, sr = librosa.load(wav, sr=22050, mono=True)
+rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=256)[0]
+rt = librosa.times_like(rms, sr=sr, hop_length=256)
+end = float(rt[np.where(rms > 0.02)[0][-1]]) + 0.3          # music end, plus a short tail
+
+tempo, beats = librosa.beat.beat_track(y=y, sr=sr, units='time', tightness=200)
+beats = [float(b) for b in beats if b < end - 0.2]
+env = librosa.onset.onset_strength(y=y, sr=sr)
+et = librosa.times_like(env, sr=sr)
+strength = np.array([env[np.argmin(abs(et - b))] for b in beats])
+strength = (strength / strength.max()).round(2).tolist()
+
+subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', src, '-vn', '-t', f'{end:.2f}', '-af', f'afade=t=out:st={end - 0.3:.2f}:d=0.3',
+                '-ac', '2', '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k', mp3], check=True)
+audio = base64.b64encode(open(mp3, 'rb').read()).decode()
+song = {'n': n, 'end': round(end, 3), 'tempo': round(float(np.atleast_1d(tempo)[0]), 1),
+        'beats': [round(b, 3) for b in beats], 'strength': strength}
+with open(out, 'w') as f:
+    f.write('(window.SONGS = window.SONGS || [])[%d] = Object.assign(%s, {audio: "%s"});\n' % (n - 1, json.dumps(song), audio))
+print(f'song{n}.js: {end:.1f} s, {song["tempo"]} BPM, {len(beats)} beats, {os.path.getsize(out) // 1024} KB')
