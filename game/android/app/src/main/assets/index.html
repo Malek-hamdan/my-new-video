@@ -449,6 +449,7 @@ function update(dt) {
     if (!b.dead && !b.fall) {
       b.slowF += ((b.slow > 0 ? 0.6 : 1) - b.slowF) * Math.min(1, dt * 4);
       b.speed = (speedAt(b.z) + HARD_SPEED * S.hard) * b.slowF;
+      b.prevZ = b.z;
       b.z += b.speed * dt;
       b.rot += b.speed * dt / R;
       if (keys.ArrowLeft) b.x -= 6 * dt;
@@ -512,10 +513,12 @@ function update(dt) {
         sfx.crash(); buzz([60, 40, 120]); say('Crash! 💥', '#ffd60a'); end(false);
         return true;
       });
-      // lasers: the fence hits a ball below its beam while lit; the sweeping beam hits at any height
-      for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
-        const r = rowAt(j), l = r.laser;
-        if (b.dead || !l || l.gone || Math.abs(b.z - (j * ROW + 1)) > R * 0.8) continue;
+      // lasers: the fence hits a ball below its beam while lit; the sweeping beam hits at any height.
+      // Beams are thin, so check the whole stretch the ball covered this frame, not just where it ended up.
+      const z0 = Math.min(b.prevZ ?? b.z, b.z) - R * 0.8, z1 = b.z + R * 0.8;
+      for (let j = Math.floor(z0 / ROW); j <= Math.floor(z1 / ROW); j++) {
+        const r = rowAt(j), l = r.laser, lz = j * ROW + 1;
+        if (b.dead || !l || l.gone || lz < z0 || lz > z1) continue;
         const hit = l.type === 'fence' ? laserLit(l) && b.y < LASER_Y + 0.03 : Math.abs(b.x - sweepX(l)) < R * 0.8 + 0.05;
         if (!hit) continue;
         if (b.shield > 0) {
