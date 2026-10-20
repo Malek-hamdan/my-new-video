@@ -9,7 +9,7 @@ html,body{margin:0;height:100%;background:#07051a;overflow:hidden;touch-action:n
 canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
 #hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;color:#fff;font-weight:800;font-size:20px;text-shadow:0 2px 6px #000c;pointer-events:none}
 #hud .grp{display:flex;gap:14px;align-items:center;white-space:nowrap}
-#powers{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 46px);display:flex;justify-content:center;gap:14px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 6px #000c;pointer-events:none}
+#powers{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 54px);display:flex;justify-content:center;gap:14px;color:#fff;font-weight:800;font-size:18px;text-shadow:0 2px 6px #000c;pointer-events:none}
 #mute{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
 .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(11,8,32,.82);color:#fff;text-align:center;gap:16px;padding:24px}
 .hidden{display:none!important}
@@ -18,6 +18,21 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 .btn:active{transform:translateY(3px);box-shadow:0 3px 0 #2457b3}
 .btn.alt{background:linear-gradient(180deg,#ff5fa2,#f72585);box-shadow:0 6px 0 #a0105a;font-size:22px;padding:12px 30px}
 .btn:disabled{filter:grayscale(1);opacity:.5}
+.btn.mighty{background:linear-gradient(180deg,#ff3355,#8a1a3a);box-shadow:0 6px 0 #4a0c24;font-size:22px;padding:12px 30px}
+.btn.small{font-size:18px;padding:9px 26px;background:#ffffff22;box-shadow:none}
+#mightyNote{font-size:14px;margin-top:-8px}
+#lvbar{position:fixed;left:14px;right:14px;top:calc(env(safe-area-inset-top) + 42px);height:5px;border-radius:4px;background:#ffffff26;overflow:hidden;pointer-events:none}
+#lvbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4cc9f0,#f72585)}
+.set{width:min(86vw,340px);display:flex;flex-direction:column;gap:18px;background:#ffffff12;border-radius:18px;padding:18px;text-align:left}
+.srow{display:flex;justify-content:space-between;align-items:center;font-size:19px;font-weight:800}
+.srow.col{flex-direction:column;align-items:stretch;gap:10px}
+.srow small{font-size:13px;font-weight:600;opacity:.75;line-height:1.5}
+.sw{width:62px;height:34px;border-radius:20px;border:0;background:#ffffff33;position:relative;transition:background .2s}
+.sw::after{content:'';position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s}
+.sw.on{background:#4cc9f0}.sw.on::after{left:32px}
+.seg{display:flex;background:#ffffff1a;border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:none;color:#fff;font:800 15px system-ui;padding:9px 0;border-radius:9px}
+.seg button.on{background:linear-gradient(180deg,#4cc9f0,#3a86ff)}
 .overlay p{margin:0;font-size:17px;opacity:.92;line-height:1.8}
 .big{font-size:64px;font-weight:900;line-height:1}
 #msg{position:fixed;left:0;right:0;top:30%;text-align:center;font-size:min(40px,9vw);white-space:pre-line;line-height:1.25;font-weight:900;color:#fff;text-shadow:0 4px 14px #000;pointer-events:none;opacity:0;transform:scale(.6);transition:transform .25s cubic-bezier(.2,1.6,.4,1),opacity .3s}
@@ -33,9 +48,10 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <body>
 <canvas id="c"></canvas>
 <div id="hud" class="hidden">
-  <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span></div>
+  <div class="grp"><span id="lvl">Lv 1</span><span id="dist">0 m</span><span id="gems">💎 0</span></div>
   <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
 </div>
+<div id="lvbar" class="hidden"><i></i></div>
 <div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span></div>
 <div id="msg"></div>
 
@@ -50,6 +66,9 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <div class="big">🔵</div>
   <h1>Rolling Ball</h1>
   <button class="btn" id="play">Play</button>
+  <button class="btn mighty" id="playMighty">💀 Mighty Level</button>
+  <p id="mightyNote"></p>
+  <button class="btn small" id="openSettings">⚙️ Settings</button>
   <p id="menuBest"></p>
 </div>
 
@@ -60,7 +79,21 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <p id="finalInfo"></p>
   <button class="btn alt" id="cont">Second Chance ❤️</button>
   <button class="btn" id="again">Play Again</button>
+  <button class="btn small" id="home">Menu</button>
   <p id="bank"></p>
+</div>
+
+<div id="settings" class="overlay hidden">
+  <h1>Settings</h1>
+  <div class="set">
+    <div class="srow"><span>🔊 Sound</span><button class="sw" id="setSound"></button></div>
+    <div class="srow"><span>📳 Vibration</span><button class="sw" id="setVibe"></button></div>
+    <div class="srow col"><span>✨ Graphics quality</span>
+      <div class="seg" id="setQuality"><button data-q="low">Low</button><button data-q="medium">Medium</button><button data-q="high">High</button><button data-q="auto">Auto</button></div>
+      <small id="qualityNote"></small>
+    </div>
+  </div>
+  <button class="btn" id="setClose">Done</button>
 </div>
 
 <script>
@@ -81,14 +114,17 @@ const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 80;
 const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
-const speedAt = z => Math.min(24, 9 + z * 0.016);
+// the Mighty Level starts at full speed in hard mode
+const speedAt = z => Math.min(24, (S.mighty ? 17 : 9) + z * 0.016);
+const LEVEL_LEN = 3000, MIGHTY_LEVEL = 10;
 const HARD_SCORE = 5000, HARD_SPEED = 7;   // hard mode starts at 5000 points; extra speed once fully hard (9000+)
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
 
 let W, H, THREE;
-let lowQ = load('rb_lowq2') === '1';   // new key: earlier builds may have saved a low-quality choice
+let lowQ = load('rb_lowq2') === '1';   // what Auto picked last time on this phone
+let quality = load('rb_quality') || 'auto';   // low / medium / high, or auto
 
 // ---------- audio ----------
 let AC = null, muted = load('rb_mute') === '1';
@@ -124,10 +160,12 @@ const sfx = {
   power() { [520, 780, 1040, 1560].forEach((f, i) => tone(f, 0.12, 'triangle', 0.14, null, i * 0.06)); },
   level() { [660, 880, 1100].forEach((f, i) => tone(f, 0.15, 'triangle', 0.15, null, i * 0.09)); },
 };
-const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+let vibeOff = load('rb_vibe') === '0';
+const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
 // ---------- state ----------
-const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250, combo: 0,
+const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), bestMighty: +(load('rb_best_mighty') || 0), mightyOpen: load('rb_mighty') === '1',
+  mighty: false, level: 1, levelZ: 0, shake: 0, combo: 0,
   bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
@@ -140,7 +178,7 @@ function makeRow(i) {
   row.hard = S.hard > 0;
   if (i < 12) return row;
   if (gen.queue.length) { gen.queue.shift()(row); return row; }
-  const diff = clamp((i - 12) / 350, 0, 1), z = i * ROW;
+  const diff = S.mighty ? 1 : clamp((i - 12) / 350, 0, 1), z = i * ROW;
   gen.gap--;
   if (gen.gap > 0) {
     // calm row: drift the safe path and maybe lay a gem or a power-up on it
@@ -201,17 +239,20 @@ function reset() {
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
-  S.gems = 0; S.banked = 0; S.continues = 0; S.nextMilestone = 250; S.combo = 0; S.hard = 0;
+  S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0;
+  S.hard = S.mighty ? 1 : 0; S.level = S.mighty ? MIGHTY_LEVEL : 1; S.levelZ = 0;
 }
 
 function hud() {
   $('dist').textContent = Math.floor(ball.z) + ' m';
+  $('lvl').textContent = (S.mighty ? '💀 ' : '') + 'Lv ' + S.level;
+  $('lvbar').firstChild.style.width = clamp((ball.z - S.levelZ) / LEVEL_LEN, 0, 1) * 100 + '%';
   $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
   $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
   $('slow').textContent = ball.slow > 0 ? '🐢 ' + Math.ceil(ball.slow) : '';
   $('double').textContent = ball.double > 0 ? '✖️2 ' + Math.ceil(ball.double) : '';
   $('gems').textContent = '💎 ' + S.gems;
-  $('best').textContent = '🏆 ' + S.best;
+  $('best').textContent = '🏆 ' + (S.mighty ? S.bestMighty : S.best);
   $('mute').textContent = muted ? '🔇' : '🔊';
 }
 function say(text, color) {
@@ -221,11 +262,27 @@ function say(text, color) {
 }
 function score() { return Math.floor(ball.z) + S.gems * 10; }
 
-function start() {
+function start(mighty) {
+  if (typeof mighty === 'boolean') S.mighty = mighty;   // Play Again keeps the current mode
+  if (S.mighty && !S.mightyOpen) return;
   ac(); reset();
   S.phase = 'play';
-  $('menu').classList.add('hidden'); $('over').classList.add('hidden'); $('hud').classList.remove('hidden'); $('powers').classList.remove('hidden');
+  for (const id of ['menu', 'over']) $(id).classList.add('hidden');
+  for (const id of ['hud', 'powers', 'lvbar']) $(id).classList.remove('hidden');
+  if (S.mighty) say('MIGHTY LEVEL 💀', '#ff3355');
   hud();
+}
+function goMenu() {
+  S.mighty = false; reset(); S.phase = 'menu';
+  $('msg').classList.remove('show'); S.msgT = 0;
+  for (const id of ['over', 'hud', 'powers', 'lvbar']) $(id).classList.add('hidden');
+  menuUI(); $('menu').classList.remove('hidden');
+}
+function menuUI() {
+  $('playMighty').disabled = !S.mightyOpen;
+  $('playMighty').textContent = S.mightyOpen ? '💀 Mighty Level' : '🔒 Mighty Level';
+  $('mightyNote').textContent = S.mightyOpen ? 'Full speed, hard mode from the start' : `Reach Level ${MIGHTY_LEVEL} to unlock`;
+  $('menuBest').innerHTML = [S.best && 'Best: ' + S.best, S.bestMighty && '💀 Best: ' + S.bestMighty, S.bank && '💎 ' + S.bank].filter(Boolean).join('<br>');
 }
 const contCost = () => 20 * 2 ** S.continues;   // 20, 40, 80... per run
 function revive() {
@@ -250,12 +307,13 @@ function end(fell) {
 function showOver(fell) {
   S.phase = 'over';
   $('msg').classList.remove('show'); S.msgT = 0;
-  const sc = score(), rec = sc > S.best;
-  if (rec) { S.best = sc; save('rb_best', sc); }
+  const sc = score(), best = S.mighty ? S.bestMighty : S.best, rec = sc > best;
+  if (rec && S.mighty) { S.bestMighty = sc; save('rb_best_mighty', sc); }
+  else if (rec) { S.best = sc; save('rb_best', sc); }
   $('overIcon').textContent = fell ? '🕳️' : '💥';
   $('overTitle').textContent = fell ? 'You Fell!' : 'Crashed!';
   $('finalScore').textContent = sc;
-  $('finalInfo').innerHTML = `${Math.floor(ball.z)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + S.best);
+  $('finalInfo').innerHTML = `${Math.floor(ball.z)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + best);
   // gems from every run go to a saved bank, which pays for second chances
   S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
   const cost = contCost();
@@ -295,10 +353,25 @@ cv.addEventListener('pointerup', up);
 cv.addEventListener('pointercancel', up);
 addEventListener('keydown', e => { keys[e.key] = true; if (e.key === 'ArrowUp' || e.key === ' ') jump(); });
 addEventListener('keyup', e => { keys[e.key] = false; });
-$('play').onclick = start;
-$('again').onclick = start;
+$('play').onclick = () => start(false);
+$('playMighty').onclick = () => start(true);
+$('again').onclick = () => start();
+$('home').onclick = goMenu;
 $('cont').onclick = revive;
 $('mute').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); hud(); };
+const QUALITY_NOTES = { low: 'Fastest. Lower resolution, no shadows. For older phones.', medium: 'Balanced. Sharp picture with soft shadows.',
+  high: 'Sharpest picture and shadows. Needs a strong phone.', auto: 'Picks the best quality your phone runs smoothly.' };
+function settingsUI() {
+  $('setSound').classList.toggle('on', !muted);
+  $('setVibe').classList.toggle('on', !vibeOff);
+  for (const b of $('setQuality').children) b.classList.toggle('on', b.dataset.q === quality);
+  $('qualityNote').textContent = QUALITY_NOTES[quality];
+}
+$('openSettings').onclick = () => { settingsUI(); $('menu').classList.add('hidden'); $('settings').classList.remove('hidden'); };
+$('setClose').onclick = () => { $('settings').classList.add('hidden'); $('menu').classList.remove('hidden'); };
+$('setSound').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); settingsUI(); hud(); if (!muted) sfx.gem(); };
+$('setVibe').onclick = () => { vibeOff = !vibeOff; save('rb_vibe', vibeOff ? '0' : '1'); settingsUI(); buzz(40); };
+for (const b of $('setQuality').children) b.onclick = () => { quality = b.dataset.q; save('rb_quality', quality); applyQuality(); settingsUI(); };
 document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? AC.suspend() : AC.resume(); });
 
 // ---------- rules ----------
@@ -471,9 +544,12 @@ function update(dt) {
         if (g.mesh) scene.remove(g.mesh);
         return false;
       });
-      if (b.z >= S.nextMilestone) {
-        const lvl = S.nextMilestone / 250 + 1;
-        say(`Level ${lvl}!\n${LEVEL_WORDS[(lvl - 2) % LEVEL_WORDS.length]}`, '#80ffdb'); sfx.level(); S.nextMilestone += 250;
+      if (b.z - S.levelZ >= LEVEL_LEN) {
+        S.level++; S.levelZ += LEVEL_LEN; sfx.level();
+        if (!S.mighty && S.level >= MIGHTY_LEVEL && !S.mightyOpen) {
+          S.mightyOpen = true; save('rb_mighty', '1');
+          say(`Level ${S.level}!\nMighty Level unlocked 💀`, '#ff3355'); buzz([80, 60, 80, 60, 160]);
+        } else say(`Level ${S.level}!\n${LEVEL_WORDS[(S.level - 2) % LEVEL_WORDS.length]}`, '#80ffdb');
       }
       hud();
     }
@@ -518,11 +594,22 @@ function canvasTex(w, h, draw) {
 
 function initRenderer() {
   renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowQ ? 2 : 3));
-  renderer.shadowMap.enabled = !lowQ;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(62, 1, 0.1, 400);
+  layout();
+}
+// resolution (times the screen's pixels) and shadows for each quality setting
+const QUALITY = { low: { pr: 1, shadows: false, map: 512 }, medium: { pr: 2, shadows: true, map: 1024 }, high: { pr: 3, shadows: true, map: 2048 } };
+function applyQuality() {
+  const q = quality === 'auto' ? (lowQ ? { pr: 2, shadows: false, map: 1024 } : QUALITY.high) : QUALITY[quality];
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pr));
+  if (renderer.shadowMap.enabled !== q.shadows) {
+    renderer.shadowMap.enabled = q.shadows;
+    scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+  }
+  sun.shadow.mapSize.set(q.map, q.map);
+  if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
   layout();
 }
 function layout() {
@@ -548,6 +635,7 @@ function initWorld() {
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 });
   scene.add(sun, sun.target);
+  applyQuality();
 
   // far-away stars and a glowing sun ride along with the camera
   starGroup = new THREE.Group();
@@ -824,16 +912,14 @@ function warmUp() {
 let last = 0, perf = { n: 0, sum: 0, done: lowQ };
 function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000 || 0.016); last = now;
-  // quality check: if the first second of the menu runs slow, drop shadows and resolution
-  if (!perf.done && S.phase === 'menu') {
+  // Auto quality: if the first second of the menu runs slow, drop shadows and resolution
+  if (!perf.done && quality === 'auto' && S.phase === 'menu') {
     perf.n++; if (perf.n > 10) perf.sum += now - perf.prev; perf.prev = now;
     if (perf.n === 70) {
       perf.done = true;
       if (perf.sum / 60 > 24) {
         lowQ = true; save('rb_lowq2', '1');
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.shadowMap.enabled = false;
-        scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
-        layout();
+        applyQuality();
       }
     }
   }
@@ -860,7 +946,7 @@ async function boot() {
   setProgress(100, 'Ready!');
   while (performance.now() - t0 < 1200) await nextFrame();
   S.phase = 'menu';
-  $('menuBest').textContent = (S.best ? 'Best: ' + S.best + '   ' : '') + (S.bank ? '💎 ' + S.bank : '');
+  menuUI();
   $('menu').classList.remove('hidden');
   $('loading').classList.add('fade');
   setTimeout(() => $('loading').classList.add('hidden'), 450);
