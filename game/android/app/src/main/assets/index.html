@@ -60,6 +60,8 @@ const ri = (a, b) => Math.floor(rand(a, b + 1));
 
 // world: 5 columns of width 1 (x in -2.5..2.5), rows of length ROW along z
 const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 70;
+const speedAt = z => Math.min(24, 9 + z * 0.016);
+const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const FLOOR = 0, HOLE = 1, BLOCK = 2;
 
 let W, H, F, HORIZON, stars = [];
@@ -128,10 +130,13 @@ function makeRow(i) {
     } else if (Math.random() < 0.3) gems.push(gen.safe);
     return { cells, gems, power };
   }
-  gen.gap = Math.max(2, ri(3, 5) - Math.round(diff * 2));
+  // space obstacles by time, not distance, so faster runs still leave time to react
+  const v = speedAt(i * ROW), react = 0.9 - diff * 0.2;
+  gen.gap = Math.max(3, Math.round(v * react / ROW) + ri(0, 1));
   const kind = Math.random();
   if (diff > 0.08 && kind < 0.18 + diff * 0.12) {
     cells.fill(HOLE);                                   // full gap: must jump
+    gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 / ROW) + 2);   // room to land after the jump
   } else if (kind < 0.6) {
     const n = clamp(ri(1, 2) + Math.round(diff * 2), 1, 4);
     const opts = [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
@@ -145,6 +150,7 @@ function makeRow(i) {
   return { cells, gems, power };
 }
 function rowAt(i) {
+  i = Math.max(0, i);   // the ball's edge can poke behind the start line
   while (rows.length <= i) rows.push(makeRow(rows.length));
   return rows[i];
 }
@@ -220,7 +226,7 @@ let touch = null;
 const keys = {};
 function jump() {
   if (S.phase !== 'play' || ball.air || ball.fall) return;
-  ball.air = true; ball.vy = 7.2; ball.cleared = false; sfx.jump(); buzz(12);
+  ball.air = true; ball.vy = 7.6; ball.cleared = false; sfx.jump(); buzz(12);
 }
 cv.addEventListener('pointerdown', e => {
   ac();
@@ -269,6 +275,16 @@ function landed() {
   tone(880 + S.combo * 110, 0.12, 'triangle', 0.12);
 }
 
+// is the ball over the top of a box? (boxes span z 0.3..1.7 of their row)
+function onBox() {
+  const b = ball, c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
+  for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
+    if (rowAt(j).cells[c] !== BLOCK) continue;
+    if (b.z + R > j * ROW + 0.3 && b.z - R < j * ROW + ROW - 0.3) return true;
+  }
+  return false;
+}
+
 function overHole() {
   const b = ball;
   if (b.shield > 0) {
@@ -290,7 +306,7 @@ function update(dt) {
   if (S.phase === 'play' || S.phase === 'ending') {
     const b = ball;
     if (!b.dead && !b.fall) {
-      b.speed = Math.min(24, 9 + b.z * 0.016);
+      b.speed = speedAt(b.z);
       b.z += b.speed * dt;
       b.rot += b.speed * dt / R;
       if (keys.ArrowLeft) b.x -= 6 * dt;
@@ -308,11 +324,16 @@ function update(dt) {
       b.vy -= 22 * dt; b.y += b.vy * dt;
       const under = rowAt(Math.floor(b.z / ROW)).cells[clamp(Math.floor(b.x + HALF), 0, COLS - 1)];
       if (under !== FLOOR) b.cleared = true;
-      if (b.y <= 0) {
+      // coming down near the top of a box lands on it instead of crashing
+      if (b.vy <= 0 && b.y <= BLOCK_H && b.y > BLOCK_H - BOX_STEP && onBox()) {
+        b.y = BLOCK_H; b.vy = 0; b.air = false; sfx.land();
+      } else if (b.y <= 0) {
         const row = rowAt(Math.floor(b.z / ROW)), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
         if (row.cells[c] === HOLE) { b.y = 0; b.air = false; overHole(); }
         else { b.y = 0; b.vy = 0; b.air = false; sfx.land(); landed(); }
       }
+    } else if (b.y > 0 && !onBox()) {
+      b.air = true; b.vy = 0;   // rolled off the end of a box
     }
     if (S.phase === 'play' && !b.dead) {
       const i = Math.floor(b.z / ROW), row = rowAt(i), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
@@ -320,12 +341,12 @@ function update(dt) {
       // blocks: check the row(s) the ball touches
       for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
         const r2 = rowAt(j), z0 = j * ROW + 0.3, z1 = j * ROW + ROW - 0.3;
-        if (b.z + R < z0 || b.z - R > z1 || b.y > BLOCK_H) continue;
+        if (b.z + R * 0.7 < z0 || b.z - R * 0.7 > z1 || b.y >= BLOCK_H - BOX_STEP) continue;
         for (let k = 0; k < COLS; k++) {
           if (r2.cells[k] !== BLOCK) continue;
           const x0 = k - HALF, x1 = x0 + 1;
           const nx = clamp(b.x, x0, x1);
-          if (Math.abs(b.x - nx) < R * 0.85) {
+          if (Math.abs(b.x - nx) < R * 0.7) {
             if (b.shield > 0) {
               r2.cells[k] = FLOOR; b.shield = 0; S.shake = 0.2;
               burst(x0 + 0.5, 0.5, j * ROW + 1, ['#f72585', '#b5179e', '#fff'], 30, 4);
@@ -511,7 +532,8 @@ function drawBall() {
   if (b.dead) return;
   const overFloor = !b.fall && rowAt(Math.floor(b.z / ROW)).cells[clamp(Math.floor(b.x + HALF), 0, COLS - 1)] !== HOLE;
   if (overFloor) {
-    const [sx, sy, sc] = proj(b.x, 0, b.z), k = 1 / (1 + b.y * 0.6);
+    const gy = onBox() ? BLOCK_H : 0;
+    const [sx, sy, sc] = proj(b.x, gy, b.z), k = 1 / (1 + Math.max(0, b.y - gy) * 0.6);
     ctx.fillStyle = `rgba(0,0,0,${0.45 * k})`;
     ctx.beginPath(); ctx.ellipse(sx, sy, R * sc * k, R * sc * 0.3 * k, 0, 0, 7); ctx.fill();
   }
