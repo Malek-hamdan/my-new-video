@@ -25,18 +25,16 @@ jobs:
         with:
           gradle-version: '8.14.3'
 
-      # Every build is signed with the same upload key, so updates install over the previous
-      # version and keep the player's saved progress. See game/SIGNING.md.
-      - name: Restore the upload key
+      # Builds are signed with the sideload key from the repo, so each one installs over the last
+      # and keeps saved progress. If the Play upload-key secrets are set, that key is used instead.
+      - name: Use the Play upload key if it is set
         env:
           RB_KEYSTORE_B64: ${{ secrets.RB_KEYSTORE_B64 }}
         run: |
-          if [ -z "$RB_KEYSTORE_B64" ]; then
-            echo "::error::Missing the RB_KEYSTORE_B64 and RB_STORE_PASSWORD secrets; see game/SIGNING.md"
-            exit 1
+          if [ -n "$RB_KEYSTORE_B64" ]; then
+            echo "$RB_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "RB_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
           fi
-          echo "$RB_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
-          echo "RB_KEYSTORE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
 
       - name: Build signed release APK and AAB
         working-directory: game/android

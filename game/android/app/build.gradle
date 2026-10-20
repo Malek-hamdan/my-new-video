@@ -15,9 +15,16 @@ android {
         versionName "1.${versionCode}"
     }
 
-    // The upload key lives only in GitHub secrets (see game/SIGNING.md); CI writes it to a file
-    // and points RB_KEYSTORE at it. Local builds without it fall back to the debug key.
+    // Builds for installing straight from the download link are signed with the sideload key
+    // kept in the repo, so every build installs over the last one and keeps saved progress.
+    // A Google Play build uses the private upload key from GitHub secrets instead (game/SIGNING.md).
     signingConfigs {
+        sideload {
+            storeFile rootProject.file('sideload.jks')
+            storePassword 'rollingball'
+            keyAlias 'sideload'
+            keyPassword 'rollingball'
+        }
         upload {
             if (System.getenv('RB_KEYSTORE')) {
                 storeFile file(System.getenv('RB_KEYSTORE'))
@@ -31,7 +38,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig System.getenv('RB_KEYSTORE') ? signingConfigs.upload : signingConfigs.debug
+            signingConfig System.getenv('RB_KEYSTORE') ? signingConfigs.upload : signingConfigs.sideload
         }
     }
 

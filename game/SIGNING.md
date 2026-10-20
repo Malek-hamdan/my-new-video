@@ -1,18 +1,17 @@
 # App signing
 
-Release builds are signed with one fixed **upload key** so that each new APK installs as an
-update over the previous one (keeping the player's saved progress), and so the same key can
-upload the AAB to Google Play.
+Every build installs as an update over the previous one, so players keep their saved progress.
 
-The key is never committed. GitHub Actions reads it from two repository secrets
-(Settings → Secrets and variables → Actions → New repository secret):
+- **Download-link builds** are signed with `android/sideload.jks`, kept in the repo on purpose so
+  CI can build with no setup. It only identifies builds installed straight from the GitHub
+  release; it is not the Google Play key.
+- **Google Play** needs the private **upload key**. It is never committed: when the repository
+  secrets below are set, CI signs the APK and the AAB with it instead.
 
 | Secret | Value |
 |---|---|
-| `RB_KEYSTORE_B64` | the `rollingball-upload.jks` keystore, base64-encoded on one line |
-| `RB_STORE_PASSWORD` | the keystore password (the key uses the same password; alias `upload`) |
+| `RB_KEYSTORE_B64` | the upload keystore, base64-encoded on one line |
+| `RB_STORE_PASSWORD` | the upload keystore password (alias `upload`, same key password) |
 
-Without them the build stops with an error rather than publishing an unsigned or debug build.
-
-Keep a private backup of the keystore and password. If it is ever lost after the app is on
-Google Play, the upload key can be reset through Play Console (with Play App Signing).
+Switching a phone from a sideload build to the Play build (or back) needs one uninstall, since
+the two are signed with different keys.
