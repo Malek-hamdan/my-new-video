@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>دحرج الطابة</title>
+<style>
+html,body{margin:0;height:100%;background:#0b0820;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;font-family:system-ui,"Segoe UI",Tahoma,sans-serif}
+canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
+#hud{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;color:#fff;font-weight:800;font-size:20px;text-shadow:0 2px 6px #000c;pointer-events:none}
+#hud .grp{display:flex;gap:14px;align-items:center}
+#mute{pointer-events:auto;background:#fff2;border:0;color:#fff;font-size:20px;border-radius:12px;padding:4px 10px}
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(11,8,32,.82);color:#fff;text-align:center;gap:16px;padding:24px}
+.hidden{display:none!important}
+h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc9f0,#f72585);-webkit-background-clip:text;background-clip:text;color:transparent}
+.btn{background:linear-gradient(180deg,#4cc9f0,#3a86ff);color:#fff;border:0;border-radius:18px;font-size:26px;font-weight:900;padding:14px 52px;box-shadow:0 6px 0 #2457b3;font-family:inherit}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 #2457b3}
+.overlay p{margin:0;font-size:17px;opacity:.92;line-height:1.8}
+.big{font-size:64px;font-weight:900;line-height:1}
+#msg{position:fixed;left:0;right:0;top:30%;text-align:center;font-size:40px;font-weight:900;color:#fff;text-shadow:0 4px 14px #000;pointer-events:none;opacity:0;transform:scale(.6);transition:transform .25s cubic-bezier(.2,1.6,.4,1),opacity .3s}
+#msg.show{opacity:1;transform:scale(1)}
+#hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;color:#fff;font-size:16px;font-weight:700;text-shadow:0 2px 6px #000;pointer-events:none;transition:opacity .5s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="grp"><span id="dist">0 م</span><span id="gems">💎 0</span></div>
+  <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
+</div>
+<div id="msg"></div>
+<div id="hint">⬅️ اسحب يمين وشمال لتحرّك الطابة ➡️<br>⬆️ اسحب لفوق لتنطّ</div>
+
+<div id="menu" class="overlay">
+  <div class="big">🔵</div>
+  <h1>دحرج الطابة</h1>
+  <p>الطابة بتمشي لقدام لحالها وإنت بتحرّكها.<br>تجنّب الصناديق، نُطّ فوق الحفر، واجمع 💎<br>كل ما مشيت أكتر، بتصير أسرع!</p>
+  <button class="btn" id="play">ابدأ</button>
+  <p id="menuBest"></p>
+</div>
+
+<div id="over" class="overlay hidden">
+  <div class="big" id="overIcon">💥</div>
+  <h1 id="overTitle">خلصت!</h1>
+  <div class="big" id="finalScore">0</div>
+  <p id="finalInfo"></p>
+  <button class="btn" id="again">العب مرة ثانية</button>
+</div>
+
+<script>
+(() => {
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const load = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const save = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const ri = (a, b) => Math.floor(rand(a, b + 1));
+
+// world: 5 columns of width 1 (x in -2.5..2.5), rows of length ROW along z
+const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 70;
+const FLOOR = 0, HOLE = 1, BLOCK = 2;
+
+let W, H, F, HORIZON, stars = [];
+function layout() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  F = Math.min(W * 0.78, H * 0.5);
+  HORIZON = H * 0.36;
+  stars = [];
+  for (let i = 0; i < 90; i++) stars.push({ x: Math.random() * W, y: Math.random() * HORIZON, r: rand(0.5, 1.8), p: Math.random() * 6 });
+}
+
+// ---------- audio ----------
+let AC = null, muted = load('rb_mute') === '1';
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, d, type, v, f2, delay) {
+  const a = ac(); if (!a || muted) return;
+  const o = a.createOscillator(), g = a.createGain(), t = a.currentTime + (delay || 0);
+  o.type = type || 'sine'; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(0.0001, a.currentTime); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + d);
+}
+function noise(d, v, freq) {
+  const a = ac(); if (!a || muted) return;
+  const n = a.sampleRate * d | 0, b = a.createBuffer(1, n, a.sampleRate), ch = b.getChannelData(0);
+  for (let i = 0; i < n; i++) ch[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(); s.buffer = b;
+  const fl = a.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = freq;
+  const g = a.createGain(); g.gain.value = v;
+  s.connect(fl).connect(g).connect(a.destination); s.start();
+}
+const sfx = {
+  gem() { tone(1320, 0.12, 'square', 0.07); tone(1760, 0.18, 'square', 0.07, null, 0.07); },
+  jump() { tone(300, 0.22, 'sine', 0.25, 700); },
+  land() { tone(110, 0.1, 'sine', 0.3, 60); },
+  crash() { noise(0.6, 0.6, 900); tone(160, 0.4, 'sawtooth', 0.2, 40); },
+  fall() { tone(600, 1.0, 'triangle', 0.2, 80); },
+  level() { [660, 880, 1100].forEach((f, i) => tone(f, 0.15, 'triangle', 0.15, null, i * 0.09)); },
+};
+const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+
+// ---------- state ----------
+const S = { phase: 'menu', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250 };
+let ball, rows, camX, parts, gen, time = 0;
+
+function makeRow(i) {
+  const cells = new Array(COLS).fill(FLOOR), gems = [];
+  const diff = clamp((i - 12) / 350, 0, 1);
+  if (i < 12) return { cells, gems };
+  gen.gap--;
+  if (gen.gap > 0) {
+    // calm row: drift the safe path and maybe lay a line of gems on it
+    if (Math.random() < 0.35) gen.safe = clamp(gen.safe + (Math.random() < 0.5 ? -1 : 1), 0, COLS - 1);
+    if (Math.random() < 0.3) gems.push(gen.safe);
+    return { cells, gems };
+  }
+  gen.gap = Math.max(2, ri(3, 5) - Math.round(diff * 2));
+  const kind = Math.random();
+  if (diff > 0.08 && kind < 0.18 + diff * 0.12) {
+    cells.fill(HOLE);                                   // full gap: must jump
+  } else if (kind < 0.6) {
+    const n = clamp(ri(1, 2) + Math.round(diff * 2), 1, 4);
+    const opts = [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
+    for (let k = 0; k < n; k++) cells[opts[k]] = BLOCK;
+  } else {
+    const n = clamp(ri(2, 3) + Math.round(diff), 2, 4);
+    const opts = [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
+    for (let k = 0; k < n; k++) cells[opts[k]] = HOLE;
+  }
+  if (cells[gen.safe] === FLOOR && Math.random() < 0.5) gems.push(gen.safe);
+  return { cells, gems };
+}
+function rowAt(i) {
+  while (rows.length <= i) rows.push(makeRow(rows.length));
+  return rows[i];
+}
+
+function reset() {
+  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false };
+  rows = []; gen = { safe: 2, gap: 2 }; camX = 0; parts = []; S.gems = 0; S.nextMilestone = 250;
+}
+
+function hud() {
+  $('dist').textContent = Math.floor(ball.z) + ' م';
+  $('gems').textContent = '💎 ' + S.gems;
+  $('best').textContent = '🏆 ' + S.best;
+  $('mute').textContent = muted ? '🔇' : '🔊';
+}
+let msgTimer;
+function say(text, color) {
+  const m = $('msg'); m.textContent = text; m.style.color = color || '#fff';
+  m.classList.add('show'); clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => m.classList.remove('show'), 1000);
+}
+function score() { return Math.floor(ball.z) + S.gems * 10; }
+
+function start() {
+  ac(); reset();
+  S.phase = 'play';
+  $('menu').classList.add('hidden'); $('over').classList.add('hidden');
+  $('hint').style.opacity = 1;
+  setTimeout(() => { $('hint').style.opacity = 0; }, 4500);
+  hud();
+}
+function end(fell) {
+  if (S.phase !== 'play') return;
+  S.phase = 'ending';
+  setTimeout(() => {
+    S.phase = 'over';
+    const sc = score(), rec = sc > S.best;
+    if (rec) { S.best = sc; save('rb_best', sc); }
+    $('overIcon').textContent = fell ? '🕳️' : '💥';
+    $('overTitle').textContent = fell ? 'وقعت!' : 'اصطدمت!';
+    $('finalScore').textContent = sc;
+    $('finalInfo').innerHTML = `${Math.floor(ball.z)} متر + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 رقم قياسي جديد!' : 'أعلى نتيجة: ' + S.best);
+    $('over').classList.remove('hidden');
+    hud();
+  }, fell ? 1100 : 800);
+}
+
+// ---------- input ----------
+let touch = null;
+const keys = {};
+function jump() {
+  if (S.phase !== 'play' || ball.air || ball.fall) return;
+  ball.air = true; ball.vy = 7.2; sfx.jump(); buzz(12);
+}
+cv.addEventListener('pointerdown', e => {
+  ac();
+  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, sy: e.clientY, jumped: false };
+  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+});
+cv.addEventListener('pointermove', e => {
+  if (!touch || e.pointerId !== touch.id) return;
+  const dx = e.clientX - touch.x;
+  touch.x = e.clientX;
+  if (S.phase === 'play' && !ball.fall) ball.x = clamp(ball.x - (dir() * dx) * (COLS / (W * 0.75)), -HALF + R, HALF - R);
+  if (!touch.jumped && touch.sy - e.clientY > 45) { touch.jumped = true; jump(); }
+  if (e.clientY > touch.sy) touch.sy = e.clientY;    // so a later upward flick still counts
+});
+const dir = () => -1;   // screen right = world +x
+const up = e => { if (touch && e.pointerId === touch.id) touch = null; };
+cv.addEventListener('pointerup', up);
+cv.addEventListener('pointercancel', up);
+addEventListener('keydown', e => { keys[e.key] = true; if (e.key === 'ArrowUp' || e.key === ' ') jump(); });
+addEventListener('keyup', e => { keys[e.key] = false; });
+$('play').onclick = start;
+$('again').onclick = start;
+$('mute').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); hud(); };
+document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? AC.suspend() : AC.resume(); });
+
+// ---------- update ----------
+function burst(x, y, z, cols, n, sp) {
+  for (let i = 0; i < n; i++)
+    parts.push({ x, y, z, vx: rand(-sp, sp), vy: rand(0, sp * 1.4), vz: rand(-sp, sp) + ball.speed * 0.5, c: cols[i % cols.length], life: rand(0.5, 1) });
+}
+
+function update(dt) {
+  time += dt;
+  if (S.phase === 'menu') { ball.z += 6 * dt; ball.rot += 6 * dt / R; ball.x = Math.sin(time * 0.8) * 1.2; }
+  if (S.phase === 'play' || S.phase === 'ending') {
+    const b = ball;
+    if (!b.dead && !b.fall) {
+      b.speed = Math.min(24, 9 + b.z * 0.016);
+      b.z += b.speed * dt;
+      b.rot += b.speed * dt / R;
+      if (keys.ArrowLeft) b.x -= 6 * dt;
+      if (keys.ArrowRight) b.x += 6 * dt;
+      b.x = clamp(b.x, -HALF + R, HALF - R);
+    }
+    if (b.air || b.fall) {
+      b.vy -= 22 * dt; b.y += b.vy * dt;
+      if (b.air && b.y <= 0) {
+        const row = rowAt(Math.floor(b.z / ROW)), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
+        if (row.cells[c] === HOLE) { b.air = false; b.fall = true; }
+        else { b.y = 0; b.vy = 0; b.air = false; sfx.land(); }
+      }
+    }
+    if (S.phase === 'play' && !b.dead) {
+      const i = Math.floor(b.z / ROW), row = rowAt(i), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
+      if (!b.air && !b.fall && row.cells[c] === HOLE) { b.fall = true; b.vy = 0; }
+      if (b.fall) { sfx.fall(); buzz(200); say('وقعت! 🕳️', '#f72585'); end(true); }
+      // blocks: check the row(s) the ball touches
+      for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
+        const r2 = rowAt(j), z0 = j * ROW + 0.3, z1 = j * ROW + ROW - 0.3;
+        if (b.z + R < z0 || b.z - R > z1 || b.y > BLOCK_H) continue;
+        for (let k = 0; k < COLS; k++) {
+          if (r2.cells[k] !== BLOCK) continue;
+          const x0 = k - HALF, x1 = x0 + 1;
+          const nx = clamp(b.x, x0, x1);
+          if (Math.abs(b.x - nx) < R * 0.85) {
+            b.dead = true; S.shake = 0.5;
+            burst(b.x, b.y + R, b.z, ['#4cc9f0', '#fff', '#f72585', '#ffd60a'], 40, 4);
+            sfx.crash(); buzz([60, 40, 120]); say('اصطدمت! 💥', '#ffd60a'); end(false);
+            break;
+          }
+        }
+        if (b.dead) break;
+      }
+      // gems
+      for (const j of [i, i + 1]) {
+        const r2 = rowAt(j);
+        r2.gems = r2.gems.filter(k => {
+          const gx = k - HALF + 0.5, gz = j * ROW + 1;
+          if (Math.abs(gx - b.x) < 0.65 && Math.abs(gz - b.z) < 0.7 && b.y < 1.2) {
+            S.gems++; sfx.gem(); buzz(8);
+            burst(gx, 0.6, gz, ['#80ffdb', '#fff', '#4cc9f0'], 12, 2.5);
+            return false;
+          }
+          return true;
+        });
+      }
+      if (b.z >= S.nextMilestone) { say(S.nextMilestone + ' متر! 🚀', '#80ffdb'); sfx.level(); S.nextMilestone += 250; }
+      hud();
+    }
+  }
+  camX += (ball.x * 0.55 - camX) * Math.min(1, dt * 6);
+  S.shake = Math.max(0, S.shake - dt);
+  for (const p of parts) { p.vy -= 12 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.life -= dt; }
+  parts = parts.filter(p => p.life > 0);
+}
+
+// ---------- draw ----------
+const BG = [11, 8, 32];
+let camZ = 0;
+const CAM_BACK = 4.2, CAM_H = 3.3;
+function proj(x, y, z) {
+  const dz = z - camZ;
+  return [W / 2 + (x - camX) * F / dz, HORIZON + (CAM_H - y) * F / dz, F / dz];
+}
+const mix = (c, t) => `rgb(${c[0] + (BG[0] - c[0]) * t | 0},${c[1] + (BG[1] - c[1]) * t | 0},${c[2] + (BG[2] - c[2]) * t | 0})`;
+function quad(a, b, c, d, fill) {
+  ctx.fillStyle = fill; ctx.beginPath();
+  ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.fill();
+}
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0b0820'); g.addColorStop(0.36, '#3a0ca3'); g.addColorStop(0.37, '#240046'); g.addColorStop(1, '#0b0820');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (const s of stars) {
+    ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(time * 1.5 + s.p));
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const sun = ctx.createRadialGradient(W / 2, HORIZON, 0, W / 2, HORIZON, W * 0.35);
+  sun.addColorStop(0, 'rgba(247,37,133,.85)'); sun.addColorStop(1, 'rgba(247,37,133,0)');
+  ctx.fillStyle = sun; ctx.fillRect(0, 0, W, HORIZON + W * 0.1);
+}
+
+const TILE_A = [72, 50, 190], TILE_B = [58, 38, 160], EDGE = [76, 201, 240], SIDE = [30, 18, 80];
+const BOX_TOP = [247, 37, 133], BOX_FRONT = [181, 23, 158], BOX_SIDE = [130, 15, 120];
+
+function drawRow(i) {
+  const row = rowAt(i), z0 = i * ROW, z1 = z0 + ROW;
+  const nz0 = Math.max(z0, camZ + 0.5);
+  if (z1 <= nz0) return;
+  const fog = clamp((z0 - camZ) / VIEW, 0, 1) ** 1.3;
+  const prev = i > 0 ? rowAt(i - 1) : null;
+  for (let k = 0; k < COLS; k++) {
+    if (row.cells[k] === HOLE) continue;
+    const x0 = k - HALF, x1 = x0 + 1;
+    const a = proj(x0, 0, nz0), b = proj(x1, 0, nz0), c = proj(x1, 0, z1), d = proj(x0, 0, z1);
+    quad(a, b, c, d, mix((i + k) % 2 ? TILE_A : TILE_B, fog));
+    // front edge of the tile is visible when the tile in front of it is missing
+    if (z0 >= nz0 && (!prev || prev.cells[k] === HOLE)) {
+      quad(a, b, proj(x1, -0.5, z0), proj(x0, -0.5, z0), mix(SIDE, fog));
+    }
+  }
+  // glowing rails along the track edges
+  ctx.strokeStyle = mix(EDGE, fog); ctx.lineWidth = Math.max(1, 0.06 * F / (nz0 - camZ));
+  for (const k of [0, COLS - 1]) {
+    if (row.cells[k] === HOLE) continue;
+    const x = k === 0 ? -HALF : HALF;
+    const p = proj(x, 0, nz0), q = proj(x, 0, z1);
+    ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+  }
+}
+
+function drawRowObjects(i) {
+  const row = rowAt(i), z0 = i * ROW + 0.3, z1 = i * ROW + ROW - 0.3;
+  if (z0 <= camZ + 0.5) return;
+  const fog = clamp((z0 - camZ) / VIEW, 0, 1) ** 1.3;
+  for (let k = 0; k < COLS; k++) {
+    if (row.cells[k] !== BLOCK) continue;
+    const x0 = k - HALF + 0.08, x1 = x0 + 0.84, h = BLOCK_H;
+    const f = [proj(x0, 0, z0), proj(x1, 0, z0), proj(x1, h, z0), proj(x0, h, z0)];
+    const t = [proj(x0, h, z0), proj(x1, h, z0), proj(x1, h, z1), proj(x0, h, z1)];
+    // side faces visible depending on where the box sits relative to the camera
+    if (x1 < camX) quad(proj(x1, 0, z0), proj(x1, 0, z1), proj(x1, h, z1), proj(x1, h, z0), mix(BOX_SIDE, fog));
+    if (x0 > camX) quad(proj(x0, 0, z0), proj(x0, 0, z1), proj(x0, h, z1), proj(x0, h, z0), mix(BOX_SIDE, fog));
+    quad(t[0], t[1], t[2], t[3], mix(BOX_TOP, fog));
+    quad(f[0], f[1], f[2], f[3], mix(BOX_FRONT, fog));
+    ctx.strokeStyle = mix([255, 120, 200], fog); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(f[0][0], f[0][1]); ctx.lineTo(f[1][0], f[1][1]); ctx.lineTo(f[2][0], f[2][1]); ctx.lineTo(f[3][0], f[3][1]); ctx.closePath(); ctx.stroke();
+  }
+  for (const k of row.gems) {
+    const gz = i * ROW + 1, gx = k - HALF + 0.5, bob = 0.55 + Math.sin(time * 4 + i) * 0.08;
+    const [sx, sy, sc] = proj(gx, bob, gz);
+    const s = 0.22 * sc, w = s * (0.55 + 0.45 * Math.abs(Math.cos(time * 3 + i)));
+    ctx.globalAlpha = 1 - fog;
+    ctx.fillStyle = '#80ffdb'; ctx.beginPath();
+    ctx.moveTo(sx, sy - s); ctx.lineTo(sx + w, sy); ctx.lineTo(sx, sy + s); ctx.lineTo(sx - w, sy); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(sx, sy - s); ctx.lineTo(sx + w * 0.4, sy); ctx.lineTo(sx, sy); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawBall() {
+  const b = ball;
+  if (b.dead) return;
+  const overFloor = !b.fall && rowAt(Math.floor(b.z / ROW)).cells[clamp(Math.floor(b.x + HALF), 0, COLS - 1)] !== HOLE;
+  if (overFloor) {
+    const [sx, sy, sc] = proj(b.x, 0, b.z), k = 1 / (1 + b.y * 0.6);
+    ctx.fillStyle = `rgba(0,0,0,${0.45 * k})`;
+    ctx.beginPath(); ctx.ellipse(sx, sy, R * sc * k, R * sc * 0.3 * k, 0, 0, 7); ctx.fill();
+  }
+  const [cx, cy, sc] = proj(b.x, b.y + R, b.z), r = R * sc;
+  const glow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 2);
+  glow.addColorStop(0, 'rgba(76,201,240,.35)'); glow.addColorStop(1, 'rgba(76,201,240,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, r * 2, 0, 7); ctx.fill();
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
+  g.addColorStop(0, '#e0fbff'); g.addColorStop(0.45, '#4cc9f0'); g.addColorStop(1, '#1e3a8a');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+  // rolling stripes: horizontal bands that sweep down as the ball rolls forward
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = r * 0.16;
+  for (let n = 0; n < 2; n++) {
+    const a = b.rot + n * Math.PI;
+    if (Math.cos(a) < 0) continue;
+    const yy = cy - Math.sin(a) * r;
+    ctx.beginPath(); ctx.ellipse(cx, yy, r * Math.cos(Math.asin(clamp(Math.sin(a), -1, 1))), r * 0.25 * Math.cos(a), 0, 0, Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawParts() {
+  for (const p of parts) {
+    if (p.z <= camZ + 0.5) continue;
+    const [sx, sy, sc] = proj(p.x, p.y, p.z);
+    ctx.globalAlpha = clamp(p.life, 0, 1); ctx.fillStyle = p.c;
+    ctx.fillRect(sx - 0.05 * sc, sy - 0.05 * sc, 0.1 * sc, 0.1 * sc);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function draw() {
+  camZ = ball.z - CAM_BACK;
+  ctx.save();
+  if (S.shake > 0) ctx.translate(rand(-1, 1) * S.shake * 18, rand(-1, 1) * S.shake * 18);
+  drawSky();
+  const first = Math.max(0, Math.floor(camZ / ROW)), last = Math.floor((camZ + VIEW) / ROW);
+  const ballRow = Math.floor(ball.z / ROW);
+  // painter's order: far rows first; the ball goes in once we reach its row
+  for (let i = last; i >= first; i--) {
+    drawRow(i);
+    if (i > ballRow) drawRowObjects(i);
+    if (i === ballRow) {
+      // a falling ball sinks below the track, so it is drawn before the nearer rows cover it
+      drawRowObjects(i); drawBall();
+    }
+  }
+  drawParts();
+  ctx.restore();
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+addEventListener('resize', layout);
+layout(); reset();
+$('menuBest').textContent = S.best ? 'أعلى نتيجة: ' + S.best : '';
+hud();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
