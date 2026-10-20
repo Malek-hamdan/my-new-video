@@ -316,12 +316,12 @@ function onBox() {
   return boxesNear((x0, x1, j) => b.x > x0 - R * 0.3 && b.x < x1 + R * 0.3 && b.z + R > j * ROW + 0.3 && b.z - R < j * ROW + ROW - 0.3);
 }
 
-// heavy landing: the ball squashes, the camera jolts and dust kicks up, all scaled by how hard it hit
+// heavy landing: the ball squashes a little, the camera dips gently and a few sparks kick up, scaled by impact
 function thud(v) {
   const b = ball, p = Math.min(1, v / 12);
-  b.squash = Math.max(b.squash, 0.4 + 0.6 * p);
-  cam.joltV -= 0.8 + 2.4 * p;
-  S.shake = Math.max(S.shake, 0.06 + 0.18 * p);
+  b.squash = Math.max(b.squash, 0.25 + 0.35 * p);
+  cam.joltV -= 0.3 + 0.8 * p;
+  S.shake = Math.max(S.shake, 0.02 + 0.05 * p);
   sfx.land(v); buzz(Math.round(20 + 45 * p));
   dust(b.x, b.y, b.z, p);
 }
@@ -375,10 +375,13 @@ function update(dt) {
         if (row.cells[c] === HOLE) { b.y = 0; b.air = false; overHole(); }
         else {
           const v = -b.vy; b.y = 0; b.vy = 0; b.air = false;
-          if (b.bounced) { b.bounced = false; sfx.land(v * 0.5); }
-          else {
+          // like a real ball it keeps bouncing, each hop smaller, until it settles
+          if (b.bounced) {
+            sfx.land(v * 0.4); b.squash = Math.max(b.squash, Math.min(0.25, v * 0.06));
+            if (v > 1.5) { b.air = true; b.vy = v * 0.4; } else b.bounced = false;
+          } else {
             thud(v); landed();
-            if (v > 6) { b.air = true; b.vy = v * 0.2; b.bounced = true; b.cleared = false; }   // one small hop
+            if (v > 4) { b.air = true; b.vy = v * 0.38; b.bounced = true; b.cleared = false; }
           }
         }
       }
@@ -464,13 +467,6 @@ function update(dt) {
   S.shake = Math.max(0, S.shake - dt);
   ball.squash = Math.max(0, ball.squash - dt * 4.5);
   cam.joltV += (-70 * cam.jolt - 10 * cam.joltV) * dt; cam.jolt += cam.joltV * dt;   // spring back after a landing
-  for (const r of rings) {
-    if (!r.mesh.visible) continue;
-    r.life -= dt;
-    const t = 1 - r.life / 0.5;
-    r.mesh.scale.setScalar(1 + t * (2 + 3 * r.p)); r.mesh.material.opacity = 0.75 * (1 - t);
-    if (r.life <= 0) r.mesh.visible = false;
-  }
   for (const p of parts) {
     p.vy -= 12 * dt; p.mesh.position.x += p.vx * dt; p.mesh.position.y += p.vy * dt; p.mesh.position.z += p.vz * dt;
     p.life -= dt; p.mesh.rotation.x += dt * 8; p.mesh.scale.setScalar(clamp(p.life * 1.5, 0.05, 1));
@@ -480,7 +476,7 @@ function update(dt) {
 }
 
 // ---------- 3D ----------
-let renderer, scene, camera, hemi, sun, ballMesh, ballGroup, rings = [], ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite;
+let renderer, scene, camera, hemi, sun, ballMesh, ballGroup, ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite;
 const GEO = {}, MAT = {};
 let partPool = [];
 function Wp(x, y, z, v) { return (v || new THREE.Vector3()).set(bend(z) + x, elev(z) + y, -z); }
@@ -595,11 +591,6 @@ function initWorld() {
   }
   ballGroup = new THREE.Group(); ballGroup.add(ballMesh);
   scene.add(ballGroup, ballLight, shieldMesh, shieldWire, magnetRings);
-  GEO.ring = new THREE.RingGeometry(0.28, 0.42, 36);
-  for (let k = 0; k < 4; k++) {
-    const m = new THREE.Mesh(GEO.ring, new THREE.MeshBasicMaterial({ color: 0xd0c2ff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
-    m.visible = false; scene.add(m); rings.push({ mesh: m, life: 0, p: 0 });
-  }
 
   const partMats = {};
   for (let i = 0; i < 160; i++) partPool.push(new THREE.Mesh(GEO.part, MAT.boxEdge));
@@ -608,10 +599,7 @@ function initWorld() {
 }
 
 function dust(x, y, z, p) {
-  const r = rings.find(q => !q.mesh.visible) || rings[0];
-  Wp(x, y + 0.03, z, r.mesh.position); r.mesh.rotation.set(-Math.PI / 2, 0, 0);
-  r.mesh.visible = true; r.life = 0.5; r.p = p; r.mesh.scale.setScalar(1);
-  burst(x, y + 0.05, z, [0xd0c2ff, 0xffffff, 0x9d8cff], Math.round(6 + 14 * p), 1.2 + 2 * p);
+  burst(x, y + 0.05, z, [0xd0c2ff, 0xffffff, 0x9d8cff], Math.round(4 + 6 * p), 0.8 + 1.2 * p);
 }
 
 function burst(x, y, z, cols, n, sp) {
@@ -728,8 +716,8 @@ function render() {
 
   // ball
   const sq = b.squash * b.squash;
-  Wp(b.x, b.y + R * (1 - 0.3 * sq), b.z, ballGroup.position);
-  ballGroup.scale.set(1 + 0.2 * sq, 1 - 0.3 * sq, 1 + 0.2 * sq);
+  Wp(b.x, b.y + R * (1 - 0.18 * sq), b.z, ballGroup.position);
+  ballGroup.scale.set(1 + 0.12 * sq, 1 - 0.18 * sq, 1 + 0.12 * sq);
   ballMesh.rotation.set(-b.rot, 0, 0);
   ballMesh.visible = !b.dead;
   ballLight.position.copy(ballGroup.position).y += 0.7;
@@ -779,7 +767,7 @@ function warmUp() {
   add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge)); add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge));
   add(new THREE.Mesh(GEO.pad, MAT.pad)); add(new THREE.Mesh(GEO.gem, MAT.gem)); add(new THREE.Mesh(GEO.shield, MAT.shield));
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
-  add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.ring, rings[0].mesh.material)); add(new THREE.Mesh(GEO.arch, MAT.archB));
+  add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
   grp.traverse(o => { if (o.isMesh) o.castShadow = true; });
   scene.add(grp);
