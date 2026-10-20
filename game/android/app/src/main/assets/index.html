@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>دحرج الطابة</title>
+<title>Rolling Ball</title>
 <style>
 html,body{margin:0;height:100%;background:#0b0820;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;font-family:system-ui,"Segoe UI",Tahoma,sans-serif}
 canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}
@@ -19,32 +19,29 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 .big{font-size:64px;font-weight:900;line-height:1}
 #msg{position:fixed;left:0;right:0;top:30%;text-align:center;font-size:40px;font-weight:900;color:#fff;text-shadow:0 4px 14px #000;pointer-events:none;opacity:0;transform:scale(.6);transition:transform .25s cubic-bezier(.2,1.6,.4,1),opacity .3s}
 #msg.show{opacity:1;transform:scale(1)}
-#hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;color:#fff;font-size:16px;font-weight:700;text-shadow:0 2px 6px #000;pointer-events:none;transition:opacity .5s}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="hud">
-  <div class="grp"><span id="dist">0 م</span><span id="gems">💎 0</span></div>
+  <div class="grp"><span id="dist">0 m</span><span id="gems">💎 0</span><span id="shield"></span></div>
   <div class="grp"><span id="best">🏆 0</span><button id="mute">🔊</button></div>
 </div>
 <div id="msg"></div>
-<div id="hint">⬅️ اسحب يمين وشمال لتحرّك الطابة ➡️<br>⬆️ اسحب لفوق لتنطّ</div>
 
 <div id="menu" class="overlay">
   <div class="big">🔵</div>
-  <h1>دحرج الطابة</h1>
-  <p>الطابة بتمشي لقدام لحالها وإنت بتحرّكها.<br>تجنّب الصناديق، نُطّ فوق الحفر، واجمع 💎<br>كل ما مشيت أكتر، بتصير أسرع!</p>
-  <button class="btn" id="play">ابدأ</button>
+  <h1>Rolling Ball</h1>
+  <button class="btn" id="play">Play</button>
   <p id="menuBest"></p>
 </div>
 
 <div id="over" class="overlay hidden">
   <div class="big" id="overIcon">💥</div>
-  <h1 id="overTitle">خلصت!</h1>
+  <h1 id="overTitle">Game Over</h1>
   <div class="big" id="finalScore">0</div>
   <p id="finalInfo"></p>
-  <button class="btn" id="again">العب مرة ثانية</button>
+  <button class="btn" id="again">Play Again</button>
 </div>
 
 <script>
@@ -103,24 +100,28 @@ const sfx = {
   land() { tone(110, 0.1, 'sine', 0.3, 60); },
   crash() { noise(0.6, 0.6, 900); tone(160, 0.4, 'sawtooth', 0.2, 40); },
   fall() { tone(600, 1.0, 'triangle', 0.2, 80); },
+  power() { [520, 780, 1040, 1560].forEach((f, i) => tone(f, 0.12, 'triangle', 0.14, null, i * 0.06)); },
   level() { [660, 880, 1100].forEach((f, i) => tone(f, 0.15, 'triangle', 0.15, null, i * 0.09)); },
 };
 const buzz = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
 // ---------- state ----------
 const S = { phase: 'menu', gems: 0, best: +(load('rb_best') || 0), shake: 0, nextMilestone: 250 };
-let ball, rows, camX, parts, gen, time = 0;
+let ball, rows, camX, parts, gen, cam, time = 0;
 
 function makeRow(i) {
   const cells = new Array(COLS).fill(FLOOR), gems = [];
+  let power = null;
   const diff = clamp((i - 12) / 350, 0, 1);
-  if (i < 12) return { cells, gems };
+  if (i < 12) return { cells, gems, power };
   gen.gap--;
   if (gen.gap > 0) {
     // calm row: drift the safe path and maybe lay a line of gems on it
     if (Math.random() < 0.35) gen.safe = clamp(gen.safe + (Math.random() < 0.5 ? -1 : 1), 0, COLS - 1);
-    if (Math.random() < 0.3) gems.push(gen.safe);
-    return { cells, gems };
+    if (i * ROW > 300 && i - gen.lastPower > 70 && Math.random() < 0.05) {
+      power = { k: gen.safe, type: 'shield' }; gen.lastPower = i;
+    } else if (Math.random() < 0.3) gems.push(gen.safe);
+    return { cells, gems, power };
   }
   gen.gap = Math.max(2, ri(3, 5) - Math.round(diff * 2));
   const kind = Math.random();
@@ -136,7 +137,7 @@ function makeRow(i) {
     for (let k = 0; k < n; k++) cells[opts[k]] = HOLE;
   }
   if (cells[gen.safe] === FLOOR && Math.random() < 0.5) gems.push(gen.safe);
-  return { cells, gems };
+  return { cells, gems, power };
 }
 function rowAt(i) {
   while (rows.length <= i) rows.push(makeRow(rows.length));
@@ -144,12 +145,13 @@ function rowAt(i) {
 }
 
 function reset() {
-  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false };
-  rows = []; gen = { safe: 2, gap: 2 }; camX = 0; parts = []; S.gems = 0; S.nextMilestone = 250;
+  ball = { x: 0, y: 0, z: 0, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, hole: null };
+  rows = []; gen = { safe: 2, gap: 2, lastPower: 0 }; cam = { back: CAM_BACK, h: CAM_H, pan: 0 }; camX = 0; parts = []; S.gems = 0; S.nextMilestone = 250;
 }
 
 function hud() {
-  $('dist').textContent = Math.floor(ball.z) + ' م';
+  $('dist').textContent = Math.floor(ball.z) + ' m';
+  $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
   $('gems').textContent = '💎 ' + S.gems;
   $('best').textContent = '🏆 ' + S.best;
   $('mute').textContent = muted ? '🔇' : '🔊';
@@ -166,8 +168,6 @@ function start() {
   ac(); reset();
   S.phase = 'play';
   $('menu').classList.add('hidden'); $('over').classList.add('hidden');
-  $('hint').style.opacity = 1;
-  setTimeout(() => { $('hint').style.opacity = 0; }, 4500);
   hud();
 }
 function end(fell) {
@@ -178,12 +178,12 @@ function end(fell) {
     const sc = score(), rec = sc > S.best;
     if (rec) { S.best = sc; save('rb_best', sc); }
     $('overIcon').textContent = fell ? '🕳️' : '💥';
-    $('overTitle').textContent = fell ? 'وقعت!' : 'اصطدمت!';
+    $('overTitle').textContent = fell ? 'You Fell!' : 'Crashed!';
     $('finalScore').textContent = sc;
-    $('finalInfo').innerHTML = `${Math.floor(ball.z)} متر + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 رقم قياسي جديد!' : 'أعلى نتيجة: ' + S.best);
+    $('finalInfo').innerHTML = `${Math.floor(ball.z)} m + ${S.gems} 💎 × 10<br>` + (rec ? '🎉 New record!' : 'Best: ' + S.best);
     $('over').classList.remove('hidden');
     hud();
-  }, fell ? 1100 : 800);
+  }, fell ? 1500 : 800);
 }
 
 // ---------- input ----------
@@ -195,19 +195,23 @@ function jump() {
 }
 cv.addEventListener('pointerdown', e => {
   ac();
-  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, sy: e.clientY, jumped: false };
+  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
 });
 cv.addEventListener('pointermove', e => {
   if (!touch || e.pointerId !== touch.id) return;
   const dx = e.clientX - touch.x;
-  touch.x = e.clientX;
+  touch.moved += Math.hypot(dx, e.clientY - touch.y);
+  touch.x = e.clientX; touch.y = e.clientY;
   if (S.phase === 'play' && !ball.fall) ball.x = clamp(ball.x - (dir() * dx) * (COLS / (W * 0.75)), -HALF + R, HALF - R);
-  if (!touch.jumped && touch.sy - e.clientY > 45) { touch.jumped = true; jump(); }
-  if (e.clientY > touch.sy) touch.sy = e.clientY;    // so a later upward flick still counts
 });
 const dir = () => -1;   // screen right = world +x
-const up = e => { if (touch && e.pointerId === touch.id) touch = null; };
+// a tap (no real drag) is a jump
+const up = e => {
+  if (!touch || e.pointerId !== touch.id) return;
+  if (e.type === 'pointerup' && touch.moved < 14 && performance.now() - touch.t < 350) jump();
+  touch = null;
+};
 cv.addEventListener('pointerup', up);
 cv.addEventListener('pointercancel', up);
 addEventListener('keydown', e => { keys[e.key] = true; if (e.key === 'ArrowUp' || e.key === ' ') jump(); });
@@ -223,6 +227,21 @@ function burst(x, y, z, cols, n, sp) {
     parts.push({ x, y, z, vx: rand(-sp, sp), vy: rand(0, sp * 1.4), vz: rand(-sp, sp) + ball.speed * 0.5, c: cols[i % cols.length], life: rand(0.5, 1) });
 }
 
+function overHole() {
+  const b = ball;
+  if (b.shield > 0) {
+    b.shield = 0; b.air = true; b.vy = 8.5;
+    sfx.jump(); buzz(60); say('Shield saved you! 🛡️', '#80ffdb');
+    return;
+  }
+  const i = Math.floor(b.z / ROW), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
+  let j = i;
+  while (rowAt(j + 1).cells[c] === HOLE) j++;
+  b.hole = { c, z0: i * ROW, z1: (j + 1) * ROW };
+  b.fall = true; b.vy = 0;
+  sfx.fall(); buzz(200); say('You fell! 🕳️', '#f72585'); end(true);
+}
+
 function update(dt) {
   time += dt;
   if (S.phase === 'menu') { ball.z += 6 * dt; ball.rot += 6 * dt / R; ball.x = Math.sin(time * 0.8) * 1.2; }
@@ -236,18 +255,24 @@ function update(dt) {
       if (keys.ArrowRight) b.x += 6 * dt;
       b.x = clamp(b.x, -HALF + R, HALF - R);
     }
-    if (b.air || b.fall) {
+    if (b.fall) {
+      // roll on towards the far wall of the hole while sinking, so the drop stays in view
+      const h = b.hole;
+      b.vy -= 5 * dt; b.y += b.vy * dt;
+      b.z += (h.z1 - R * 1.2 - b.z) * Math.min(1, dt * 5);
+      b.x += (h.c - HALF + 0.5 - b.x) * Math.min(1, dt * 4);
+      b.rot += 6 * dt;
+    } else if (b.air) {
       b.vy -= 22 * dt; b.y += b.vy * dt;
-      if (b.air && b.y <= 0) {
+      if (b.y <= 0) {
         const row = rowAt(Math.floor(b.z / ROW)), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
-        if (row.cells[c] === HOLE) { b.air = false; b.fall = true; }
+        if (row.cells[c] === HOLE) { b.y = 0; b.air = false; overHole(); }
         else { b.y = 0; b.vy = 0; b.air = false; sfx.land(); }
       }
     }
     if (S.phase === 'play' && !b.dead) {
       const i = Math.floor(b.z / ROW), row = rowAt(i), c = clamp(Math.floor(b.x + HALF), 0, COLS - 1);
-      if (!b.air && !b.fall && row.cells[c] === HOLE) { b.fall = true; b.vy = 0; }
-      if (b.fall) { sfx.fall(); buzz(200); say('وقعت! 🕳️', '#f72585'); end(true); }
+      if (!b.air && !b.fall && row.cells[c] === HOLE) overHole();
       // blocks: check the row(s) the ball touches
       for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
         const r2 = rowAt(j), z0 = j * ROW + 0.3, z1 = j * ROW + ROW - 0.3;
@@ -257,9 +282,15 @@ function update(dt) {
           const x0 = k - HALF, x1 = x0 + 1;
           const nx = clamp(b.x, x0, x1);
           if (Math.abs(b.x - nx) < R * 0.85) {
+            if (b.shield > 0) {
+              r2.cells[k] = FLOOR; b.shield = 0; S.shake = 0.2;
+              burst(x0 + 0.5, 0.5, j * ROW + 1, ['#f72585', '#b5179e', '#fff'], 30, 4);
+              sfx.crash(); buzz(60); say('Shield saved you! 🛡️', '#80ffdb');
+              continue;
+            }
             b.dead = true; S.shake = 0.5;
             burst(b.x, b.y + R, b.z, ['#4cc9f0', '#fff', '#f72585', '#ffd60a'], 40, 4);
-            sfx.crash(); buzz([60, 40, 120]); say('اصطدمت! 💥', '#ffd60a'); end(false);
+            sfx.crash(); buzz([60, 40, 120]); say('Crash! 💥', '#ffd60a'); end(false);
             break;
           }
         }
@@ -277,12 +308,26 @@ function update(dt) {
           }
           return true;
         });
+        const pw = r2.power;
+        if (pw && Math.abs(pw.k - HALF + 0.5 - b.x) < 0.7 && Math.abs(j * ROW + 1 - b.z) < 0.8 && b.y < 1.4) {
+          r2.power = null; b.shield = 15;
+          sfx.power(); buzz([20, 30, 20]); say('Shield! 🛡️', '#80ffdb');
+          burst(b.x, 0.6, b.z + 0.5, ['#80ffdb', '#fff', '#4cc9f0'], 20, 3);
+        }
       }
-      if (b.z >= S.nextMilestone) { say(S.nextMilestone + ' متر! 🚀', '#80ffdb'); sfx.level(); S.nextMilestone += 250; }
+      if (b.shield > 0) b.shield = Math.max(0, b.shield - dt);
+      if (b.z >= S.nextMilestone) { say(S.nextMilestone + ' m! 🚀', '#80ffdb'); sfx.level(); S.nextMilestone += 250; }
       hud();
     }
   }
   camX += (ball.x * 0.55 - camX) * Math.min(1, dt * 6);
+  if (ball.fall) {
+    // lean over the hole and tilt down so the ball can be watched dropping into it
+    const k = Math.min(1, dt * 2.5);
+    cam.back += (2.6 - cam.back) * k; cam.h += (4.6 - cam.h) * k;
+    const yNoPan = HORIZON + (cam.h - ball.y) * F / cam.back;
+    cam.pan += (H * 0.58 - yNoPan - cam.pan) * k;
+  }
   S.shake = Math.max(0, S.shake - dt);
   for (const p of parts) { p.vy -= 12 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.life -= dt; }
   parts = parts.filter(p => p.life > 0);
@@ -294,7 +339,7 @@ let camZ = 0;
 const CAM_BACK = 4.2, CAM_H = 3.3;
 function proj(x, y, z) {
   const dz = z - camZ;
-  return [W / 2 + (x - camX) * F / dz, HORIZON + (CAM_H - y) * F / dz, F / dz];
+  return [W / 2 + (x - camX) * F / dz, HORIZON + cam.pan + (cam.h - y) * F / dz, F / dz];
 }
 const mix = (c, t) => `rgb(${c[0] + (BG[0] - c[0]) * t | 0},${c[1] + (BG[1] - c[1]) * t | 0},${c[2] + (BG[2] - c[2]) * t | 0})`;
 function quad(a, b, c, d, fill) {
@@ -362,6 +407,20 @@ function drawRowObjects(i) {
     ctx.strokeStyle = mix([255, 120, 200], fog); ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(f[0][0], f[0][1]); ctx.lineTo(f[1][0], f[1][1]); ctx.lineTo(f[2][0], f[2][1]); ctx.lineTo(f[3][0], f[3][1]); ctx.closePath(); ctx.stroke();
   }
+  if (row.power) {
+    const [sx, sy, sc] = proj(row.power.k - HALF + 0.5, 0.6 + Math.sin(time * 3) * 0.1, i * ROW + 1);
+    const r = 0.3 * sc;
+    ctx.globalAlpha = 1 - fog;
+    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 1.8);
+    g.addColorStop(0, 'rgba(128,255,219,.6)'); g.addColorStop(1, 'rgba(128,255,219,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r * 1.8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#80ffdb'; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, r * 0.15);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r * 0.85, sy - r * 0.6); ctx.lineTo(sx + r * 0.7, sy + r * 0.3);
+    ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r * 0.7, sy + r * 0.3); ctx.lineTo(sx - r * 0.85, sy - r * 0.6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
   for (const k of row.gems) {
     const gz = i * ROW + 1, gx = k - HALF + 0.5, bob = 0.55 + Math.sin(time * 4 + i) * 0.08;
     const [sx, sy, sc] = proj(gx, bob, gz);
@@ -383,6 +442,13 @@ function drawBall() {
     ctx.fillStyle = `rgba(0,0,0,${0.45 * k})`;
     ctx.beginPath(); ctx.ellipse(sx, sy, R * sc * k, R * sc * 0.3 * k, 0, 0, 7); ctx.fill();
   }
+  ctx.save();
+  if (b.fall) {
+    const h = b.hole, x0 = h.c - HALF, z0 = Math.max(h.z0, camZ + 0.5);
+    const a = proj(x0, 0, z0), b2 = proj(x0 + 1, 0, z0), c2 = proj(x0 + 1, 0, h.z1), d = proj(x0, 0, h.z1);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b2[0], b2[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(d[0], d[1]); ctx.closePath(); ctx.clip();
+    ctx.globalAlpha = clamp(1 + b.y / 5, 0.1, 1);
+  }
   const [cx, cy, sc] = proj(b.x, b.y + R, b.z), r = R * sc;
   const glow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 2);
   glow.addColorStop(0, 'rgba(76,201,240,.35)'); glow.addColorStop(1, 'rgba(76,201,240,0)');
@@ -400,6 +466,13 @@ function drawBall() {
     ctx.beginPath(); ctx.ellipse(cx, yy, r * Math.cos(Math.asin(clamp(Math.sin(a), -1, 1))), r * 0.25 * Math.cos(a), 0, 0, Math.PI); ctx.stroke();
   }
   ctx.restore();
+  // shield bubble, blinking in its last 3 seconds
+  if (b.shield > 0 && (b.shield > 3 || Math.sin(time * 20) > 0)) {
+    ctx.strokeStyle = 'rgba(128,255,219,.9)'; ctx.lineWidth = Math.max(2, r * 0.12);
+    ctx.fillStyle = 'rgba(128,255,219,.15)';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 1.45, 0, 7); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawParts() {
@@ -413,7 +486,7 @@ function drawParts() {
 }
 
 function draw() {
-  camZ = ball.z - CAM_BACK;
+  camZ = ball.z - cam.back;
   ctx.save();
   if (S.shake > 0) ctx.translate(rand(-1, 1) * S.shake * 18, rand(-1, 1) * S.shake * 18);
   drawSky();
@@ -440,7 +513,7 @@ function frame(now) {
 }
 addEventListener('resize', layout);
 layout(); reset();
-$('menuBest').textContent = S.best ? 'أعلى نتيجة: ' + S.best : '';
+$('menuBest').textContent = S.best ? 'Best: ' + S.best : '';
 hud();
 requestAnimationFrame(frame);
 })();
