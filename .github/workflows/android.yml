@@ -7,6 +7,9 @@ on:
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -45,9 +48,22 @@ jobs:
           set -o pipefail
           ./gradlew assembleDebug --no-daemon --console=plain 2>&1 | grep -vE '^[[:space:]]+at |^[[:space:]]+\.\.\. '
 
-      - name: Upload APK
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk ../FieldLog.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: FieldLog-debug-apk
-          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          path: FieldLog.apk
           if-no-files-found: error
+
+      - name: Publish to Release (direct download link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: FieldLog (latest build)
+          body: |
+            Direct APK download: tap **FieldLog.apk** below on your phone.
+            Debug build from commit ${{ github.sha }}.
+          files: FieldLog.apk
