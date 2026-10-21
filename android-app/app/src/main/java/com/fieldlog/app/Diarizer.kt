@@ -103,8 +103,15 @@ object Diarizer {
                     lab[p] = bi
                 }
                 val sum = Array(k) { DoubleArray(d) }; val cnt = IntArray(k)
-                for (p in data.indices) { val c = lab[p]; cnt[c]++; for (j in 0 until d) sum[c][j] += data[p][j] }
-                for (c in 0 until k) if (cnt[c] > 0) for (j in 0 until d) cent[c][j] = (sum[c][j] / cnt[c]).toFloat()
+                for (p in data.indices) {
+                    val c = lab[p]; cnt[c] = cnt[c] + 1
+                    val dp = data[p]; val sc = sum[c]
+                    for (j in 0 until d) sc[j] = sc[j] + dp[j]
+                }
+                for (c in 0 until k) if (cnt[c] > 0) {
+                    val sc = sum[c]; val cc = cent[c]
+                    for (j in 0 until d) cc[j] = (sc[j] / cnt[c]).toFloat()
+                }
             }
             var cost = 0.0
             for (p in data.indices) { val cc = cent[lab[p]]; val dp = data[p]; for (j in 0 until d) { val t = dp[j] - cc[j]; cost += t * t } }
