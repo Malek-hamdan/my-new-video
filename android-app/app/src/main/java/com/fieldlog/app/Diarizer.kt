@@ -57,7 +57,7 @@ object Diarizer {
         // Standardize features across segments.
         val d = NCEP; val mean = FloatArray(d); val sd = FloatArray(d)
         for (v in segVecs) for (c in 0 until d) mean[c] += v[c]
-        for (c in 0 until d) mean[c] /= segVecs.size
+        for (c in 0 until d) mean[c] = mean[c] / segVecs.size.toFloat()
         for (v in segVecs) for (c in 0 until d) { val t = v[c] - mean[c]; sd[c] += t * t }
         for (c in 0 until d) sd[c] = sqrt(sd[c] / segVecs.size) + 1e-6f
         val norm = segVecs.map { v -> FloatArray(d) { (v[it] - mean[it]) / sd[it] } }
