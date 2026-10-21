@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">FieldLog</string>
+
+    <!-- Neutral notification wording: no "recording" term -->
+    <string name="channel_name">Background session</string>
+    <string name="channel_desc">Shows while a session is active.</string>
+    <string name="notif_title">FieldLog</string>
+    <string name="notif_active">Session active</string>
+    <string name="notif_stop">Stop &amp; save</string>
+
+    <string name="level_light">Light</string>
+    <string name="level_medium">Medium</string>
+    <string name="level_strong">Strong</string>
+    <string name="tap_to_record">Tap to record</string>
+    <string name="recordings">Recordings</string>
+    <string name="settings">Settings</string>
+
+    <string name="pin_title">Enter PIN</string>
+    <string name="pin_wrong">Wrong PIN</string>
+    <string name="pin_set_hint">Default PIN is 2026 — change it in Settings.</string>
+
+    <string name="volume_service_label">FieldLog stop control</string>
+    <string name="volume_service_desc">Lets Volume-Down pressed 3 times stop the current session while the screen is off. FieldLog does not read your screen.</string>
+</resources>
