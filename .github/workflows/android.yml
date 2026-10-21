@@ -41,7 +41,9 @@ jobs:
           test -f src/rnnoise_data.c && echo "model OK"
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --console=plain 2>&1 | grep -vE '^[[:space:]]+at |^[[:space:]]+\.\.\. '
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

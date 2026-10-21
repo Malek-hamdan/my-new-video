@@ -211,7 +211,7 @@ class MainActivity : AppCompatActivity() {
                 val s = segs[idx]
                 mp.seekTo(s.startMs.toInt())
                 mp.start()
-                val dur = (s.endMs - s.startMs).coerceAtLeast(200)
+                val dur = (s.endMs - s.startMs).coerceAtLeast(200L)
                 idx++
                 ui.postDelayed(this, dur)
             }
