@@ -27,6 +27,19 @@ jobs:
         with:
           packages: ""
 
+      - name: Install NDK and CMake
+        run: |
+          yes | sdkmanager "ndk;26.3.11579264" "cmake;3.22.1" >/dev/null 2>&1 || true
+
+      - name: Download RNNoise model
+        working-directory: android-app/app/src/main/cpp/rnnoise
+        run: |
+          hash=$(cat model_version)
+          echo "Model: $hash"
+          wget -q "https://media.xiph.org/rnnoise/models/rnnoise_data-$hash.tar.gz"
+          tar xzf "rnnoise_data-$hash.tar.gz"
+          test -f src/rnnoise_data.c && echo "model OK"
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 

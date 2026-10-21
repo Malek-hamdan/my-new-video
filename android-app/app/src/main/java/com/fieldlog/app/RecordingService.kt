@@ -121,8 +121,10 @@ class RecordingService : Service() {
                     val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                     val level = prefs.level
                     val dir = recordingsDir(this)
-                    val cleaned = Enhancer.process(raw, level)
-                    WavIo.writeWav(File(dir, "FieldLog_${stamp}__${level.name}.wav"), cleaned)
+                    val ai = prefs.aiEnabled
+                    val cleaned = Enhancer.process(raw, level, ai)
+                    val tag = if (ai && Rnnoise.available) "${level.name}-AI" else level.name
+                    WavIo.writeWav(File(dir, "FieldLog_${stamp}__${tag}.wav"), cleaned)
                     if (prefs.keepOriginal) WavIo.writeWav(File(dir, "FieldLog_${stamp}__ORIGINAL.wav"), raw)
                 }
                 RecorderBus.processing = false; RecorderBus.notifyChanged()

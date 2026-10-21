@@ -3,7 +3,15 @@
 A private voice recorder that keeps recording with the screen off, cleans the
 audio in three levels, and stops on a triple Volume-Down press.
 
-## This build (v1)
+## v2 additions
+- **AI noise removal (RNNoise, on-device)** — native C (Xiph RNNoise, BSD) built via the
+  NDK and blended into each level (`Rnnoise.kt`, `cpp/`, `Enhancer.processAi`). Toggle in
+  Settings; falls back to the DSP path if the native lib is unavailable.
+- **Split by speaker** — model-free, on-device diarization (`Diarizer.kt`): MFCC features,
+  energy VAD, ~1 s embeddings, k-means. From a recording's menu → "Split by speaker";
+  plays one speaker's turns only. Approximate: best for turn-taking, can't name speakers.
+
+## v1 features
 - **Custom, neutral notification** — shows "FieldLog" and a timer, never the word "recording".
 - **Records with the screen off / phone in pocket** via a foreground microphone service.
 - **Three enhancement levels** — Light / Medium / Strong (`Enhancer.kt`), applied when you stop.

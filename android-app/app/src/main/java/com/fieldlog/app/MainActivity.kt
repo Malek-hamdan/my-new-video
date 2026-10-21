@@ -144,13 +144,80 @@ class MainActivity : AppCompatActivity() {
 
     private fun itemMenu(f: File) {
         AlertDialog.Builder(this)
-            .setItems(arrayOf("Share", "Rename", "Delete")) { _, which ->
+            .setItems(arrayOf("Split by speaker", "Share", "Rename", "Delete")) { _, which ->
                 when (which) {
-                    0 -> share(f)
-                    1 -> rename(f)
-                    2 -> { f.delete(); File(f.parent, f.name.replace(Regex("__\\w+\\.wav"), "__ORIGINAL.wav")).delete(); loadList() }
+                    0 -> splitBySpeaker(f)
+                    1 -> share(f)
+                    2 -> rename(f)
+                    3 -> { f.delete(); File(f.parent, f.name.replace(Regex("__[\\w-]+\\.wav"), "__ORIGINAL.wav")).delete(); loadList() }
                 }
             }.show()
+    }
+
+    // ---- speaker split ----
+    private fun splitBySpeaker(f: File) {
+        val progress = AlertDialog.Builder(this)
+            .setTitle("Split by speaker")
+            .setMessage("Analyzing voices… this runs on your phone and may take a moment.")
+            .setCancelable(false).show()
+        Thread {
+            val result = runCatching {
+                val pcm = WavIo.readPcm16(f)
+                Diarizer.diarize(pcm, maxSpeakers = 2)
+            }.getOrNull()
+            ui.post {
+                progress.dismiss()
+                if (result == null || result.segments.isEmpty()) {
+                    Toast.makeText(this, "Couldn't analyze this recording", Toast.LENGTH_SHORT).show()
+                    return@post
+                }
+                showSpeakers(f, result)
+            }
+        }.start()
+    }
+
+    private fun showSpeakers(f: File, r: Diarizer.Result) {
+        if (r.speakers <= 1) {
+            AlertDialog.Builder(this).setTitle("One speaker")
+                .setMessage("Only one voice was detected in this recording.")
+                .setPositiveButton("OK", null).show()
+            return
+        }
+        val names = (0 until r.speakers).map { sp ->
+            val sec = (r.talkMs[sp] / 1000).toInt()
+            "Speaker ${sp + 1}  ·  ${sec / 60}:${String.format(Locale.US, "%02d", sec % 60)}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("${r.speakers} speakers found")
+            .setItems(names) { _, which -> playSpeaker(f, r, which) }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private var segRunner: Runnable? = null
+
+    private fun playSpeaker(f: File, r: Diarizer.Result, speaker: Int) {
+        val segs = r.segments.filter { it.speaker == speaker }
+        if (segs.isEmpty()) return
+        player?.release()
+        val mp = MediaPlayer().apply { setDataSource(f.absolutePath); prepare() }
+        player = mp
+        Toast.makeText(this, "Playing Speaker ${speaker + 1} only", Toast.LENGTH_SHORT).show()
+        var idx = 0
+        val step = object : Runnable {
+            override fun run() {
+                if (player !== mp) return
+                if (idx >= segs.size) { mp.pause(); return }
+                val s = segs[idx]
+                mp.seekTo(s.startMs.toInt())
+                mp.start()
+                val dur = (s.endMs - s.startMs).coerceAtLeast(200)
+                idx++
+                ui.postDelayed(this, dur)
+            }
+        }
+        segRunner = step
+        ui.post(step)
     }
 
     private fun share(f: File) {
@@ -179,6 +246,7 @@ class MainActivity : AppCompatActivity() {
             .setItems(
                 arrayOf(
                     "Change PIN",
+                    if (prefs.aiEnabled) "AI noise removal: ON" else "AI noise removal: OFF",
                     if (prefs.keepOriginal) "Keep original copy: ON" else "Keep original copy: OFF",
                     if (prefs.volumeStop) "Volume-Down ×3 stop: ON" else "Volume-Down ×3 stop: OFF",
                     "Enable stop control (Accessibility)"
@@ -186,9 +254,15 @@ class MainActivity : AppCompatActivity() {
             ) { _, which ->
                 when (which) {
                     0 -> changePin()
-                    1 -> { prefs.keepOriginal = !prefs.keepOriginal; showSettings() }
-                    2 -> { prefs.volumeStop = !prefs.volumeStop; showSettings() }
-                    3 -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    1 -> {
+                        prefs.aiEnabled = !prefs.aiEnabled
+                        if (prefs.aiEnabled && !Rnnoise.available)
+                            Toast.makeText(this, "AI engine unavailable on this device", Toast.LENGTH_SHORT).show()
+                        showSettings()
+                    }
+                    2 -> { prefs.keepOriginal = !prefs.keepOriginal; showSettings() }
+                    3 -> { prefs.volumeStop = !prefs.volumeStop; showSettings() }
+                    4 -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
             }.show()
     }

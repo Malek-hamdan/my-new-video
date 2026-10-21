@@ -37,10 +37,41 @@ object Enhancer {
 
     private const val SR = 48000.0
 
-    fun process(input: FloatArray, level: Level): FloatArray {
+    fun process(input: FloatArray, level: Level, ai: Boolean = false): FloatArray {
+        if (ai && Rnnoise.available) return processAi(input, level)
         val p = params(level)
         var y = biquad(input, "hp", p.hp)
         y = denoise(y, p.floorDb, p.over)
+        y = autoLevel(y)
+        y = biquad(y, "peak", 300.0, 1.0, p.mud)
+        y = biquad(y, "peak", 3000.0, 0.9, p.pres)
+        if (p.air != 0.0) y = biquad(y, "shelf", 5000.0, 0.707, p.air)
+        p.topCut?.let { y = biquad(y, "lp", it) }
+        y = compress(y, p.thr, p.ratio, p.expRatio)
+        return limit(y)
+    }
+
+    // AI path: RNNoise as the core remover, blended with a little dry signal to stay natural.
+    private class AiParams(
+        val dryDb: Double, val postFloor: Double?, val hp: Double,
+        val mud: Double, val pres: Double, val air: Double, val topCut: Double?,
+        val thr: Double, val ratio: Double, val expRatio: Double
+    )
+
+    private fun aiParams(level: Level): AiParams = when (level) {
+        Level.LIGHT  -> AiParams(-10.0, null,  80.0,  -1.5, 2.0, 1.5, null,    -16.0, 2.0, 1.0)
+        Level.MEDIUM -> AiParams(-20.0, null,  90.0,  -2.0, 3.0, 2.5, null,    -18.0, 2.5, 1.5)
+        Level.STRONG -> AiParams(-30.0, -10.0, 100.0, -2.5, 3.5, 3.5, 14000.0, -20.0, 3.0, 2.0)
+    }
+
+    private fun processAi(input: FloatArray, level: Level): FloatArray {
+        val p = aiParams(level)
+        var y = biquad(input, "hp", p.hp)
+        val dry = Math.pow(10.0, p.dryDb / 20.0).toFloat()
+        val wet = Rnnoise.denoise(y)
+        val blended = FloatArray(y.size) { wet[it] + y[it] * dry }
+        y = blended
+        p.postFloor?.let { y = denoise(y, it, 1.0) }
         y = autoLevel(y)
         y = biquad(y, "peak", 300.0, 1.0, p.mud)
         y = biquad(y, "peak", 3000.0, 0.9, p.pres)

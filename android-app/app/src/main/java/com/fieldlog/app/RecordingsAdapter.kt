@@ -35,13 +35,17 @@ class RecordingsAdapter(
 
     private fun displayName(f: File): String {
         // FieldLog_20261021_094312__MEDIUM.wav -> "Oct 21, 09:43 · Medium"
-        val m = Regex("FieldLog_(\\d{8})_(\\d{6})__(\\w+)").find(f.name)
+        val m = Regex("FieldLog_(\\d{8})_(\\d{6})__([\\w-]+)").find(f.name)
         if (m != null) {
             val (d, t, tag) = m.destructured
             val date = runCatching {
                 SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).parse("${d}_$t")
             }.getOrNull()
-            val label = if (tag == "ORIGINAL") "Original" else tag.lowercase().replaceFirstChar { it.uppercase() }
+            val label = when {
+                tag == "ORIGINAL" -> "Original"
+                tag.endsWith("-AI") -> tag.removeSuffix("-AI").lowercase().replaceFirstChar { it.uppercase() } + " · AI"
+                else -> tag.lowercase().replaceFirstChar { it.uppercase() }
+            }
             val when_ = if (date != null) SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()).format(date) else f.name
             return "$when_ · $label"
         }

@@ -6,3 +6,6 @@ local.properties
 .idea/
 .kotlin/
 captures/
+rnnoise/src/rnnoise_data.c
+rnnoise/src/rnnoise_data.h
+rnnoise/*.tar.gz

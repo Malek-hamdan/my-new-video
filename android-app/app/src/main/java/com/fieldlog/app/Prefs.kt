@@ -18,6 +18,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("keepOriginal", true)
         set(v) = sp.edit().putBoolean("keepOriginal", v).apply()
 
+    var aiEnabled: Boolean
+        get() = sp.getBoolean("aiEnabled", true)
+        set(v) = sp.edit().putBoolean("aiEnabled", v).apply()
+
     var volumeStop: Boolean
         get() = sp.getBoolean("volumeStop", true)
         set(v) = sp.edit().putBoolean("volumeStop", v).apply()
