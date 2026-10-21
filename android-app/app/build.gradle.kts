@@ -11,8 +11,8 @@ android {
         applicationId = "com.fieldlog.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 3
+        versionName = "2.1"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
@@ -46,6 +46,13 @@ android {
     }
     buildFeatures {
         viewBinding = true
+    }
+    // Extract native libraries at install time — more compatible with some
+    // device installers (e.g. Samsung) for sideloaded APKs with native code.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
