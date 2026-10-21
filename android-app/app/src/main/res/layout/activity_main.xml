@@ -3,16 +3,17 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg">
+    android:background="@drawable/bg_glow">
 
-    <!-- Main content -->
     <LinearLayout
         android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:paddingHorizontal="20dp"
+        android:paddingTop="24dp">
 
+        <!-- header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -24,63 +25,114 @@
                 android:layout_weight="1"
                 android:text="@string/app_name"
                 android:textColor="@color/text"
-                android:textSize="22sp"
-                android:textStyle="bold" />
-            <com.google.android.material.button.MaterialButton
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:letterSpacing="-0.02" />
+            <ImageView
                 android:id="@+id/btnSettings"
-                style="@style/Widget.Material3.Button.IconButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:icon="@android:drawable/ic_menu_manage"
-                app:iconTint="@color/muted" />
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/pill_bg"
+                android:padding="9dp"
+                android:src="@drawable/ic_settings"
+                android:contentDescription="@string/settings"
+                app:tint="@color/muted" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButtonToggleGroup
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="NOISE REDUCTION"
+            android:textColor="@color/muted"
+            android:textSize="11sp"
+            android:letterSpacing="0.08" />
+
+        <!-- segmented level control -->
+        <LinearLayout
             android:id="@+id/levelGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:singleSelection="true"
-            app:selectionRequired="true">
-            <com.google.android.material.button.MaterialButton android:id="@+id/levelLight" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="@string/level_light" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/levelMedium" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="@string/level_medium" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/levelStrong" style="?attr/materialButtonOutlinedStyle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="@string/level_strong" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
+            android:layout_marginTop="8dp"
+            android:background="@drawable/pill_bg"
+            android:orientation="horizontal"
+            android:padding="4dp">
+            <TextView android:id="@+id/levelLight" style="@style/SegItem" android:text="@string/level_light" />
+            <TextView android:id="@+id/levelMedium" style="@style/SegItem" android:text="@string/level_medium" />
+            <TextView android:id="@+id/levelStrong" style="@style/SegItem" android:text="@string/level_strong" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/levelHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:textColor="@color/muted"
+            android:textSize="12sp" />
+
+        <!-- orb record button -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="236dp"
+            android:layout_marginTop="8dp">
+
+            <View
+                android:layout_width="236dp"
+                android:layout_height="236dp"
+                android:layout_gravity="center"
+                android:background="@drawable/orb_ring2" />
+            <View
+                android:layout_width="188dp"
+                android:layout_height="188dp"
+                android:layout_gravity="center"
+                android:background="@drawable/orb_ring1" />
+
+            <FrameLayout
+                android:id="@+id/btnRecord"
+                android:layout_width="124dp"
+                android:layout_height="124dp"
+                android:layout_gravity="center"
+                android:background="@drawable/orb_gradient"
+                android:clickable="true"
+                android:focusable="true"
+                android:elevation="12dp">
+                <ImageView
+                    android:id="@+id/recordIcon"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_mic"
+                    android:contentDescription="@string/tap_to_record" />
+            </FrameLayout>
+        </FrameLayout>
 
         <TextView
             android:id="@+id/timer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="4dp"
             android:gravity="center"
             android:text="00:00:00"
             android:textColor="@color/text"
-            android:textSize="40sp" />
+            android:textSize="44sp"
+            android:fontFamily="sans-serif-light"
+            android:letterSpacing="0.02" />
 
         <TextView
             android:id="@+id/status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:gravity="center"
             android:text="@string/tap_to_record"
             android:textColor="@color/muted"
-            android:textSize="14sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnRecord"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="16dp"
-            android:paddingHorizontal="40dp"
-            android:text="Record"
-            app:backgroundTint="@color/accent"
-            app:cornerRadius="28dp" />
+            android:textSize="13sp" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="22dp"
             android:text="@string/recordings"
             android:textColor="@color/text"
             android:textSize="16sp"
@@ -91,7 +143,7 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:clipToPadding="false"
             android:paddingBottom="16dp" />
     </LinearLayout>
@@ -101,17 +153,30 @@
         android:id="@+id/pinOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/bg"
+        android:background="@drawable/bg_glow"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="32dp">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🔒" android:textSize="40sp" />
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="@string/pin_title" android:textColor="@color/text" android:textSize="18sp" />
+        <FrameLayout
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="@drawable/orb_gradient">
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_lock"
+                app:tint="@color/white"
+                android:contentDescription="@string/pin_title" />
+        </FrameLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="@string/pin_title" android:textColor="@color/text" android:textSize="18sp" android:textStyle="bold" />
         <EditText
             android:id="@+id/pinInput"
             android:layout_width="200dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
+            android:background="@drawable/pill_bg"
+            android:paddingVertical="12dp"
             android:gravity="center"
             android:inputType="numberPassword"
             android:maxLength="8"
@@ -120,13 +185,18 @@
             android:letterSpacing="0.3"
             android:autofillHints="" />
         <TextView android:id="@+id/pinHint" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="@string/pin_set_hint" android:textColor="@color/muted" android:textSize="12sp" android:gravity="center" />
-        <com.google.android.material.button.MaterialButton
+        <TextView
             android:id="@+id/btnUnlock"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/play_gradient"
+            android:paddingHorizontal="36dp"
+            android:paddingVertical="13dp"
             android:text="Unlock"
-            app:backgroundTint="@color/accent2"
-            app:cornerRadius="24dp" />
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true" />
     </LinearLayout>
 </FrameLayout>

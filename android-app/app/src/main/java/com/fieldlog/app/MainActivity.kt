@@ -66,20 +66,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- levels ----
+    private val levelViews by lazy {
+        listOf(
+            b.levelLight to Enhancer.Level.LIGHT,
+            b.levelMedium to Enhancer.Level.MEDIUM,
+            b.levelStrong to Enhancer.Level.STRONG
+        )
+    }
+
     private fun setupLevels() {
-        val id = when (prefs.level) {
-            Enhancer.Level.LIGHT -> b.levelLight.id
-            Enhancer.Level.MEDIUM -> b.levelMedium.id
-            Enhancer.Level.STRONG -> b.levelStrong.id
-        }
-        b.levelGroup.check(id)
-        b.levelGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            prefs.level = when (checkedId) {
-                b.levelLight.id -> Enhancer.Level.LIGHT
-                b.levelStrong.id -> Enhancer.Level.STRONG
-                else -> Enhancer.Level.MEDIUM
+        levelViews.forEach { (view, lvl) -> view.setOnClickListener { selectLevel(lvl) } }
+        selectLevel(prefs.level)
+    }
+
+    private fun selectLevel(lvl: Enhancer.Level) {
+        prefs.level = lvl
+        levelViews.forEach { (view, l) ->
+            if (l == lvl) {
+                view.setBackgroundResource(R.drawable.seg_selected)
+                view.setTextColor(ContextCompat.getColor(this, R.color.white))
+                view.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                view.setTextColor(ContextCompat.getColor(this, R.color.muted))
+                view.setTypeface(null, android.graphics.Typeface.NORMAL)
             }
+        }
+        b.levelHint.text = when (lvl) {
+            Enhancer.Level.LIGHT -> "Natural sound · gentle clean-up"
+            Enhancer.Level.MEDIUM -> "Best for most conversations"
+            Enhancer.Level.STRONG -> "For loud places"
         }
     }
 
@@ -99,7 +115,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshRecordingUi() {
         val rec = RecorderBus.recording
-        b.btnRecord.text = if (rec) "Stop & save" else "Record"
+        b.recordIcon.setImageResource(if (rec) R.drawable.ic_stop else R.drawable.ic_mic)
         b.status.text = when {
             RecorderBus.processing -> "Saving & cleaning…"
             rec -> "Recording · you can turn off the screen"
