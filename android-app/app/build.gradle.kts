@@ -11,24 +11,25 @@ android {
         applicationId = "com.fieldlog.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "2.2-test"
-        // --- Native (RNNoise) temporarily disabled to isolate an install failure ---
-        // ndk {
-        //     abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        // }
-        // externalNativeBuild {
-        //     cmake { arguments += "-DANDROID_STL=none" }
-        // }
+        versionCode = 5
+        versionName = "2.2"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=none"
+            }
+        }
     }
 
-    // externalNativeBuild {
-    //     cmake {
-    //         path = file("src/main/cpp/CMakeLists.txt")
-    //         version = "3.22.1"
-    //     }
-    // }
-    // ndkVersion = "26.3.11579264"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    ndkVersion = "26.3.11579264"
 
     buildTypes {
         release {
