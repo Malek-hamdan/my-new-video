@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>مسجّل الصوت</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --text: #1d1d1f; --muted: #6b6b70;
+    --line: #e4e2dd; --accent: #d93a3a; --accent-2: #2a6df4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121214; --card: #1c1c20; --text: #f2f2f4; --muted: #9a9aa2; --line: #2c2c32; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px;
+  }
+  main { width: 100%; max-width: 480px; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  canvas { width: 100%; height: 90px; display: block; }
+  .timer { font-size: 40px; font-variant-numeric: tabular-nums; text-align: center; margin: 12px 0; direction: ltr; }
+  .controls { display: flex; gap: 12px; justify-content: center; }
+  button {
+    border: 0; border-radius: 999px; padding: 12px 20px; font-size: 16px; cursor: pointer;
+    background: var(--line); color: var(--text); font-family: inherit;
+  }
+  button:disabled { opacity: .4; cursor: default; }
+  #rec { background: var(--accent); color: #fff; min-width: 120px; }
+  #rec.on { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .7; } }
+  .status { text-align: center; color: var(--muted); font-size: 14px; margin-top: 10px; min-height: 1.2em; }
+  h2 { font-size: 17px; margin: 24px 0 10px; }
+  ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .name { font-weight: 600; background: none; border: 0; color: var(--text); font: inherit; width: 100%; padding: 0; }
+  .meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  audio { width: 100%; }
+  .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .actions a, .actions button { font-size: 14px; padding: 8px 14px; text-decoration: none; }
+  .actions a { background: var(--accent-2); color: #fff; border-radius: 999px; }
+  .empty { color: var(--muted); text-align: center; padding: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎙️ مسجّل الصوت</h1>
+
+  <section class="card">
+    <canvas id="wave" width="800" height="180"></canvas>
+    <div class="timer" id="timer">00:00</div>
+    <div class="controls">
+      <button id="rec">تسجيل</button>
+      <button id="pause" disabled>إيقاف مؤقت</button>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <h2>التسجيلات</h2>
+  <ul id="list"></ul>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const recBtn = $("rec"), pauseBtn = $("pause"), timerEl = $("timer"),
+      statusEl = $("status"), listEl = $("list"), canvas = $("wave");
+const ctx2d = canvas.getContext("2d");
+
+let recorder, stream, chunks = [], audioCtx, analyser, rafId;
+let elapsed = 0, tickStart = 0, tickId;
+
+// ---------- storage (IndexedDB) ----------
+const dbReady = new Promise((resolve, reject) => {
+  const req = indexedDB.open("voice-recorder", 1);
+  req.onupgradeneeded = () => req.result.createObjectStore("clips", { keyPath: "id" });
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+async function store(mode, fn) {
+  const db = await dbReady;
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("clips", mode);
+    const r = fn(tx.objectStore("clips"));
+    tx.oncomplete = () => resolve(r && r.result);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+const saveClip = (c) => store("readwrite", (s) => s.put(c));
+const deleteClip = (id) => store("readwrite", (s) => s.delete(id));
+const allClips = () => store("readonly", (s) => s.getAll());
+
+// ---------- helpers ----------
+const fmt = (ms) => {
+  const s = Math.floor(ms / 1000);
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+};
+const pickMime = () =>
+  ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus", "audio/webm"]
+    .find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
+const extFor = (mime) => mime.includes("mp4") ? "m4a" : mime.includes("ogg") ? "ogg" : "webm";
+
+function startTimer() { tickStart = performance.now(); tickId = setInterval(() => timerEl.textContent = fmt(elapsed + performance.now() - tickStart), 200); }
+function stopTimer() { clearInterval(tickId); elapsed += performance.now() - tickStart; }
+
+// ---------- waveform ----------
+function draw() {
+  const data = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(data);
+  const w = canvas.width, h = canvas.height;
+  ctx2d.clearRect(0, 0, w, h);
+  ctx2d.lineWidth = 4;
+  ctx2d.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent");
+  ctx2d.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = (i / (data.length - 1)) * w, y = (data[i] / 255) * h;
+    i ? ctx2d.lineTo(x, y) : ctx2d.moveTo(x, y);
+  }
+  ctx2d.stroke();
+  rafId = requestAnimationFrame(draw);
+}
+
+// ---------- recording ----------
+async function start() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    statusEl.textContent = "ما في صلاحية للمايكروفون — اسمح بالوصول من إعدادات المتصفح.";
+    return;
+  }
+  const mimeType = pickMime();
+  recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  chunks = [];
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recorder.onstop = finish;
+  recorder.start(250);
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  draw();
+
+  elapsed = 0; startTimer();
+  recBtn.textContent = "إيقاف"; recBtn.classList.add("on");
+  pauseBtn.disabled = false; pauseBtn.textContent = "إيقاف مؤقت";
+  statusEl.textContent = "جاري التسجيل…";
+}
+
+function stop() { if (recorder && recorder.state !== "inactive") recorder.stop(); }
+
+async function finish() {
+  if (recorder.state !== "paused") stopTimer();
+  cancelAnimationFrame(rafId);
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  stream.getTracks().forEach((t) => t.stop());
+  audioCtx && audioCtx.close();
+
+  const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+  const now = new Date();
+  const clip = {
+    id: now.getTime(),
+    name: "تسجيل " + now.toLocaleString("ar", { dateStyle: "short", timeStyle: "short" }),
+    duration: elapsed, blob, mime: blob.type,
+  };
+  await saveClip(clip);
+  recBtn.textContent = "تسجيل"; recBtn.classList.remove("on");
+  pauseBtn.disabled = true; timerEl.textContent = "00:00";
+  statusEl.textContent = "تم الحفظ ✓";
+  render();
+}
+
+function togglePause() {
+  if (recorder.state === "recording") {
+    recorder.pause(); stopTimer();
+    pauseBtn.textContent = "استكمال"; recBtn.classList.remove("on");
+    statusEl.textContent = "متوقف مؤقتاً";
+  } else if (recorder.state === "paused") {
+    recorder.resume(); startTimer();
+    pauseBtn.textContent = "إيقاف مؤقت"; recBtn.classList.add("on");
+    statusEl.textContent = "جاري التسجيل…";
+  }
+}
+
+recBtn.onclick = () => (recorder && recorder.state !== "inactive" ? stop() : start());
+pauseBtn.onclick = togglePause;
+
+// ---------- list ----------
+const urls = [];
+async function render() {
+  urls.splice(0).forEach(URL.revokeObjectURL);
+  const clips = (await allClips()).sort((a, b) => b.id - a.id);
+  listEl.innerHTML = "";
+  if (!clips.length) { listEl.innerHTML = '<li class="empty">ما في تسجيلات بعد</li>'; return; }
+  for (const c of clips) {
+    const url = URL.createObjectURL(c.blob); urls.push(url);
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <div class="row"><input class="name"><span class="meta"></span></div>
+      <audio controls preload="metadata"></audio>
+      <div class="actions"><a>تنزيل</a><button>حذف</button></div>`;
+    const nameInput = li.querySelector(".name");
+    nameInput.value = c.name;
+    nameInput.onchange = () => { c.name = nameInput.value.trim() || c.name; saveClip(c); };
+    li.querySelector(".meta").textContent = fmt(c.duration);
+    li.querySelector("audio").src = url;
+    const a = li.querySelector("a");
+    a.href = url; a.download = `${c.name}.${extFor(c.mime)}`.replace(/[\\/:*?"<>|]/g, "-");
+    li.querySelector("button").onclick = async () => {
+      if (confirm("حذف هذا التسجيل؟")) { await deleteClip(c.id); render(); }
+    };
+    listEl.appendChild(li);
+  }
+}
+
+if (!navigator.mediaDevices || !window.MediaRecorder) {
+  recBtn.disabled = true;
+  statusEl.textContent = "متصفحك ما بيدعم التسجيل — جرّب Chrome أو Safari حديث.";
+}
+render();
+</script>
+</body>
+</html>
