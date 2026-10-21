@@ -198,19 +198,25 @@
   .btn.btn-transfer:hover { background: rgba(255,138,101,0.26); border-color: #ff8a65; box-shadow: 0 0 0 3px rgba(255,138,101,0.1); }
   .btn.btn-receive { background: rgba(127,214,164,0.16); border-color: rgba(127,214,164,0.6); color: #c6f1d8; }
   .btn.btn-receive:hover { background: rgba(127,214,164,0.26); border-color: #7fd6a4; }
-  body.cons-view .btn-transfer, body.tx-view .btn-transfer, body.sum-view .btn-transfer, body.locked .btn-transfer,
-  body.cons-view .btn-receive, body.tx-view .btn-receive, body.sum-view .btn-receive, body.locked .btn-receive { display: none !important; }
+  body.side-view .btn-transfer, body.tx-view .btn-transfer, body.sum-view .btn-transfer, body.locked .btn-transfer,
+  body.side-view .btn-receive, body.tx-view .btn-receive, body.sum-view .btn-receive, body.locked .btn-receive { display: none !important; }
   .tr-card.in .tr-title { color: #c6f1d8; }
   .tr-card.in .tr-line-box { display: none; }
-  .tr-card { max-width: 560px; }
-  .tr-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; color: #ffd3c2; margin-bottom: 14px; }
+  .confirm-card.tr-card { max-width: 820px; padding: 26px 28px; }
+  .tr-card .tr-chip { padding: 8px 16px; }
+  .tr-card .tr-input { padding: 12px 14px; font-size: 16px; }
+  .tr-card .tr-opt { padding: 11px 14px; }
+  .tr-card .tr-opt .n { font-size: 15px; }
+  .tr-card .tr-picked { padding: 14px 16px; }
+  .tr-card .tr-picked .n { font-size: 16px; }
+  .tr-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: #ffd3c2; margin-bottom: 14px; }
   .tr-label { display: block; margin: 14px 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
   .tr-chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .tr-chip { padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .tr-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #06101f; }
   .tr-input { width: 100%; padding: 11px 12px; border: 1px solid var(--border-strong); border-radius: 10px; background: rgba(255,255,255,0.03); color: var(--text); font: inherit; font-size: 15px; }
   .tr-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,157,255,0.15); }
-  .tr-list { margin-top: 6px; max-height: 210px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .tr-list { margin-top: 6px; max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
   .tr-list:empty { display: none; }
   .tr-opt { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; padding: 9px 12px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
   .tr-opt:first-child { border-top: 0; }
@@ -219,7 +225,7 @@
   .tr-picked { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid rgba(91,157,255,0.45); border-radius: 10px; background: rgba(91,157,255,0.08); }
   .tr-picked .n { font-weight: 700; } .tr-picked .r { color: var(--muted); font-size: 13px; }
   .tr-picked .stock { text-align: right; font-size: 13px; color: var(--muted); white-space: nowrap; } .tr-picked .stock b { display: block; color: var(--text); font-size: 18px; }
-  .tr-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .tr-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 18px; margin-top: 4px; }
   .tr-qty { display: flex; align-items: center; gap: 6px; }
   .tr-qty button { width: 38px; height: 42px; border: 1px solid var(--border-strong); border-radius: 10px; background: rgba(255,255,255,0.04); color: var(--text); font-size: 18px; cursor: pointer; }
   .tr-qty input { text-align: center; font-size: 18px; font-weight: 700; padding: 9px 4px; }
@@ -228,6 +234,12 @@
   .tr-mach { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; margin-right: 8px; vertical-align: 1px; }
   .tr-mach.BLM { background: #1F4E8C; } .tr-mach.BCW3 { background: #0E7C66; } .tr-mach.Bonal { background: #B35418; } .tr-mach.Sollas { background: #6B3FA0; }
   .tr-picked .tr-mach { font-size: 13px; padding: 3px 11px; }
+  .tr-mach.EQUIP { background: #0F766E; }
+  .tr-src { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-right: 8px; vertical-align: 1px; }
+  .tr-src.used { background: rgba(240,170,80,0.2); color: #ffd59a; border: 1px solid rgba(240,170,80,0.55); }
+  .tr-src.equip { background: rgba(70,200,180,0.16); color: #bff0e8; border: 1px solid rgba(70,200,180,0.5); }
+  .chip.src-used { background: rgba(240,170,80,0.18); border-color: rgba(240,170,80,0.55); color: #ffd59a; margin-left: 6px; }
+  .chip.src-equip { background: rgba(70,200,180,0.14); border-color: rgba(70,200,180,0.5); color: #bff0e8; margin-left: 6px; }
   @media (max-width: 560px) { .tr-row { grid-template-columns: 1fr 1fr; } .tr-row > div:last-child { grid-column: 1 / -1; } }
   .tr-err { margin-top: 10px; color: var(--danger); font-size: 14px; font-weight: 600; }
   /* Consumables: one list of often-used parts, outside the months */
@@ -236,7 +248,24 @@
   .month.cons svg { width: 15px; height: 15px; flex: none; }
   .month.cons:hover { color: #fff; border-color: rgba(190,150,255,0.85); }
   .month.cons[aria-current="true"] { color: #14081f; background: #b78cff; border-color: #b78cff; }
-  body.cons-view .btn-arrival, body.cons-view .tx-filter, body.cons-view #lockBar, body.cons-view #copyBanner { display: none !important; }
+  .month.used { display: inline-flex; align-items: center; gap: 7px; color: #ffe2b8; border-color: rgba(240,170,80,0.5); background: rgba(240,170,80,0.12); }
+  .month.used:hover { color: #fff; border-color: rgba(240,170,80,0.85); }
+  .month.used[aria-current="true"] { color: #1f1405; background: #f0aa50; border-color: #f0aa50; }
+  .month.equip { display: inline-flex; align-items: center; gap: 7px; color: #bff0e8; border-color: rgba(70,200,180,0.5); background: rgba(70,200,180,0.12); }
+  .month.equip:hover { color: #fff; border-color: rgba(70,200,180,0.85); }
+  .month.equip[aria-current="true"] { color: #04181a; background: #46c8b4; border-color: #46c8b4; }
+  .month.used svg, .month.equip svg { width: 15px; height: 15px; flex: none; }
+  th.col-uname, th.col-ename { width: 28%; }
+  th.col-uref, th.col-eref { width: 18%; }
+  th.col-uqty, th.col-eqty { width: 9%; }
+  th.col-ucond, th.col-econd { width: 14%; }
+  th.col-eloc { width: 16%; }
+  .side-sel { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: rgba(255,255,255,0.03); color: var(--text); font: inherit; font-size: 14px; }
+  .side-sel[data-state="ok"] { border-color: rgba(127,214,164,0.5); color: #c6f1d8; }
+  .side-sel[data-state="warn"] { border-color: rgba(255,196,87,0.6); color: #ffe3a8; }
+  .side-sel[data-state="bad"] { border-color: rgba(255,107,107,0.6); color: #ffb4b4; }
+  .side-sel option { background: #141925; color: var(--text); }
+  body.side-view .btn-arrival, body.side-view .tx-filter, body.side-view #lockBar, body.side-view #copyBanner { display: none !important; }
   th.col-cname { width: 50%; }
   .result.cons-hit { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) auto; }
 
@@ -975,7 +1004,7 @@
         <div class="tr-list" id="trList"></div>
       </div>
       <div class="tr-row">
-        <div><span class="tr-label">Quantity</span><div class="tr-qty"><button type="button" id="trMinus">&minus;</button><input class="tr-input" id="trQty" value="1" inputmode="numeric"><button type="button" id="trPlus">+</button></div></div>
+        <div><span class="tr-label">Quantity</span><div class="tr-qty"><button type="button" id="trMinus">&minus;</button><input class="tr-input" id="trQty" value="0" inputmode="numeric"><button type="button" id="trPlus">+</button></div></div>
         <div class="tr-line-box"><span class="tr-label">Line</span><div class="tr-chips" id="trLines"></div></div>
         <div><span class="tr-label">Date</span><input class="tr-input" type="date" id="trDate"></div>
       </div>
@@ -1057,12 +1086,12 @@
   var data = emptyData();
   // txList = [{id, partId, month, machine, name, reference, change, after, ts}], newest first
   var txList = [];
-  // consList = [{id, machine, name, reference, created}]: parts used often, one list outside the months
-  var CONS_KEY = "uii-consumables-v1", VIEW_KEY = "uii-spare-parts-view", CONS_TAB_KEY = "uii-consumables-tab";
-  var consList = [];
-  var consView = false;
-  var consActive = "BLM";
-  var consTimers = {};
+  // Lists outside the months (Consumables, Used parts, Equipment): sideLists[key] = rows
+  var CONS_KEY = "uii-consumables-v1", VIEW_KEY = "uii-spare-parts-view", CONS_TAB_KEY = "uii-consumables-tab", SIDE_TAB_KEY = "uii-side-tab-";
+  var sideLists = { cons: [], used: [], equip: [] };
+  var sideView = "";
+  var sideActive = { cons: "BLM", used: "BLM", equip: "Tools" };
+  var sideTimers = {};
   function openSheet() {
     if (!allParts[month]) allParts[month] = emptyData();
     if (!allTx[month]) allTx[month] = [];
@@ -1123,7 +1152,9 @@
       line: t.line === "1" || t.line === "2" || t.line === 1 || t.line === 2 ? String(t.line) : "",
       // date shown in Transaction; editable, defaults to the day it was recorded
       date: /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : "",
-      ts: Number(t.ts) || 0
+      ts: Number(t.ts) || 0,
+      // "used" or "equip" when the item is from Used parts or Equipment, not a spare part
+      source: t.source === "used" || t.source === "equip" ? t.source : ""
     };
   }
 
@@ -1131,7 +1162,7 @@
     return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "" };
   }
   function ymd(ts) {
     var d = new Date(ts);
@@ -1217,29 +1248,32 @@
       var rawTx = localStorage.getItem(TX_KEY);
       if (rawTx) { var arr = JSON.parse(rawTx); if (Array.isArray(arr)) txs = arr; }
     } catch (e) {}
-    var cons = [];
-    try { var rawC = JSON.parse(localStorage.getItem(CONS_KEY) || "null"); if (Array.isArray(rawC)) cons = rawC; } catch (e) {}
-    return { parts: rows, transactions: txs, consumables: cons, found: !!(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(TX_KEY) || localStorage.getItem(CONS_KEY)) };
+    var side = {}, sideFound = false;
+    SIDE_KEYS.forEach(function (k) {
+      side[k] = [];
+      try { var raw = localStorage.getItem(SIDE[k].lsKey); if (raw) { sideFound = true; var arr = JSON.parse(raw); if (Array.isArray(arr)) side[k] = arr; } } catch (e) {}
+    });
+    return { parts: rows, transactions: txs, side: side, found: !!(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(TX_KEY)) || sideFound };
   }
   function loadLocal() {
     return loadLocalData().then(function () { localReady = true; });
   }
   function loadLocalData() {
     return idbOpen().then(function (conn) {
-      if (!conn) { localBackend = "ls"; var l = readLegacyLocal(); setConsList(l.consumables); buildFromLists(l.parts, l.transactions); return; }
+      if (!conn) { localBackend = "ls"; var l = readLegacyLocal(); setSideFrom(l.side); buildFromLists(l.parts, l.transactions); return; }
       idbConn = conn; localBackend = "idb";
-      return Promise.all([kvGet("parts"), kvGet("transactions"), kvGet("savedAt"), kvGet("consumables")]).then(function (v) {
+      return Promise.all([kvGet("parts"), kvGet("transactions"), kvGet("savedAt"), kvGet("consumables"), kvGet("usedParts"), kvGet("equipment")]).then(function (v) {
         var rows = v[0], txs = v[1], savedAt = v[2] || 0;
-        setConsList(v[3]);
+        setSideFrom({ cons: v[3], used: v[4], equip: v[5] });
         if (!rows) {
           // first run with IndexedDB: move what was in localStorage over, then free that space
           var l = readLegacyLocal();
           rows = l.parts; txs = l.transactions;
-          setConsList(l.consumables);
+          setSideFrom(l.side);
           return migrateSnapshots().then(function () {
-            return kvPutMany({ parts: rows, transactions: txs, consumables: serializeCons(), savedAt: Date.now() });
+            return kvPutMany({ parts: rows, transactions: txs, consumables: serializeSide("cons"), usedParts: serializeSide("used"), equipment: serializeSide("equip"), savedAt: Date.now() });
           }).then(function () {
-            if (l.found) { try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(TX_KEY); localStorage.removeItem(CONS_KEY); } catch (e) {} }
+            if (l.found) { try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(TX_KEY); SIDE_KEYS.forEach(function (k) { localStorage.removeItem(SIDE[k].lsKey); }); } catch (e) {} }
             buildFromLists(rows, txs);
           });
         }
@@ -1249,12 +1283,12 @@
           if (j && j.savedAt > savedAt && j.month) {
             rows = rows.filter(function (r) { return r.month !== j.month; }).concat(j.parts || []);
             txs = (txs || []).filter(function (t) { return t.month !== j.month; }).concat(j.transactions || []);
-            if (Array.isArray(j.consumables)) setConsList(j.consumables);
+            setSideFrom({ cons: j.consumables, used: j.usedParts, equip: j.equipment }, true);
           }
         } catch (e) {}
         buildFromLists(rows, txs);
       });
-    }).catch(function () { localBackend = "ls"; var l = readLegacyLocal(); setConsList(l.consumables); buildFromLists(l.parts, l.transactions); });
+    }).catch(function () { localBackend = "ls"; var l = readLegacyLocal(); setSideFrom(l.side); buildFromLists(l.parts, l.transactions); });
   }
   var idbChain = Promise.resolve(), idbPending = null;
   function saveLocal() {
@@ -1265,11 +1299,12 @@
       try {
         localStorage.setItem(JOURNAL_KEY, JSON.stringify({ savedAt: stamp, month: month,
           parts: all.parts.filter(function (r) { return r.month === month; }),
-          transactions: all.transactions.filter(function (t) { return t.month === month; }), consumables: all.consumables }));
+          transactions: all.transactions.filter(function (t) { return t.month === month; }),
+          consumables: all.consumables, usedParts: all.usedParts, equipment: all.equipment }));
       } catch (e) {}
       // only the latest state needs writing; collapse saves that pile up
       var first = !idbPending;
-      idbPending = { parts: all.parts, transactions: all.transactions, consumables: all.consumables, savedAt: stamp };
+      idbPending = { parts: all.parts, transactions: all.transactions, consumables: all.consumables, usedParts: all.usedParts, equipment: all.equipment, savedAt: stamp };
       if (first) idbChain = idbChain.then(function () {
         var job = idbPending; idbPending = null;
         return kvPutMany(job).then(function () { setStatus("Saved", "saved"); }, function () {
@@ -1281,7 +1316,7 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ parts: all.parts }));
       localStorage.setItem(TX_KEY, JSON.stringify(all.transactions));
-      localStorage.setItem(CONS_KEY, JSON.stringify(all.consumables));
+      SIDE_KEYS.forEach(function (k) { localStorage.setItem(SIDE[k].lsKey, JSON.stringify(all[SIDE[k].store])); });
       setStatus("Saved", "saved");
     } catch (e) {
       setStatus("Not saved: browser storage is full or blocked. Download a full backup now.", "error");
@@ -1326,12 +1361,7 @@
     editTimers[row.id] = setTimeout(function () { delete editTimers[row.id]; writeRow(findRow(row.id) || row); }, 400);
   }
   function flushWrites() {
-    Object.keys(consTimers).forEach(function (id) {
-      clearTimeout(consTimers[id]);
-      delete consTimers[id];
-      var c = findCons(id);
-      if (c) writeCons(c);
-    });
+    flushSide();
     Object.keys(editTimers).forEach(function (id) {
       clearTimeout(editTimers[id]);
       delete editTimers[id];
@@ -1484,7 +1514,7 @@
         dot.setAttribute("aria-label", "has entries");
         b.appendChild(dot);
       }
-      if (k === month && !consView) b.setAttribute("aria-current", "true");
+      if (k === month && !sideView) b.setAttribute("aria-current", "true");
       b.addEventListener("click", function () { selectMonth(k); });
       monthsEl.appendChild(b);
     });
@@ -1493,25 +1523,29 @@
     sep.className = "months-sep";
     sep.setAttribute("aria-hidden", "true");
     monthsEl.appendChild(sep);
-    var cb = document.createElement("button");
-    cb.type = "button";
-    cb.className = "month cons";
-    cb.id = "consBtn";
-    cb.title = "Parts you use often, for every machine";
-    cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg><span>Consumables</span>';
-    if (consView) cb.setAttribute("aria-current", "true");
-    cb.addEventListener("click", openConsumables);
-    monthsEl.appendChild(cb);
+    SIDE_KEYS.forEach(function (key) {
+      var cb = document.createElement("button");
+      cb.type = "button";
+      cb.className = "month " + key;
+      cb.id = key + "Btn";
+      cb.title = SIDE[key].title;
+      cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + SIDE[key].icon + "</svg><span></span>";
+      cb.lastChild.textContent = SIDE[key].label;
+      if (sideView === key) cb.setAttribute("aria-current", "true");
+      cb.addEventListener("click", function () { openSide(key); });
+      monthsEl.appendChild(cb);
+    });
   }
-  // narrow screens: bring the Consumables button into view (sideways only)
-  function showConsBtn() {
-    var wrap = monthsEl.parentNode;
-    if (wrap && wrap.scrollWidth > wrap.clientWidth) wrap.scrollLeft = wrap.scrollWidth;
+  // narrow screens: bring the open list's button into view (sideways only)
+  function showSideBtn() {
+    var wrap = monthsEl.parentNode, btn = document.getElementById(sideView + "Btn");
+    if (!wrap || !btn || wrap.scrollWidth <= wrap.clientWidth) return;
+    wrap.scrollLeft = Math.max(0, btn.offsetLeft + btn.offsetWidth - wrap.clientWidth + 16);
   }
   function selectMonth(k) {
-    if (k === month && !consView) return;
+    if (k === month && !sideView) return;
     flushWrites();
-    if (consView) leaveConsumables();
+    if (sideView) leaveConsumables();
     if (k !== month) delete unlocked[month];
     month = k;
     viewYear = parseInt(k.slice(0, 4), 10);
@@ -1526,7 +1560,7 @@
 
   function renderTabs() {
     tabsEl.innerHTML = "";
-    if (consView) { renderConsTabs(); return; }
+    if (sideView) { renderSideTabs(); return; }
     TABS.forEach(function (m) {
       if (m === TX) {
         var sep = document.createElement("span");
@@ -1552,14 +1586,14 @@
   }
 
   tabsEl.addEventListener("keydown", function (e) {
-    if (consView) {
-      var c = MACHINES.indexOf(consActive);
-      if (e.key === "ArrowRight") c = (c + 1) % MACHINES.length;
-      else if (e.key === "ArrowLeft") c = (c - 1 + MACHINES.length) % MACHINES.length;
+    if (sideView) {
+      var tabs = SIDE[sideView].tabs, c = tabs.indexOf(sideTab());
+      if (e.key === "ArrowRight") c = (c + 1) % tabs.length;
+      else if (e.key === "ArrowLeft") c = (c - 1 + tabs.length) % tabs.length;
       else return;
       e.preventDefault();
-      switchCons(MACHINES[c]);
-      document.getElementById("tab-" + consActive).focus();
+      switchSide(tabs[c]);
+      document.getElementById("tab-" + sideTab()).focus();
       return;
     }
     var i = TABS.indexOf(active);
@@ -1651,7 +1685,7 @@
     var raw = searchEl.value.trim();
     if (!raw) { resultsEl.hidden = true; resultsEl.innerHTML = ""; return; }
     var q = norm(raw);
-    if (consView) { renderConsSearch(raw, q); return; }
+    if (sideView) { renderSideSearch(raw, q); return; }
     var hits = [];
     MONTHS.forEach(function (k) {
       var p = allParts[k];
@@ -1754,7 +1788,7 @@
 
   function updateCounts() {
     renderMonths();
-    if (consView) { updateConsCounts(); return; }
+    if (sideView) { updateSideCounts(); return; }
     updateCopyBanner();
     if (searchEl.value.trim()) renderSearch();
     TABS.forEach(function (m) {
@@ -1893,7 +1927,14 @@
       mtd.innerHTML = '<span class="tx-text"><span class="chip"></span></span>';
       mtd.querySelector(".chip").textContent = t.machine;
       tr.appendChild(mtd);
-      tr.appendChild(txCell("Name", name));
+      var ncell = txCell("Name", name);
+      if (t.source) {
+        var stag = document.createElement("span");
+        stag.className = "chip src-" + t.source;
+        stag.textContent = t.source === "used" ? "Used" : "Equipment";
+        (ncell.querySelector(".tx-text") || ncell).appendChild(stag);
+      }
+      tr.appendChild(ncell);
       tr.appendChild(txCell("Reference", ref));
       var ttd = document.createElement("td");
       ttd.setAttribute("data-label", "Type");
@@ -1954,6 +1995,7 @@
     MACHINES.forEach(function (m) { st[m] = { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0, used: {} }; });
     (allTx[k] || []).forEach(function (t) {
       if (upTo && txDate(t) > upTo) return;
+      if (t.source) return;
       var s = st[t.machine];
       if (!s) return;
       var part = partIn(k, t.partId), p = part ? unitPrice(part) : null, cur = part ? part.currency : "";
@@ -2087,15 +2129,21 @@
   function reverseTx(t) {
     var list = allTx[t.month] || [], idx = list.findIndex(function (x) { return x.id === t.id; });
     if (idx === -1) return "gone";
-    var part = partIn(t.month, t.partId);
+    var part = t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId);
     if (part) {
       var now = /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : 0, back = now - t.change;
       if (back < 0) return "Can't put it back: " + (part.name || part.reference) + " has only " + now + " now.";
       part.quantity = String(back);
-      part.loggedQty = part.quantity;
-      clearTimeout(editTimers[part.id]);
-      delete editTimers[part.id];
-      writeRow(part);
+      if (t.source) {
+        clearTimeout(sideTimers[part.id]);
+        delete sideTimers[part.id];
+        writeSide(t.source, part);
+      } else {
+        part.loggedQty = part.quantity;
+        clearTimeout(editTimers[part.id]);
+        delete editTimers[part.id];
+        writeRow(part);
+      }
     }
     list.splice(idx, 1);
     deleteDoc("transactions", t.id);
@@ -2106,8 +2154,8 @@
     if (ro()) return;
     var t = txList.find(function (x) { return x.id === id; });
     if (!t) return;
-    var part = partIn(t.month, t.partId), now = part && /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : null;
-    var what = (t.change > 0 ? "In +" : "Out \u2212") + Math.abs(t.change) + " \u00B7 " + (part && part.name ? part.name : t.name || t.reference) + " \u00B7 " + t.machine + (t.line ? " \u00B7 Line " + t.line : "") + ".";
+    var part = t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId), now = part && /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : null;
+    var what = (t.change > 0 ? "In +" : "Out \u2212") + Math.abs(t.change) + " \u00B7 " + (part && part.name ? part.name : t.name || t.reference) + " \u00B7 " + t.machine + (t.source ? " (" + SIDE[t.source].label + ")" : "") + (t.line ? " \u00B7 Line " + t.line : "") + ".";
     document.getElementById("txDelText").textContent = what + (part && now !== null
       ? " " + (t.change < 0 ? Math.abs(t.change) + (t.change === -1 ? " goes" : " go") + " back into stock" : t.change + (t.change === 1 ? " comes" : " come") + " off the stock") + ": " + now + " \u2192 " + (now - t.change) + "."
       : " The part is no longer on the list, so only the transaction is removed.");
@@ -2444,11 +2492,13 @@
   unlockDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") closeUnlock(); });
 
   function renderRows(focusId) {
-    document.body.classList.toggle("cons-view", consView);
-    document.querySelector("#addTop span").textContent = consView ? "Add consumable" : "Add part";
-    document.getElementById("addBottomLabel").textContent = consView ? "Add consumable" : "Add part";
-    document.getElementById("addTop").title = consView ? "Add a part you use often to " + consActive + "." : "Add a part you already have in stock. Its starting quantity is not recorded as a transaction.";
-    if (consView) { renderConsumables(focusId); return; }
+    document.body.classList.toggle("side-view", !!sideView);
+    if (!sideView) document.body.removeAttribute("data-side");
+    var addLabel = sideView === "cons" ? "Add consumable" : sideView === "used" ? "Add used part" : sideView === "equip" ? "Add equipment" : "Add part";
+    document.querySelector("#addTop span").textContent = addLabel;
+    document.getElementById("addBottomLabel").textContent = addLabel;
+    document.getElementById("addTop").title = sideView ? addLabel + " to " + sideTab() + "." : "Add a part you already have in stock. Its starting quantity is not recorded as a transaction.";
+    if (sideView) { renderSide(focusId); return; }
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
     updateLockBar();
     document.body.classList.toggle("tx-view", active === TX);
@@ -2521,7 +2571,7 @@
   // received = a part that just arrived: its first quantity is logged as In.
   // Otherwise the first quantity is starting stock and is not logged.
   function addRow(received) {
-    if (consView) { addCons(); return; }
+    if (sideView) { addSide(); return; }
     if (ro() || active === TX) return;
     var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency() }, active);
     data[active].push(row);
@@ -2576,7 +2626,7 @@
     document.getElementById("trIcon").setAttribute("d", inn ? "M19 12H5M11 6l-6 6 6 6" : "M5 12h14M13 6l6 6-6 6");
     document.getElementById("trSave").textContent = inn ? "Save receipt" : "Save transfer";
     document.getElementById("trSearch").value = "";
-    document.getElementById("trQty").value = "1";
+    document.getElementById("trQty").value = "0";
     var t = new Date(); document.getElementById("trDate").value = t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate());
     trDlg.hidden = false; trRender();
     document.getElementById("trSearch").focus();
@@ -2585,7 +2635,7 @@
     var mBox = document.getElementById("trMachines"); mBox.innerHTML = "";
     ["All"].concat(MACHINES).forEach(function (m) {
       var b = document.createElement("button"); b.type = "button"; b.className = "tr-chip"; b.textContent = m === "All" ? "All machines" : m;
-      var on = trState.part ? trState.part.machine === m : m === trState.machine;
+      var on = trState.part ? (trState.kind === "equip" ? m === "All" : trState.part.machine === m) : m === trState.machine;
       b.setAttribute("aria-pressed", on ? "true" : "false");
       b.addEventListener("click", function () { trState.machine = m; trState.part = null; trRender(); document.getElementById("trSearch").focus(); });
       mBox.appendChild(b);
@@ -2604,38 +2654,52 @@
       var r = trState.part, pk = document.createElement("div"); pk.className = "tr-picked"; pk.id = "trPicked";
       pk.innerHTML = '<div><div class="n"></div><div class="r"></div></div><div class="stock">In stock<b></b></div>';
       pk.querySelector(".n").textContent = r.name || "(no name)"; pk.querySelector(".r").textContent = r.reference;
-      var badge = document.createElement("span"); badge.className = "tr-mach " + r.machine; badge.textContent = r.machine;
-      pk.querySelector(".n").prepend(badge);
+      trBadges(pk.querySelector(".n"), trState.kind, r);
       pk.querySelector("b").textContent = trStock(r);
-      pk.title = "Click to choose another part";
+      pk.title = "Click to choose another one";
       pk.style.cursor = "pointer";
       pk.addEventListener("click", function () { trState.part = null; trRender(); search.focus(); });
       box.appendChild(pk);
     } else {
       search.hidden = false;
-      var pool = trState.machine === "All" ? MACHINES.reduce(function (a, m) { return a.concat(data[m] || []); }, []) : (data[trState.machine] || []);
-      var q = norm(search.value.trim()), hits = pool.filter(function (r) {
-        return hasContent(r) && (!q || norm(r.reference).indexOf(q) !== -1 || norm(r.name).indexOf(q) !== -1);
+      // spare parts of the open month, then Used parts
+      var all = trState.machine === "All", pool = [];
+      MACHINES.forEach(function (m) { if (all || trState.machine === m) (data[m] || []).forEach(function (r) { if (hasContent(r)) pool.push({ kind: "part", r: r }); }); });
+      sideLists.used.forEach(function (r) { if ((all || trState.machine === r.machine) && sideHasContent("used", r)) pool.push({ kind: "used", r: r }); });
+      var q = norm(search.value.trim()), hits = pool.filter(function (h) {
+        return !q || norm(h.r.reference).indexOf(q) !== -1 || norm(h.r.name).indexOf(q) !== -1;
       }).slice(0, q ? 30 : 0);
       list.innerHTML = "";
-      hits.forEach(function (r) {
-        var b = document.createElement("button"); b.type = "button"; b.className = "tr-opt";
+      hits.forEach(function (h) {
+        var r = h.r, b = document.createElement("button"); b.type = "button"; b.className = "tr-opt";
         b.innerHTML = '<span class="n"></span><span class="q"></span><span class="r"></span>';
         b.querySelector(".n").textContent = r.name || "(no name)"; b.querySelector(".r").textContent = r.reference;
-        var mb = document.createElement("span"); mb.className = "tr-mach " + r.machine; mb.textContent = r.machine; b.querySelector(".n").prepend(mb);
+        trBadges(b.querySelector(".n"), h.kind, r);
         b.querySelector(".q").textContent = "In stock " + trStock(r);
-        b.addEventListener("click", function () { trState.part = r; trRender(); document.getElementById("trQty").select(); });
+        b.addEventListener("click", function () { trState.part = r; trState.kind = h.kind; trRender(); document.getElementById("trQty").select(); });
         list.appendChild(b);
       });
     }
     trCheck();
   }
-  function trCheck() {
+  // coloured machine tag, plus "Used" or the equipment kind
+  function trBadges(el, kind, r) {
+    var src = null;
+    if (kind === "used") { src = document.createElement("span"); src.className = "tr-src used"; src.textContent = "Used"; }
+    if (kind === "equip") { src = document.createElement("span"); src.className = "tr-src equip"; src.textContent = r.type; }
+    if (src) el.prepend(src);
+    var mb = document.createElement("span");
+    mb.className = "tr-mach " + (kind === "equip" ? "EQUIP" : r.machine);
+    mb.textContent = kind === "equip" ? "Equipment" : r.machine;
+    el.prepend(mb);
+  }
+  // strict: also say what is missing (on Save); while typing a 0 just shows nothing yet
+  function trCheck(strict) {
     var after = document.getElementById("trAfter"), err = document.getElementById("trErr"), qty = parseInt(document.getElementById("trQty").value, 10) || 0;
     err.hidden = true; after.hidden = true;
     if (!trState.part) return false;
     var have = trStock(trState.part);
-    if (qty < 1) { err.textContent = trState.mode === "in" ? "Enter how many arrived." : "Enter how many you take out."; err.hidden = false; return false; }
+    if (qty < 1) { if (!strict) return false; err.textContent = trState.mode === "in" ? "Enter how many arrived." : "Enter how many you take out."; err.hidden = false; return false; }
     if (trState.mode === "in") {
       after.innerHTML = "Stock goes from <b></b> to <b></b>. Recorded in Transaction as <b></b>.";
       var bi = after.querySelectorAll("b"); bi[0].textContent = have; bi[1].textContent = have + qty; bi[2].textContent = "In +" + qty;
@@ -2649,10 +2713,11 @@
     return true;
   }
   function trSave() {
-    if (!trCheck()) return;
+    if (!trCheck(true)) return;
     var err = document.getElementById("trErr");
     var inn = trState.mode === "in";
     if (!inn && !trState.line) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
+    if (trState.kind === "used" || trState.kind === "equip") { trSaveSide(inn); return; }
     var row = findRow(trState.part.id) || trState.part, qty = parseInt(document.getElementById("trQty").value, 10);
     var before = trStock(row), after = inn ? before + qty : before - qty, date = document.getElementById("trDate").value;
     row.quantity = String(after); row.loggedQty = row.quantity; row.baseline = false;
@@ -2667,6 +2732,26 @@
     setStatus(inn ? "Received " + qty + " \u00D7 " + (row.name || row.reference) + " on " + row.machine
       : "Transferred " + qty + " \u00D7 " + (row.name || row.reference) + " from " + row.machine + " to Line " + trState.line, "saved");
   }
+  // Used parts and Equipment: their own quantity changes; the Transaction shows it with a tag, the Summary leaves it out
+  function trSaveSide(inn) {
+    var key = trState.kind, row = findSide(key, trState.part.id) || trState.part, qty = parseInt(document.getElementById("trQty").value, 10);
+    var before = trStock(row), after = inn ? before + qty : before - qty, date = document.getElementById("trDate").value;
+    row.quantity = String(after);
+    clearTimeout(sideTimers[row.id]);
+    delete sideTimers[row.id];
+    writeSide(key, row);
+    var tx = cleanTx({ partId: row.id, month: month, machine: key === "equip" ? row.type : row.machine, name: row.name, reference: row.reference,
+      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key }, uid());
+    txList.unshift(tx); sortTx(txList);
+    saveDoc("transactions", tx.id, txBody(tx));
+    trDlg.hidden = true;
+    var tab = row[SIDE[key].tabField];
+    openSide(key);
+    if (sideTab() !== tab) switchSide(tab); else renderRows();
+    var tr = rowsEl.querySelector('tr[data-id="' + row.id + '"]');
+    if (tr) { tr.scrollIntoView({ block: "center", behavior: "smooth" }); tr.classList.remove("flash"); void tr.offsetWidth; tr.classList.add("flash"); }
+    setStatus((inn ? "Received " : "Transferred ") + qty + " \u00D7 " + (row.name || row.reference) + " (" + SIDE[key].label + ")" + (inn ? "" : " to Line " + trState.line), "saved");
+  }
   document.getElementById("transferBtn").addEventListener("click", function () { trOpen("out"); });
   document.getElementById("receiveBtn").addEventListener("click", function () { trOpen("in"); });
   document.getElementById("trCancel").addEventListener("click", function () { trDlg.hidden = true; });
@@ -2675,163 +2760,244 @@
   document.getElementById("trSearch").addEventListener("keydown", function (e) { if (e.key === "Enter") { var f = document.querySelector("#trList .tr-opt"); if (f) f.click(); } });
   document.getElementById("trQty").addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); trCheck(); });
   document.getElementById("trQty").addEventListener("keydown", function (e) { if (e.key === "Enter") trSave(); });
-  document.getElementById("trMinus").addEventListener("click", function () { var q = document.getElementById("trQty"); q.value = Math.max(1, (parseInt(q.value, 10) || 1) - 1); trCheck(); });
+  document.getElementById("trMinus").addEventListener("click", function () { var q = document.getElementById("trQty"); q.value = Math.max(0, (parseInt(q.value, 10) || 0) - 1); trCheck(); });
   document.getElementById("trPlus").addEventListener("click", function () { var q = document.getElementById("trQty"); q.value = (parseInt(q.value, 10) || 0) + 1; trCheck(); });
   trDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") trDlg.hidden = true; });
-  // ---- Consumables: parts used often, by machine, outside the months ----
-  var CONS_HEAD = '<tr><th class="col-num">#</th><th class="col-cname">Name</th><th>Reference</th><th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
-  function cleanCons(r) {
-    if (!r || MACHINES.indexOf(r.machine) === -1) return null;
-    return { id: String(r.id || uid()), machine: r.machine, name: String(r.name || ""), reference: String(r.reference || ""), created: Number(r.created) || Date.now() };
+  // ---- Side lists outside the months: Consumables, Used parts, Equipment ----
+  // Each list has its own tabs (machines, or kinds of equipment) and its own columns.
+  var SIDE_KEYS = ["cons", "used", "equip"];
+  var SIDE = {
+    cons: { label: "Consumables", store: "consumables", lsKey: CONS_KEY, tabField: "machine", tabs: MACHINES, theme: "CONS",
+      blurb: "Parts you use often", one: "part", many: "parts", file: "UII-Consumables.xlsx", title: "Parts you use often, for every machine",
+      icon: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+      fields: [{ k: "name", label: "Name", w: 48, cls: "col-cname" }, { k: "reference", label: "Reference", w: 28 }] },
+    used: { label: "Used parts", store: "usedParts", lsKey: "uii-used-parts-v1", tabField: "machine", tabs: MACHINES, theme: "USED",
+      blurb: "Parts taken off a machine that can still be used", one: "part", many: "parts", file: "UII-Used-parts.xlsx", title: "Second-hand parts kept for each machine",
+      icon: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
+      fields: [{ k: "name", label: "Name", w: 40, cls: "col-uname" }, { k: "reference", label: "Reference", w: 24, cls: "col-uref" },
+        { k: "quantity", label: "Quantity", w: 11, num: true, cls: "col-uqty" },
+        { k: "condition", label: "Condition", w: 16, options: ["Good", "Needs repair"], cls: "col-ucond" },
+        { k: "notes", label: "Notes", w: 36 }] },
+    equip: { label: "Equipment", store: "equipment", lsKey: "uii-equipment-v1", tabField: "type", tabs: ["Tools", "Measuring", "Machines", "Safety"], theme: "EQUIP",
+      blurb: "Tools and equipment that are not spare parts", one: "item", many: "items", file: "UII-Equipment.xlsx", title: "Tools, measuring devices and other equipment",
+      icon: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
+      fields: [{ k: "name", label: "Name", w: 38, cls: "col-ename" }, { k: "reference", label: "Serial / Reference", w: 22, cls: "col-eref" },
+        { k: "quantity", label: "Quantity", w: 11, num: true, cls: "col-eqty" },
+        { k: "location", label: "Location", w: 20, cls: "col-eloc" },
+        { k: "condition", label: "Condition", w: 16, options: ["Working", "Needs repair", "Broken"], cls: "col-econd" }] }
+  };
+  var CONDITION_CLASS = { "Needs repair": "warn", "Broken": "bad" };
+  function sideFieldKeys(key) { return SIDE[key].fields.map(function (f) { return f.k; }); }
+  function cleanSide(key, r) {
+    var c = SIDE[key];
+    if (!r || c.tabs.indexOf(r[c.tabField]) === -1) return null;
+    var out = { id: String(r.id || uid()), created: Number(r.created) || Date.now() };
+    out[c.tabField] = r[c.tabField];
+    c.fields.forEach(function (f) { out[f.k] = String(r[f.k] == null ? "" : r[f.k]); });
+    return out;
   }
-  function setConsList(list) {
-    consList = (Array.isArray(list) ? list : []).map(cleanCons).filter(Boolean);
-    consList.sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); });
+  function setSideList(key, list) {
+    sideLists[key] = (Array.isArray(list) ? list : []).map(function (r) { return cleanSide(key, r); }).filter(Boolean);
+    sideLists[key].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); });
   }
-  function consBody(r) { return { machine: r.machine, name: r.name, reference: r.reference, created: r.created }; }
-  function serializeCons() { return consList.map(function (r) { var b = consBody(r); b.id = r.id; return b; }); }
-  function consHasContent(r) { return (r.name + r.reference).trim() !== ""; }
-  function consOf(m) { return consList.filter(function (r) { return r.machine === m; }); }
-  function findCons(id) { for (var i = 0; i < consList.length; i++) if (consList[i].id === id) return consList[i]; return null; }
-  function writeCons(r) { saveDoc("consumables", r.id, consBody(r)); }
-  function scheduleCons(r) {
-    clearTimeout(consTimers[r.id]);
-    consTimers[r.id] = setTimeout(function () { delete consTimers[r.id]; var c = findCons(r.id); if (c) writeCons(c); }, 400);
+  function sideBody(key, r) {
+    var b = { created: r.created };
+    b[SIDE[key].tabField] = r[SIDE[key].tabField];
+    sideFieldKeys(key).forEach(function (k) { b[k] = r[k]; });
+    return b;
+  }
+  function serializeSide(key) { return sideLists[key].map(function (r) { var b = sideBody(key, r); b.id = r.id; return b; }); }
+  function sideHasContent(key, r) { return sideFieldKeys(key).some(function (k) { return String(r[k]).trim() !== "" && !(k === "condition"); }); }
+  function sideOf(key, tab) { return sideLists[key].filter(function (r) { return r[SIDE[key].tabField] === tab; }); }
+  function findSide(key, id) { var l = sideLists[key]; for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
+  function writeSide(key, r) { saveDoc(SIDE[key].store, r.id, sideBody(key, r)); }
+  function scheduleSide(key, r) {
+    clearTimeout(sideTimers[r.id]);
+    sideTimers[r.id] = setTimeout(function () { delete sideTimers[r.id]; var c = findSide(key, r.id); if (c) writeSide(key, c); }, 400);
+  }
+  function flushSide() {
+    Object.keys(sideTimers).forEach(function (id) {
+      clearTimeout(sideTimers[id]);
+      delete sideTimers[id];
+      SIDE_KEYS.forEach(function (key) { var c = findSide(key, id); if (c) writeSide(key, c); });
+    });
   }
   // shared store: remove what is gone, write the rest
-  function syncConsDocs(oldIds) {
+  function syncSideDocs(key, oldIds) {
     var keep = {};
-    consList.forEach(function (r) { keep[r.id] = 1; });
-    oldIds.forEach(function (id) { if (!keep[id]) deleteDoc("consumables", id); });
-    consList.forEach(writeCons);
+    sideLists[key].forEach(function (r) { keep[r.id] = 1; });
+    oldIds.forEach(function (id) { if (!keep[id]) deleteDoc(SIDE[key].store, id); });
+    sideLists[key].forEach(function (r) { writeSide(key, r); });
   }
+  // kept for the Consumables names used elsewhere
+  function serializeCons() { return serializeSide("cons"); }
+  function setConsList(list) { setSideList("cons", list); }
 
-  function updateSearchPlaceholder() {
-    searchEl.placeholder = consView ? "Search consumables by name or reference" : "Search by reference or name, across all machines and months";
+  // obj = {cons, used, equip}; onlyArrays leaves a list alone when obj has nothing for it
+  function setSideFrom(obj, onlyArrays) {
+    SIDE_KEYS.forEach(function (k) { if (!onlyArrays || Array.isArray(obj[k])) setSideList(k, obj[k]); });
   }
-  function openConsumables() {
-    if (consView) return;
+  function sideTab() { return sideActive[sideView]; }
+  function updateSearchPlaceholder() {
+    searchEl.placeholder = sideView ? "Search " + SIDE[sideView].label.toLowerCase() + " by name or reference" : "Search by reference or name, across all machines and months";
+  }
+  function openSide(key) {
+    if (sideView === key) return;
     flushWrites();
-    consView = true;
-    try { localStorage.setItem(VIEW_KEY, "cons"); } catch (e) {}
+    sideView = key;
+    try { localStorage.setItem(VIEW_KEY, key); } catch (e) {}
     updateSearchPlaceholder();
     renderMonths();
     renderTabs();
     renderRows();
     renderSearch();
-    showConsBtn();
+    showSideBtn();
   }
+  function openConsumables() { openSide("cons"); }
   function leaveConsumables() {
-    consView = false;
+    sideView = "";
     try { localStorage.setItem(VIEW_KEY, ""); } catch (e) {}
     updateSearchPlaceholder();
     renderSearch();
   }
-  function switchCons(m) {
-    consActive = m;
-    try { localStorage.setItem(CONS_TAB_KEY, m); } catch (e) {}
+  function switchSide(tab) {
+    sideActive[sideView] = tab;
+    try { localStorage.setItem(SIDE_TAB_KEY + sideView, tab); } catch (e) {}
     renderTabs();
     renderRows();
   }
-  function renderConsTabs() {
-    MACHINES.forEach(function (m) {
+  function renderSideTabs() {
+    SIDE[sideView].tabs.forEach(function (m) {
       var b = document.createElement("button");
       b.type = "button";
       b.className = "tab";
       b.id = "tab-" + m;
       b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", m === consActive ? "true" : "false");
+      b.setAttribute("aria-selected", m === sideTab() ? "true" : "false");
       b.setAttribute("aria-controls", "panel");
-      b.tabIndex = m === consActive ? 0 : -1;
+      b.tabIndex = m === sideTab() ? 0 : -1;
       b.innerHTML = '<span></span><span class="count"></span>';
       b.firstChild.textContent = m;
-      b.lastChild.textContent = consOf(m).length;
-      b.addEventListener("click", function () { switchCons(m); });
+      b.lastChild.textContent = sideOf(sideView, m).length;
+      b.addEventListener("click", function () { switchSide(m); });
       tabsEl.appendChild(b);
     });
   }
-  function consDupIds() {
+  function sideDupIds() {
     var seen = {}, dup = {};
-    consOf(consActive).forEach(function (r) {
+    sideOf(sideView, sideTab()).forEach(function (r) {
       var k = norm(r.reference);
       if (!k) return;
       if (seen[k]) { dup[seen[k]] = 1; dup[r.id] = 1; } else seen[k] = r.id;
     });
     return dup;
   }
-  function updateConsCounts() {
+  function updateSideCounts() {
+    var c = SIDE[sideView], tab = sideTab();
     copyBanner.hidden = true;
     if (searchEl.value.trim()) renderSearch();
-    MACHINES.forEach(function (m) {
-      var c = document.querySelector("#tab-" + m + " .count");
-      if (c) c.textContent = consOf(m).length;
+    c.tabs.forEach(function (m) {
+      var el = document.querySelector("#tab-" + m + " .count");
+      if (el) el.textContent = sideOf(sideView, m).length;
     });
-    var n = consOf(consActive).length;
-    metaEl.textContent = "Parts you use often · " + n + (n === 1 ? " part" : " parts");
-    var dup = consDupIds(), d = Object.keys(dup).length;
-    consOf(consActive).forEach(function (r) {
+    var n = sideOf(sideView, tab).length;
+    metaEl.textContent = c.blurb + " · " + n + " " + (n === 1 ? c.one : c.many);
+    var dup = sideView === "equip" ? {} : sideDupIds(), d = Object.keys(dup).length;
+    sideOf(sideView, tab).forEach(function (r) {
       var el = document.getElementById("c-" + r.id + "-reference");
       if (!el) return;
       el.classList.toggle("dup", !!dup[r.id]);
-      el.title = dup[r.id] ? "Another consumable on " + consActive + " has the same reference" : "";
+      el.title = dup[r.id] ? "Another one on " + tab + " has the same reference" : "";
     });
     if (d) {
       var w = document.createElement("span");
       w.className = "warn";
-      w.textContent = " · ⚠ " + d + " parts share a reference";
+      w.textContent = " · ⚠ " + d + " " + c.many + " share a reference";
       metaEl.appendChild(w);
     }
     emptyEl.hidden = n !== 0;
   }
-  function makeConsCell(row, field, label) {
+  function updateConsCounts() { updateSideCounts(); }
+  function makeSideCell(key, row, f) {
     var td = document.createElement("td");
-    td.setAttribute("data-label", label);
-    var input = document.createElement("textarea");
-    input.className = "cell wrap";
-    input.rows = 1;
-    input.id = "c-" + row.id + "-" + field;
-    input.value = row[field];
-    input.placeholder = label;
-    input.setAttribute("aria-label", label);
-    input.autocomplete = "off";
-    input.spellcheck = false;
-    input.dir = "auto";
-    input.readOnly = readOnly;
-    input.addEventListener("input", function () {
-      if (/\n/.test(input.value)) input.value = input.value.replace(/\n/g, " ");
-      fitSoon(input);
-      var cur = findCons(row.id) || row;
-      cur[field] = input.value;
-      if (field === "reference") { clearTimeout(dupTimer); dupTimer = setTimeout(updateCounts, 300); }
-      scheduleCons(cur);
-    });
+    td.setAttribute("data-label", f.label);
+    var input;
+    if (f.options) {
+      input = document.createElement("select");
+      input.className = "cell side-sel";
+      [""].concat(f.options).forEach(function (o) {
+        var op = document.createElement("option");
+        op.value = o; op.textContent = o || "—";
+        input.appendChild(op);
+      });
+      input.value = row[f.k];
+      input.disabled = readOnly;
+      var paint = function () { input.setAttribute("data-state", CONDITION_CLASS[input.value] || (input.value ? "ok" : "")); };
+      paint();
+      input.addEventListener("change", function () {
+        var cur = findSide(key, row.id) || row;
+        cur[f.k] = input.value;
+        paint();
+        writeSide(key, cur);
+      });
+    } else if (f.num) {
+      input = document.createElement("input");
+      input.type = "text";
+      input.inputMode = "numeric";
+      input.className = "cell qty";
+    } else {
+      input = document.createElement("textarea");
+      input.className = "cell wrap";
+      input.rows = 1;
+    }
+    input.id = "c-" + row.id + "-" + f.k;
+    input.setAttribute("aria-label", f.label);
+    if (!f.options) {
+      input.value = row[f.k];
+      input.placeholder = f.label;
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      input.dir = "auto";
+      input.readOnly = readOnly;
+      input.addEventListener("input", function () {
+        if (f.num) { if (/\D/.test(input.value)) input.value = input.value.replace(/\D/g, ""); }
+        else { if (/\n/.test(input.value)) input.value = input.value.replace(/\n/g, " "); fitSoon(input); }
+        var cur = findSide(key, row.id) || row;
+        cur[f.k] = input.value;
+        if (f.k === "reference") { clearTimeout(dupTimer); dupTimer = setTimeout(updateCounts, 300); }
+        scheduleSide(key, cur);
+      });
+    }
     td.appendChild(input);
     return td;
   }
-  function renderConsumables(focusId) {
-    panelEl.setAttribute("aria-labelledby", "tab-" + consActive);
+  function renderSide(focusId) {
+    var key = sideView, c = SIDE[key], tab = sideTab();
+    panelEl.setAttribute("aria-labelledby", "tab-" + tab);
     lockBar.hidden = true;
     document.body.classList.remove("locked", "tx-view", "sum-view");
+    document.body.setAttribute("data-side", key);
     document.getElementById("summary").hidden = true;
-    document.getElementById("thead").innerHTML = CONS_HEAD;
-    emptyEl.querySelector("strong").textContent = "No consumables yet";
-    emptyEl.querySelector("span").textContent = "Use “Add consumable” for a part you use often on " + consActive + ".";
-    titleEl.textContent = "Consumables · " + consActive;
+    document.getElementById("thead").innerHTML = '<tr><th class="col-num">#</th>' +
+      c.fields.map(function (f) { return '<th' + (f.cls ? ' class="' + f.cls + '"' : "") + ">" + f.label + "</th>"; }).join("") +
+      '<th class="col-act"><span style="position:absolute;left:-9999px">Actions</span></th></tr>';
+    emptyEl.querySelector("strong").textContent = "Nothing in " + c.label + " · " + tab + " yet";
+    emptyEl.querySelector("span").textContent = "Use “Add” to put the first one on " + tab + ".";
+    titleEl.textContent = c.label + " · " + tab;
     rowsEl.innerHTML = "";
-    consOf(consActive).forEach(function (row, i) {
+    sideOf(key, tab).forEach(function (row, i) {
       var tr = document.createElement("tr");
       tr.setAttribute("data-id", row.id);
       var num = document.createElement("td");
       num.className = "col-num";
       num.textContent = i + 1;
       tr.appendChild(num);
-      tr.appendChild(makeConsCell(row, "name", "Name"));
-      tr.appendChild(makeConsCell(row, "reference", "Reference"));
+      c.fields.forEach(function (f) { tr.appendChild(makeSideCell(key, row, f)); });
       var act = document.createElement("td");
       act.className = "col-act";
-      if (!readOnly) act.appendChild(deleteButton("Delete consumable " + (i + 1), function () {
-        return consHasContent(findCons(row.id) || row);
-      }, function () { deleteCons(row.id); }));
+      if (!readOnly) act.appendChild(deleteButton("Delete " + c.one + " " + (i + 1), function () {
+        return sideHasContent(key, findSide(key, row.id) || row);
+      }, function () { deleteSide(key, row.id); }));
       tr.appendChild(act);
       rowsEl.appendChild(tr);
       if (row.id === focusId) {
@@ -2845,41 +3011,46 @@
     fitAll(rowsEl.querySelectorAll("textarea.wrap"));
     updateCounts();
   }
-  function addCons() {
+  function renderConsumables(focusId) { renderSide(focusId); }
+  function addSide() {
     if (readOnly) return;
-    var row = cleanCons({ id: uid(), machine: consActive, created: Date.now() });
-    consList.push(row);
-    writeCons(row);
+    var key = sideView, seed = { id: uid(), created: Date.now() };
+    seed[SIDE[key].tabField] = sideTab();
+    var row = cleanSide(key, seed);
+    sideLists[key].push(row);
+    writeSide(key, row);
     renderRows(row.id);
   }
-  function deleteCons(id) {
-    var idx = consList.findIndex(function (r) { return r.id === id; });
+  function deleteSide(key, id) {
+    var idx = sideLists[key].findIndex(function (r) { return r.id === id; });
     if (idx === -1 || readOnly) return;
-    clearTimeout(consTimers[id]);
-    delete consTimers[id];
-    consList.splice(idx, 1);
-    deleteDoc("consumables", id);
+    clearTimeout(sideTimers[id]);
+    delete sideTimers[id];
+    sideLists[key].splice(idx, 1);
+    deleteDoc(SIDE[key].store, id);
     renderRows();
   }
-  function renderConsSearch(raw, q) {
-    var hits = consList.filter(function (r) {
-      return consHasContent(r) && (norm(r.reference).indexOf(q) !== -1 || norm(r.name).indexOf(q) !== -1);
+  function renderSideSearch(raw, q) {
+    var key = sideView, c = SIDE[key];
+    var hits = sideLists[key].filter(function (r) {
+      return sideHasContent(key, r) && ["reference", "name", "location", "notes"].some(function (k) { return r[k] != null && norm(r[k]).indexOf(q) !== -1; });
     });
     resultsEl.innerHTML = "";
     resultsEl.hidden = false;
     if (!hits.length) {
-      resultsEl.innerHTML = '<div class="results-none"><strong></strong><span>No consumable with this reference or name on any machine.</span></div>';
+      resultsEl.innerHTML = '<div class="results-none"><strong></strong><span></span></div>';
       resultsEl.querySelector("strong").textContent = "Not found: “" + raw + "”";
+      resultsEl.querySelector("span").textContent = "Nothing in " + c.label + " with this reference or name.";
       return;
     }
-    hits.sort(function (a, b) { return MACHINES.indexOf(a.machine) - MACHINES.indexOf(b.machine); });
-    var machinesHit = {};
-    hits.forEach(function (r) { machinesHit[r.machine] = 1; });
+    hits.sort(function (a, b) { return c.tabs.indexOf(a[c.tabField]) - c.tabs.indexOf(b[c.tabField]); });
+    var tabsHit = {};
+    hits.forEach(function (r) { tabsHit[r[c.tabField]] = 1; });
     var head = document.createElement("div");
     head.className = "results-head";
     head.innerHTML = "<strong></strong> · <span></span>";
-    head.firstChild.textContent = hits.length + (hits.length === 1 ? " consumable found" : " consumables found");
-    head.lastChild.textContent = "in " + Object.keys(machinesHit).join(", ");
+    head.firstChild.textContent = hits.length + " found in " + c.label;
+    head.lastChild.textContent = "in " + Object.keys(tabsHit).join(", ");
     resultsEl.appendChild(head);
     hits.slice(0, 60).forEach(function (r) {
       var b = document.createElement("button");
@@ -2889,8 +3060,8 @@
       var nm = document.createElement("div"); nm.className = "r-name"; nm.dir = "auto";
       nm.appendChild(highlight(r.name || "(no name)", raw));
       var tags = document.createElement("div"); tags.className = "r-tags";
-      [[r.machine, "chip"], ["Consumable", "chip chip-month"]].forEach(function (t) {
-        var c = document.createElement("span"); c.className = t[1]; c.textContent = t[0]; tags.appendChild(c);
+      [[r[c.tabField], "chip"], [c.label, "chip chip-month"]].forEach(function (t) {
+        var s = document.createElement("span"); s.className = t[1]; s.textContent = t[0]; tags.appendChild(s);
       });
       first.appendChild(nm); first.appendChild(tags);
       b.appendChild(first);
@@ -2902,12 +3073,14 @@
       b.appendChild(refBox);
       var go = document.createElement("span"); go.className = "r-go"; go.textContent = "Open →";
       b.appendChild(go);
-      b.addEventListener("click", function () { openCons(r); });
+      b.addEventListener("click", function () { openSideRow(r); });
       resultsEl.appendChild(b);
     });
   }
-  function openCons(r) {
-    if (consActive !== r.machine) switchCons(r.machine);
+  function renderConsSearch(raw, q) { renderSideSearch(raw, q); }
+  function openSideRow(r) {
+    var t = r[SIDE[sideView].tabField];
+    if (sideTab() !== t) switchSide(t);
     var tr = rowsEl.querySelector('tr[data-id="' + r.id + '"]');
     if (!tr) return;
     tr.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -2916,19 +3089,20 @@
     tr.classList.add("flash");
   }
   // shared store updates; rows with an edit still waiting keep their local text
-  function applyCons(snap) {
+  function applySide(key, snap) {
     var next = [];
     snap.docs.forEach(function (d) {
-      var v = d.data() || {};
-      var row = cleanCons({ id: d.id, machine: v.machine, name: v.name, reference: v.reference, created: v.created });
+      var v = Object.assign({}, d.data() || {}, { id: d.id });
+      var row = cleanSide(key, v);
       if (!row) return;
-      var local = consTimers[d.id] && findCons(d.id);
+      var local = sideTimers[d.id] && findSide(key, d.id);
       next.push(local || row);
     });
-    var before = consOf(consActive).map(function (r) { return r.id; }).join(",");
-    setConsList(next);
-    if (!consView) return;
-    var after = consOf(consActive).map(function (r) { return r.id; }).join(",");
+    var shown = sideView === key;
+    var before = shown ? sideOf(key, sideTab()).map(function (r) { return r.id; }).join(",") : "";
+    setSideList(key, next);
+    if (!shown) return;
+    var after = sideOf(key, sideTab()).map(function (r) { return r.id; }).join(",");
     if (before !== after) {
       var focused = document.activeElement;
       var keep = focused && focused.id && focused.classList.contains("cell") ? focused.id : null;
@@ -2936,45 +3110,55 @@
       if (keep) { var el = document.getElementById(keep); if (el) el.focus(); }
       return;
     }
-    consOf(consActive).forEach(function (row) {
-      ["name", "reference"].forEach(function (f) {
+    sideOf(key, sideTab()).forEach(function (row) {
+      sideFieldKeys(key).forEach(function (f) {
         var el = document.getElementById("c-" + row.id + "-" + f);
-        if (el && el !== document.activeElement && el.value !== row[f]) { el.value = row[f]; fitHeight(el); }
+        if (el && el !== document.activeElement && el.value !== row[f]) { el.value = row[f]; if (el.tagName === "TEXTAREA") fitHeight(el); }
       });
     });
     updateCounts();
   }
-  function restoreConsumables(list, label) {
+  function restoreSide(key, list, label) {
     flushWrites();
     takeSnapshot("pre-" + Date.now(), "pre", label).then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
-      var oldIds = consList.map(function (r) { return r.id; });
-      setConsList(list);
-      if (!db) saveLocal(); else syncConsDocs(oldIds);
+      var oldIds = sideLists[key].map(function (r) { return r.id; });
+      setSideList(key, list);
+      if (!db) saveLocal(); else syncSideDocs(key, oldIds);
       backupDlg.hidden = true;
       renderMonths(); renderTabs(); renderRows();
       setStatus("Restored " + label, "saved");
     });
   }
-  // Excel: one sheet per machine (or one with a Machine column), plus a hidden copy for Restore
-  var CONS_MARK = "UII-CONS-v1";
-  function consSheet(name, title, list, withMachine, stamp, theme) {
+  function restoreConsumables(list, label) { restoreSide("cons", list, label); }
+  // Excel: one sheet per tab (or one with a tab column), plus a hidden copy for Restore
+  var CONS_MARK = "UII-CONS-v1", LIST_MARK = "UII-LIST-v1";
+  function sideSheet(key, name, title, list, withTab, stamp, theme) {
+    var c = SIDE[key];
     function z(n, i) { return n + (i % 2 ? "Z" : ""); }
     var rows = list.map(function (r, i) {
-      var cells = withMachine ? [{ v: r.machine, s: z("center", i) }] : [];
-      return cells.concat([{ v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) }]);
+      var cells = withTab ? [{ v: r[c.tabField], s: z("center", i) }] : [];
+      return cells.concat(c.fields.map(function (f) {
+        return { v: f.num ? numOrText(r[f.k]) : r[f.k], s: f.k === "name" || f.k === "notes" ? z("text", i) : f.num ? z("bold", i) : z("center", i) };
+      }));
     });
-    var cols = (withMachine ? [{ name: "Machine", width: 12 }] : []).concat([{ name: "Name", width: 48 }, { name: "Reference", width: 28 }]);
+    var cols = (withTab ? [{ name: c.tabField === "machine" ? "Machine" : "Type", width: 12 }] : []).concat(c.fields.map(function (f) { return { name: f.label, width: f.w }; }));
     return { name: name, xml: sheetXml({
-      title: title, subtitle: "Consumables · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
+      title: title, subtitle: c.label + " · " + list.length + " " + (list.length === 1 ? c.one : c.many) + " · " + stamp,
       theme: theme, rows: rows, columns: cols
     }) };
   }
-  function buildConsWorkbook() {
-    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
-    var sheets = MACHINES.map(function (m) { return consSheet(m, "UII — " + m + " consumables", consOf(m).filter(consHasContent), false, stamp, m); });
-    sheets.push(dataSheet(CONS_MARK, { app: "UII parts", kind: "consumables", savedAt: Date.now(), consumables: serializeCons() }));
+  function consSheet(name, title, list, withMachine, stamp, theme) { return sideSheet("cons", name, title, list, withMachine, stamp, theme); }
+  function buildSideWorkbook(key) {
+    var c = SIDE[key], stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    var sheets = c.tabs.map(function (t) {
+      return sideSheet(key, t, "UII — " + t + " " + c.label.toLowerCase(), sideOf(key, t).filter(function (r) { return sideHasContent(key, r); }), false, stamp, c.tabField === "machine" ? t : c.theme);
+    });
+    var payload = { app: "UII parts", kind: key === "cons" ? "consumables" : c.store, savedAt: Date.now() };
+    payload[c.store] = serializeSide(key);
+    sheets.push(dataSheet(key === "cons" ? CONS_MARK : LIST_MARK, payload));
     return packXlsx(sheets);
   }
+  function buildConsWorkbook() { return buildSideWorkbook("cons"); }
 
   // ---- Apply snapshots from the shared store without disturbing typing ----
   function applyParts(snap) {
@@ -3106,7 +3290,8 @@
   xf("moneyBoldZero", 6, FILL_ZERO, 1, "center", false, 4);
   // One colour per sheet: the title band in it, headings light grey with a line in it, totals on its tint
   var XL_THEMES = { BLM: ["1F4E8C", "EAF0F8"], BCW3: ["0E7C66", "E7F4F1"], Bonal: ["B35418", "FBEFE7"], Sollas: ["6B3FA0", "F1ECF8"],
-    ALL: ["374151", "EEF0F3"], UII: ["1F3864", "E8EDF6"], CONS: ["6D3FC0", "F1ECF8"] };
+    ALL: ["374151", "EEF0F3"], UII: ["1F3864", "E8EDF6"], CONS: ["6D3FC0", "F1ECF8"],
+    USED: ["A0661B", "FBF1E3"], EQUIP: ["0F766E", "E6F4F2"] };
   Object.keys(XL_THEMES).forEach(function (t) {
     var c = XL_THEMES[t][0], line = '<color rgb="FF' + c + '"/>', grey = '<color rgb="FFD5DCE8"/>';
     XL_FILLS.push(solid(c), solid(XL_THEMES[t][1]));
@@ -3219,7 +3404,7 @@
         var cells = [{ v: txDate(t), s: z("center", i) }];
         if (withMachine) cells.push({ v: t.machine, s: z("center", i) });
         return cells.concat([
-          { v: part && part.name ? part.name : t.name, s: z("text", i) },
+          { v: (part && part.name ? part.name : t.name) + (t.source ? " (" + SIDE[t.source].label + ")" : ""), s: z("text", i) },
           { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" },
           { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
@@ -3319,7 +3504,7 @@
       (allTx[k] || []).slice().reverse().forEach(function (t) {
         var i = tr.length, part = partIn(k, t.partId), isIn = t.change > 0, val = txValue(t, part);
         tr.push([{ v: txDate(t), s: z("center", i) }, { v: monthLabel(k), s: z("center", i) }, { v: t.machine, s: z("center", i) },
-          { v: part && part.name ? part.name : t.name, s: z("text", i) }, { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
+          { v: (part && part.name ? part.name : t.name) + (t.source ? " (" + SIDE[t.source].label + ")" : ""), s: z("text", i) }, { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" }, { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
           { v: t.line ? "Line " + t.line : "", s: z("center", i) }, { v: part ? priceVal(part.price) : "", s: z("money", i) }, { v: part ? part.currency : "", s: z("center", i) },
           { v: val === null ? "" : val, s: z("moneyBold", i) }, { v: t.after, s: z("center", i) }]);
@@ -3332,7 +3517,9 @@
         { name: "Type", width: 9 }, { name: "Quantity", width: 11 }, { name: "Line", width: 9 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]
     }) });
 
-    sheets.push(consSheet("Consumables", "UII \u2014 Consumables", consList.filter(consHasContent), true, stamp, "CONS"));
+    SIDE_KEYS.forEach(function (k) {
+      sheets.push(sideSheet(k, SIDE[k].label, "UII \u2014 " + SIDE[k].label, sideLists[k].filter(function (r) { return sideHasContent(k, r); }), true, stamp, SIDE[k].theme));
+    });
     sheets.push(dataSheet(BACKUP_MARK, all));
     return packXlsx(sheets);
   }
@@ -3406,7 +3593,7 @@
       if (rows) {
         var nums = Object.keys(rows).map(Number).sort(function (a, b) { return a - b; });
         var vals = nums.map(function (n) { return rows[n][0] || ""; });
-        if (vals[0] === BACKUP_MARK || vals[0] === MONTH_MARK || vals[0] === CONS_MARK) return JSON.parse(vals.slice(1).join(""));
+        if (vals[0] === BACKUP_MARK || vals[0] === MONTH_MARK || vals[0] === CONS_MARK || vals[0] === LIST_MARK) return JSON.parse(vals.slice(1).join(""));
       }
       return readMonthSheets(sheetRows);
     });
@@ -3520,13 +3707,13 @@
   function exportFilename() { return "UII-" + monthLabel(month).replace(" ", "-") + ".xlsx"; }
   exportBtn.addEventListener("click", function () {
     flushWrites();
-    if (consView) { saveFile("UII-Consumables.xlsx", buildConsWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export"); return; }
+    if (sideView) { saveFile(SIDE[sideView].file, buildSideWorkbook(sideView), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export"); return; }
     saveFile(exportFilename(), buildWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export");
   });
   function updateExportLabel() {
-    if (consView) {
-      exportBtn.title = "Download the consumables list as an Excel file";
-      document.getElementById("exportLabel").textContent = "Export Consumables to Excel";
+    if (sideView) {
+      exportBtn.title = "Download " + SIDE[sideView].label + " as an Excel file";
+      document.getElementById("exportLabel").textContent = "Export " + SIDE[sideView].label + " to Excel";
       return;
     }
     exportBtn.title = "Download " + monthLabel(month) + " as an Excel file";
@@ -3617,10 +3804,11 @@
       MACHINES.forEach(function (m) { allParts[k][m].forEach(function (r) { var b = rowBody(r); b.id = r.id; parts.push(b); }); });
     });
     Object.keys(allTx).forEach(function (k) { allTx[k].forEach(function (t) { var b = txBody(t); b.id = t.id; txs.push(b); }); });
-    return { app: "UII parts", version: 1, savedAt: Date.now(), parts: parts, transactions: txs, consumables: serializeCons() };
+    return { app: "UII parts", version: 1, savedAt: Date.now(), parts: parts, transactions: txs,
+      consumables: serializeSide("cons"), usedParts: serializeSide("used"), equipment: serializeSide("equip") };
   }
   function hasAnyData() {
-    return consList.length > 0 || Object.keys(allParts).some(function (k) { return MACHINES.some(function (m) { return allParts[k][m].length; }); });
+    return SIDE_KEYS.some(function (k) { return sideLists[k].length > 0; }) || Object.keys(allParts).some(function (k) { return MACHINES.some(function (m) { return allParts[k][m].length; }); });
   }
   // Replace everything with a saved copy
   function applyAll(snap) {
@@ -3642,12 +3830,13 @@
     snap.transactions.forEach(function (t) { var tx = cleanTx(t); (allTx[tx.month] = allTx[tx.month] || []).push(tx); });
     Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
     openSheet();
-    // backups made before Consumables existed leave the list as it is
-    var oldCons = consList.map(function (r) { return r.id; });
-    if (Array.isArray(snap.consumables)) setConsList(snap.consumables);
+    // a list the backup does not have (made before it existed) stays as it is
+    var oldSide = {};
+    SIDE_KEYS.forEach(function (k) { oldSide[k] = sideLists[k].map(function (r) { return r.id; }); });
+    setSideFrom({ cons: snap.consumables, used: snap.usedParts, equip: snap.equipment }, true);
     if (!db) { saveLocal(); }
     else {
-      if (Array.isArray(snap.consumables)) syncConsDocs(oldCons);
+      SIDE_KEYS.forEach(function (k) { if (Array.isArray(snap[SIDE[k].store])) syncSideDocs(k, oldSide[k]); });
       curP.forEach(function (id) { if (!keepP[id]) deleteDoc("parts", id); });
       curT.forEach(function (id) { if (!keepT[id]) deleteDoc("transactions", id); });
       snap.parts.forEach(function (r) { var b = Object.assign({}, r); delete b.id; saveDoc("parts", r.id, b); });
@@ -3918,11 +4107,13 @@
     var reading = isJson ? f.text().then(function (t) { return JSON.parse(t); }) : f.arrayBuffer().then(readBackupXlsx);
     reading.then(function (snap) {
       if (!snap || snap.app !== "UII parts") throw new Error("not a backup");
-      if (snap.kind === "consumables") {
-        if (!Array.isArray(snap.consumables)) throw new Error("not a backup");
-        var nc = snap.consumables.filter(consHasContent).length;
-        askCode("Consumables file " + f.name + " (" + nc + (nc === 1 ? " part" : " parts") + "). It replaces the consumables list. The months are not touched.", function () {
-          restoreConsumables(snap.consumables, f.name);
+      var listKey = SIDE_KEYS.filter(function (k) { return SIDE[k].store === snap.kind; })[0];
+      if (listKey) {
+        var lc = SIDE[listKey], items = snap[lc.store];
+        if (!Array.isArray(items)) throw new Error("not a backup");
+        var nc = items.filter(function (r) { return sideHasContent(listKey, cleanSide(listKey, r) || {}); }).length;
+        askCode(lc.label + " file " + f.name + " (" + nc + " " + (nc === 1 ? lc.one : lc.many) + "). It replaces the " + lc.label + " list. The months are not touched.", function () {
+          restoreSide(listKey, items, f.name);
         });
         return;
       }
@@ -3976,9 +4167,12 @@
     if (TABS.indexOf(savedTab) !== -1) active = savedTab;
     var savedMonth = localStorage.getItem(MONTH_KEY);
     if (MONTHS.indexOf(savedMonth) !== -1) month = savedMonth;
-    consView = localStorage.getItem(VIEW_KEY) === "cons";
-    var savedCons = localStorage.getItem(CONS_TAB_KEY);
-    if (MACHINES.indexOf(savedCons) !== -1) consActive = savedCons;
+    var savedView = localStorage.getItem(VIEW_KEY);
+    sideView = SIDE_KEYS.indexOf(savedView) !== -1 ? savedView : "";
+    SIDE_KEYS.forEach(function (k) {
+      var t = localStorage.getItem(SIDE_TAB_KEY + k) || (k === "cons" ? localStorage.getItem(CONS_TAB_KEY) : "");
+      if (SIDE[k].tabs.indexOf(t) !== -1) sideActive[k] = t;
+    });
   } catch (e) {}
   updateSearchPlaceholder();
   openSheet();
@@ -3987,10 +4181,10 @@
   renderMonths();
   renderTabs();
   renderRows();
-  if (consView) showConsBtn();
+  if (sideView) showSideBtn();
   if (!useClaude) loadLocal().then(function () {
     renderMonths(); renderTabs(); renderRows();
-    if (consView) showConsBtn();
+    if (sideView) showSideBtn();
     maybeDailySnapshot(); updateReminder();
   });
 
@@ -4017,7 +4211,7 @@
       function ready() { if (gotParts && gotTx) maybeDailySnapshot(); }
       db.collection("parts").onSnapshot(function (snap) { applyParts(snap); if (!snap.metadata || !snap.metadata.fromCache) { gotParts = true; ready(); } }, lost);
       db.collection("transactions").onSnapshot(function (snap) { applyTx(snap); if (!snap.metadata || !snap.metadata.fromCache) { gotTx = true; ready(); } }, lost);
-      db.collection("consumables").onSnapshot(applyCons, lost);
+      SIDE_KEYS.forEach(function (k) { db.collection(SIDE[k].store).onSnapshot(function (snap) { applySide(k, snap); }, lost); });
       loadLastBackup();
     });
   }
