@@ -11,8 +11,8 @@ android {
         applicationId = "com.fieldlog.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "2.3"
+        versionCode = 7
+        versionName = "2.4"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
@@ -65,4 +65,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.8.4")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.dynamicanimation:dynamicanimation:1.0.0")
+    implementation("androidx.interpolator:interpolator:1.0.0")
 }

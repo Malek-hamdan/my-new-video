@@ -1,8 +1,11 @@
 package com.fieldlog.app
 
 import android.Manifest
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -10,7 +13,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.MotionEvent
 import android.view.View
+import android.view.animation.OvershootInterpolator
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +23,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.dynamicanimation.animation.SpringAnimation
+import androidx.dynamicanimation.animation.SpringForce
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.fieldlog.app.databinding.ActivityMainBinding
 import java.io.File
@@ -49,20 +56,67 @@ class MainActivity : AppCompatActivity() {
         requestPerms()
     }
 
-    // ---- PIN ----
+    // ---- PIN (create + confirm on first run, unlock afterwards) ----
+    private enum class PinStep { CREATE, CONFIRM, UNLOCK }
+    private var pinStep = PinStep.UNLOCK
+    private var pinFirst = ""
+
     private fun setupPin() {
         b.pinOverlay.visibility = View.VISIBLE
+        b.content.alpha = 0f
         b.content.visibility = View.INVISIBLE
-        val unlock = {
-            if (b.pinInput.text.toString() == prefs.pin) {
-                b.pinOverlay.visibility = View.GONE
-                b.content.visibility = View.VISIBLE
-            } else {
-                b.pinHint.text = getString(R.string.pin_wrong)
-                b.pinInput.text?.clear()
+        pinStep = if (prefs.pinSet) PinStep.UNLOCK else PinStep.CREATE
+        renderPinStep()
+        b.btnUnlock.setOnClickListener { bounce(it); submitPin() }
+        b.pinInput.setOnEditorActionListener { _, _, _ -> submitPin(); true }
+    }
+
+    private fun renderPinStep() {
+        b.pinInput.text?.clear()
+        b.pinInput.requestFocus()
+        when (pinStep) {
+            PinStep.CREATE -> { b.pinTitle.text = "Create a PIN"; b.pinHint.text = "Choose a 4–8 digit PIN"; b.btnUnlock.text = "Continue" }
+            PinStep.CONFIRM -> { b.pinTitle.text = "Confirm PIN"; b.pinHint.text = "Re-enter your PIN"; b.btnUnlock.text = "Confirm" }
+            PinStep.UNLOCK -> { b.pinTitle.text = "Enter PIN"; b.pinHint.text = ""; b.btnUnlock.text = "Unlock" }
+        }
+    }
+
+    private fun submitPin() {
+        val entered = b.pinInput.text.toString()
+        when (pinStep) {
+            PinStep.CREATE -> {
+                if (entered.length < 4) { b.pinHint.text = "Use 4–8 digits"; shake(b.pinInput); return }
+                pinFirst = entered; pinStep = PinStep.CONFIRM; renderPinStep()
+            }
+            PinStep.CONFIRM -> {
+                if (entered == pinFirst) { prefs.pin = entered; Toast.makeText(this, "PIN set", Toast.LENGTH_SHORT).show(); unlockToApp() }
+                else { b.pinHint.text = "PINs don't match — try again"; shake(b.pinInput); pinStep = PinStep.CREATE; pinFirst = "" }
+            }
+            PinStep.UNLOCK -> {
+                if (entered == prefs.pin) unlockToApp()
+                else { b.pinHint.text = getString(R.string.pin_wrong); shake(b.pinInput); b.pinInput.text?.clear() }
             }
         }
-        b.btnUnlock.setOnClickListener { unlock() }
+    }
+
+    private fun unlockToApp() {
+        b.pinOverlay.animate().alpha(0f).translationY(-40f).setDuration(280).withEndAction {
+            b.pinOverlay.visibility = View.GONE
+        }.start()
+        b.content.visibility = View.VISIBLE
+        b.content.alpha = 0f
+        b.content.translationY = 40f
+        b.content.animate().alpha(1f).translationY(0f).setDuration(320).start()
+    }
+
+    private fun shake(v: View) {
+        ObjectAnimator.ofFloat(v, "translationX", 0f, 24f, -24f, 18f, -18f, 10f, -10f, 0f)
+            .setDuration(420).start()
+    }
+
+    private fun bounce(v: View) {
+        SpringAnimation(v, SpringAnimation.SCALE_X, 1f).apply { spring.stiffness = SpringForce.STIFFNESS_MEDIUM; spring.dampingRatio = 0.35f; setStartValue(0.9f) }.start()
+        SpringAnimation(v, SpringAnimation.SCALE_Y, 1f).apply { spring.stiffness = SpringForce.STIFFNESS_MEDIUM; spring.dampingRatio = 0.35f; setStartValue(0.9f) }.start()
     }
 
     // ---- levels ----
@@ -74,23 +128,41 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun setupLevels() {
-        levelViews.forEach { (view, lvl) -> view.setOnClickListener { selectLevel(lvl) } }
-        selectLevel(prefs.level)
+    private fun levelIndex(l: Enhancer.Level) = when (l) {
+        Enhancer.Level.LIGHT -> 0; Enhancer.Level.MEDIUM -> 1; Enhancer.Level.STRONG -> 2
     }
 
-    private fun selectLevel(lvl: Enhancer.Level) {
+    private fun setupLevels() {
+        levelViews.forEach { (view, lvl) -> view.setOnClickListener { selectLevel(lvl, true) } }
+        b.levelGroup.post { positionHighlight(prefs.level, false); applyLevelText(prefs.level) }
+    }
+
+    private fun selectLevel(lvl: Enhancer.Level, animate: Boolean) {
         prefs.level = lvl
+        positionHighlight(lvl, animate)
+        applyLevelText(lvl)
+    }
+
+    private fun positionHighlight(lvl: Enhancer.Level, animate: Boolean) {
+        val item = b.levelLight
+        val w = item.width; val h = item.height
+        if (w == 0) return
+        b.levelHighlight.layoutParams = b.levelHighlight.layoutParams.apply { width = w; height = h }
+        val target = (levelIndex(lvl) * w).toFloat()
+        if (animate) {
+            SpringAnimation(b.levelHighlight, SpringAnimation.TRANSLATION_X, target).apply {
+                spring.stiffness = SpringForce.STIFFNESS_LOW
+                spring.dampingRatio = 0.72f
+            }.start()
+        } else {
+            b.levelHighlight.translationX = target
+        }
+    }
+
+    private fun applyLevelText(lvl: Enhancer.Level) {
         levelViews.forEach { (view, l) ->
-            if (l == lvl) {
-                view.setBackgroundResource(R.drawable.seg_selected)
-                view.setTextColor(ContextCompat.getColor(this, R.color.white))
-                view.setTypeface(null, android.graphics.Typeface.BOLD)
-            } else {
-                view.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                view.setTextColor(ContextCompat.getColor(this, R.color.muted))
-                view.setTypeface(null, android.graphics.Typeface.NORMAL)
-            }
+            view.setTextColor(ContextCompat.getColor(this, if (l == lvl) R.color.white else R.color.muted))
+            view.setTypeface(null, if (l == lvl) Typeface.BOLD else Typeface.NORMAL)
         }
         b.levelHint.text = when (lvl) {
             Enhancer.Level.LIGHT -> "Natural sound · gentle clean-up"
@@ -100,6 +172,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- record ----
+    private var lastRec: Boolean? = null
+    private var recPulse: ObjectAnimator? = null
+    private var recPulseAlpha: ObjectAnimator? = null
+
     private fun setupRecord() {
         b.btnRecord.setOnClickListener {
             if (RecorderBus.recording) {
@@ -111,11 +187,38 @@ class MainActivity : AppCompatActivity() {
                 RecordingService.start(this)
             }
         }
+        b.btnRecord.setOnTouchListener { v, e ->
+            if (e.action == MotionEvent.ACTION_DOWN) v.animate().scaleX(0.92f).scaleY(0.92f).setDuration(90).start()
+            else if (e.action == MotionEvent.ACTION_UP || e.action == MotionEvent.ACTION_CANCEL) v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+            false
+        }
+        // gentle ambient breathing on the inner ring
+        ObjectAnimator.ofFloat(b.ring1, "scaleX", 1f, 1.05f).apply { duration = 2400; repeatMode = ObjectAnimator.REVERSE; repeatCount = ObjectAnimator.INFINITE; start() }
+        ObjectAnimator.ofFloat(b.ring1, "scaleY", 1f, 1.05f).apply { duration = 2400; repeatMode = ObjectAnimator.REVERSE; repeatCount = ObjectAnimator.INFINITE; start() }
+    }
+
+    private fun startRecPulse() {
+        if (recPulse != null) return
+        recPulse = ObjectAnimator.ofFloat(b.ring2, "scaleX", 1f, 1.15f).apply { duration = 1300; repeatCount = ObjectAnimator.INFINITE; start() }
+        ObjectAnimator.ofFloat(b.ring2, "scaleY", 1f, 1.15f).apply { duration = 1300; repeatCount = ObjectAnimator.INFINITE; start() }
+        recPulseAlpha = ObjectAnimator.ofFloat(b.ring2, "alpha", 0.7f, 0f).apply { duration = 1300; repeatCount = ObjectAnimator.INFINITE; start() }
+    }
+
+    private fun stopRecPulse() {
+        recPulse?.cancel(); recPulseAlpha?.cancel(); recPulse = null; recPulseAlpha = null
+        b.ring2.scaleX = 1f; b.ring2.scaleY = 1f; b.ring2.alpha = 1f
     }
 
     private fun refreshRecordingUi() {
         val rec = RecorderBus.recording
-        b.recordIcon.setImageResource(if (rec) R.drawable.ic_stop else R.drawable.ic_mic)
+        if (rec != lastRec) {
+            b.recordIcon.animate().alpha(0f).setDuration(110).withEndAction {
+                b.recordIcon.setImageResource(if (rec) R.drawable.ic_stop else R.drawable.ic_mic)
+                b.recordIcon.animate().alpha(1f).setDuration(140).start()
+            }.start()
+            if (rec) startRecPulse() else stopRecPulse()
+            lastRec = rec
+        }
         b.status.text = when {
             RecorderBus.processing -> "Saving & cleaning…"
             rec -> "Recording · you can turn off the screen"

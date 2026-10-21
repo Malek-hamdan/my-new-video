@@ -7,8 +7,10 @@ class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("fieldlog", Context.MODE_PRIVATE)
 
     var pin: String
-        get() = sp.getString("pin", "2026") ?: "2026"
+        get() = sp.getString("pin", "") ?: ""
         set(v) = sp.edit().putString("pin", v).apply()
+
+    val pinSet: Boolean get() = pin.isNotEmpty()
 
     var level: Enhancer.Level
         get() = runCatching { Enhancer.Level.valueOf(sp.getString("level", "MEDIUM")!!) }.getOrDefault(Enhancer.Level.MEDIUM)
