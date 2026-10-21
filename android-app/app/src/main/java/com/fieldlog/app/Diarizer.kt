@@ -46,7 +46,7 @@ object Diarizer {
             while (j < feats.size && speech[j] && j - i < segLen) {
                 for (c in 0 until NCEP) acc[c] += feats[j][c]; cnt++; j++
             }
-            if (cnt >= 10) { for (c in 0 until NCEP) acc[c] /= cnt; segVecs.add(acc); segBounds.add(intArrayOf(i, j)) }
+            if (cnt >= 10) { for (c in 0 until NCEP) acc[c] = acc[c] / cnt.toFloat(); segVecs.add(acc); segBounds.add(intArrayOf(i, j)) }
             i = j
         }
         if (segVecs.size < 2) {
