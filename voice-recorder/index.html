@@ -44,6 +44,21 @@
   .actions a, .actions button { font-size: 14px; padding: 8px 14px; text-decoration: none; }
   .actions a { background: var(--accent-2); color: #fff; border-radius: 999px; }
   .empty { color: var(--muted); text-align: center; padding: 16px; }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+  .modes label {
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 4px; text-align: center;
+    font-size: 14px; cursor: pointer; user-select: none;
+  }
+  .modes input { position: absolute; opacity: 0; pointer-events: none; }
+  .modes label { position: relative; }
+  .modes label:has(input:focus-visible) { outline: 2px solid var(--accent-2); }
+  .modes input:checked + span { color: var(--accent); font-weight: 700; }
+  .modes label:has(input:checked) { border-color: var(--accent); }
+  .modes label:has(input:disabled) { opacity: .5; cursor: default; }
+  .hint { color: var(--muted); font-size: 13px; margin: -6px 0 12px; text-align: center; min-height: 1.2em; }
+  .boost { display: flex; align-items: center; gap: 10px; font-size: 14px; margin-bottom: 8px; }
+  .boost input { flex: 1; }
+  .tag { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-inline-start: 6px; }
 </style>
 </head>
 <body>
@@ -51,6 +66,17 @@
   <h1>🎙️ مسجّل الصوت</h1>
 
   <section class="card">
+    <div class="modes">
+      <label><input type="radio" name="mode" value="raw"><span>صوت خام</span></label>
+      <label><input type="radio" name="mode" value="clean"><span>تنقية</span></label>
+      <label><input type="radio" name="mode" value="strong"><span>تنقية قوية</span></label>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="boost" id="boostRow">
+      <span>تعلية</span>
+      <input type="range" id="boost" min="1" max="4" step="0.25" value="1.5">
+      <span id="boostVal" dir="ltr">×1.5</span>
+    </div>
     <canvas id="wave" width="800" height="180"></canvas>
     <div class="timer" id="timer">00:00</div>
     <div class="controls">
@@ -72,6 +98,100 @@ const ctx2d = canvas.getContext("2d");
 
 let recorder, stream, chunks = [], audioCtx, analyser, rafId;
 let elapsed = 0, tickStart = 0, tickId;
+let makeupGain, gateId, recMode;
+
+// ---------- modes ----------
+const MODES = {
+  raw:    { label: "خام",        hint: "تسجيل نقي بدون أي معالجة — لأهدأ مكان وأعلى أمانة للصوت." },
+  clean:  { label: "تنقية",      hint: "يشيل الضجة الثابتة (مكيّف، مروحة، طنين) ويوضّح الصوت ويعلّيه." },
+  strong: { label: "تنقية قوية", hint: "للأماكن الصاخبة: تنقية + بوابة ضجيج بتخفّض الخلفية لما ما في كلام." },
+};
+const modeInputs = [...document.querySelectorAll('input[name="mode"]')];
+const boostEl = $("boost"), boostVal = $("boostVal");
+const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+const setPref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const currentMode = () => modeInputs.find((i) => i.checked).value;
+function syncMode() {
+  const m = currentMode();
+  $("hint").textContent = MODES[m].hint;
+  $("boostRow").style.display = m === "raw" ? "none" : "";
+  setPref("mode", m);
+}
+(modeInputs.find((i) => i.value === pref("mode", "clean")) || modeInputs[1]).checked = true;
+boostEl.value = pref("boost", "1.5");
+boostVal.textContent = "×" + boostEl.value;
+modeInputs.forEach((i) => (i.onchange = syncMode));
+boostEl.oninput = () => {
+  boostVal.textContent = "×" + boostEl.value;
+  setPref("boost", boostEl.value);
+  if (makeupGain) makeupGain.gain.setTargetAtTime(makeupFor(recMode), audioCtx.currentTime, 0.05);
+};
+const makeupFor = (m) => (m === "strong" ? 2 : 1.6) * Number(boostEl.value);
+syncMode();
+
+// Builds: highpass → (lowpass) → presence EQ → noise gate → compressor → makeup → limiter.
+// Returns the processed stream to record.
+function buildChain(mode) {
+  const src = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  if (mode === "raw") { src.connect(analyser); return stream; }
+
+  const strong = mode === "strong";
+  const nodes = [];
+  const hp = audioCtx.createBiquadFilter();           // rumble, wind, AC hum
+  hp.type = "highpass"; hp.frequency.value = strong ? 120 : 85; hp.Q.value = 0.7;
+  nodes.push(hp);
+  if (strong) {                                       // hiss above the voice band
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 8000; lp.Q.value = 0.7;
+    nodes.push(lp);
+  }
+  const mud = audioCtx.createBiquadFilter();          // boxy/muddy room tone
+  mud.type = "peaking"; mud.frequency.value = 300; mud.Q.value = 1; mud.gain.value = -3;
+  const presence = audioCtx.createBiquadFilter();     // speech intelligibility
+  presence.type = "peaking"; presence.frequency.value = 3000; presence.Q.value = 0.9; presence.gain.value = strong ? 5 : 4;
+  nodes.push(mud, presence);
+
+  const gate = audioCtx.createGain();
+  const comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = strong ? -34 : -28; comp.knee.value = 10;
+  comp.ratio.value = strong ? 6 : 4; comp.attack.value = 0.005; comp.release.value = 0.2;
+  makeupGain = audioCtx.createGain();
+  makeupGain.gain.value = makeupFor(mode);
+  const limiter = audioCtx.createDynamicsCompressor();
+  limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.001; limiter.release.value = 0.1;
+  const dest = audioCtx.createMediaStreamDestination();
+
+  let prev = src;
+  for (const n of [...nodes, gate, comp, makeupGain, limiter]) { prev.connect(n); prev = n; }
+  limiter.connect(dest);
+  limiter.connect(analyser);
+
+  if (strong) startGate(presence, gate);
+  return dest.stream;
+}
+
+// Adaptive noise gate: tracks the background level and ducks it when nobody is talking.
+function startGate(input, gate) {
+  const det = audioCtx.createAnalyser();
+  det.fftSize = 1024;
+  input.connect(det);
+  const buf = new Float32Array(det.fftSize);
+  let floor = 0.01, lastVoice = 0;
+  gateId = setInterval(() => {
+    det.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (const v of buf) sum += v * v;
+    const rms = Math.sqrt(sum / buf.length);
+    floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * 0.998 + rms * 0.002;
+    const now = performance.now();
+    if (rms > Math.max(floor * 2.5, 0.004)) lastVoice = now;
+    const open = now - lastVoice < 300;
+    gate.gain.setTargetAtTime(open ? 1 : 0.12, audioCtx.currentTime, open ? 0.01 : 0.15);
+  }, 20);
+}
 
 // ---------- storage (IndexedDB) ----------
 const dbReady = new Promise((resolve, reject) => {
@@ -125,23 +245,30 @@ function draw() {
 
 // ---------- recording ----------
 async function start() {
+  recMode = currentMode();
+  const processed = recMode !== "raw";
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Browser's built-in (WebRTC) noise suppression only in the cleaning modes.
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1, sampleRate: 48000, sampleSize: 16,
+        noiseSuppression: processed, echoCancellation: processed, autoGainControl: false,
+      },
+    });
   } catch (e) {
     statusEl.textContent = "ما في صلاحية للمايكروفون — اسمح بالوصول من إعدادات المتصفح.";
     return;
   }
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  const out = buildChain(recMode);
+
   const mimeType = pickMime();
-  recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  recorder = new MediaRecorder(out, { ...(mimeType && { mimeType }), audioBitsPerSecond: 192000 });
   chunks = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   recorder.onstop = finish;
   recorder.start(250);
-
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 1024;
-  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  modeInputs.forEach((i) => (i.disabled = true));
   draw();
 
   elapsed = 0; startTimer();
@@ -156,15 +283,18 @@ async function finish() {
   if (recorder.state !== "paused") stopTimer();
   cancelAnimationFrame(rafId);
   ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  clearInterval(gateId);
   stream.getTracks().forEach((t) => t.stop());
   audioCtx && audioCtx.close();
+  makeupGain = null;
+  modeInputs.forEach((i) => (i.disabled = false));
 
   const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
   const now = new Date();
   const clip = {
     id: now.getTime(),
     name: "تسجيل " + now.toLocaleString("ar", { dateStyle: "short", timeStyle: "short" }),
-    duration: elapsed, blob, mime: blob.type,
+    duration: elapsed, blob, mime: blob.type, mode: recMode,
   };
   await saveClip(clip);
   recBtn.textContent = "تسجيل"; recBtn.classList.remove("on");
@@ -206,6 +336,11 @@ async function render() {
     nameInput.value = c.name;
     nameInput.onchange = () => { c.name = nameInput.value.trim() || c.name; saveClip(c); };
     li.querySelector(".meta").textContent = fmt(c.duration);
+    if (c.mode) {
+      const tag = document.createElement("span");
+      tag.className = "tag"; tag.textContent = MODES[c.mode].label;
+      li.querySelector(".meta").appendChild(tag);
+    }
     li.querySelector("audio").src = url;
     const a = li.querySelector("a");
     a.href = url; a.download = `${c.name}.${extFor(c.mime)}`.replace(/[\\/:*?"<>|]/g, "-");
