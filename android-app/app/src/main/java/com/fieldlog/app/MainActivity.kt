@@ -51,9 +51,22 @@ class MainActivity : AppCompatActivity() {
         setupPin()
         setupLevels()
         setupRecord()
+        setupToggles()
         setupList()
         b.btnSettings.setOnClickListener { showSettings() }
         requestPerms()
+    }
+
+    // ---- AI + backup toggles on the home screen ----
+    private fun setupToggles() {
+        val aiOk = Rnnoise.available
+        b.swAi.isChecked = prefs.aiEnabled && aiOk
+        b.swAi.isEnabled = aiOk
+        b.aiSub.text = if (aiOk) "On-device · free · offline" else "Not supported on this device"
+        b.swAi.setOnCheckedChangeListener { _, checked -> prefs.aiEnabled = checked }
+
+        b.swKeep.isChecked = prefs.keepOriginal
+        b.swKeep.setOnCheckedChangeListener { _, checked -> prefs.keepOriginal = checked }
     }
 
     // ---- PIN (create + confirm on first run, unlock afterwards) ----

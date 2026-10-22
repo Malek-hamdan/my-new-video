@@ -81,29 +81,62 @@
             android:textColor="@color/muted"
             android:textSize="12sp" />
 
+        <!-- AI + backup toggles -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical">
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AI noise removal" android:textColor="@color/text" android:textSize="14sp" />
+                    <TextView android:id="@+id/aiSub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="On-device · free · offline" android:textColor="@color/muted" android:textSize="11sp" />
+                </LinearLayout>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swAi"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line" />
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Keep original copy" android:textColor="@color/text" android:textSize="14sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Backup of the raw recording" android:textColor="@color/muted" android:textSize="11sp" />
+                </LinearLayout>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swKeep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- orb record button -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="236dp"
-            android:layout_marginTop="8dp">
+            android:layout_height="196dp"
+            android:layout_marginTop="6dp">
 
             <View
                 android:id="@+id/ring2"
-                android:layout_width="236dp"
-                android:layout_height="236dp"
+                android:layout_width="196dp"
+                android:layout_height="196dp"
                 android:layout_gravity="center"
                 android:background="@drawable/orb_ring2" />
             <View
                 android:id="@+id/ring1"
-                android:layout_width="188dp"
-                android:layout_height="188dp"
+                android:layout_width="158dp"
+                android:layout_height="158dp"
                 android:layout_gravity="center"
                 android:background="@drawable/orb_ring1" />
 
             <FrameLayout
                 android:id="@+id/btnRecord"
-                android:layout_width="124dp"
-                android:layout_height="124dp"
+                android:layout_width="112dp"
+                android:layout_height="112dp"
                 android:layout_gravity="center"
                 android:background="@drawable/orb_gradient"
                 android:clickable="true"
@@ -111,8 +144,8 @@
                 android:elevation="12dp">
                 <ImageView
                     android:id="@+id/recordIcon"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_mic"
                     android:contentDescription="@string/tap_to_record" />
@@ -123,7 +156,7 @@
             android:id="@+id/timer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="2dp"
             android:gravity="center"
             android:text="00:00:00"
             android:textColor="@color/text"
