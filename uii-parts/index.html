@@ -203,6 +203,8 @@
   .tr-card.in .tr-title { color: #c6f1d8; }
   .tr-card.in .tr-line-box, .tr-card.in .tr-out-only { display: none; }
   .tr-row2 { grid-template-columns: 1fr 1fr 1fr; align-items: end; }
+  .tr-search2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #trPicked { margin-top: 14px; }
   .tr-print { display: flex; align-items: center; gap: 9px; padding: 12px 0; color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
   .tr-print input { width: 18px; height: 18px; accent-color: var(--accent); }
   .tx-print { width: 32px; height: 32px; margin-right: 4px; border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
@@ -273,7 +275,7 @@
   .tr-src.equip { background: rgba(70,200,180,0.16); color: #bff0e8; border: 1px solid rgba(70,200,180,0.5); }
   .chip.src-used { background: rgba(240,170,80,0.18); border-color: rgba(240,170,80,0.55); color: #ffd59a; margin-left: 6px; }
   .chip.src-equip { background: rgba(70,200,180,0.14); border-color: rgba(70,200,180,0.5); color: #bff0e8; margin-left: 6px; }
-  @media (max-width: 560px) { .tr-row { grid-template-columns: 1fr 1fr; } .tr-row > div:last-child { grid-column: 1 / -1; } }
+  @media (max-width: 560px) { .tr-search2 { grid-template-columns: 1fr; } .tr-row { grid-template-columns: 1fr 1fr; } .tr-row > div:last-child { grid-column: 1 / -1; } }
   .tr-err { margin-top: 10px; color: var(--danger); font-size: 14px; font-weight: 600; }
   /* Consumables: one list of often-used parts, outside the months */
   .months-sep { flex: 0 0 1px; align-self: stretch; margin: 4px 6px; background: var(--border-strong); }
@@ -1031,9 +1033,11 @@
       <div class="tr-title" id="trTitle"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path id="trIcon" d="M5 12h14M13 6l6 6-6 6"/></svg><span id="trTitleText">Transfer parts out</span></div>
       <span class="tr-label">Machine</span>
       <div class="tr-chips" id="trMachines"></div>
-      <span class="tr-label">Part</span>
       <div id="trPartBox">
-        <input class="tr-input" id="trSearch" placeholder="Type a reference or name" autocomplete="off" spellcheck="false" dir="auto">
+        <div class="tr-search2" id="trSearchRow">
+          <div><span class="tr-label">Reference</span><input class="tr-input" id="trSearch" placeholder="Type the reference" autocomplete="off" spellcheck="false" dir="auto"></div>
+          <div><span class="tr-label">Part name</span><input class="tr-input" id="trName" placeholder="Type the part name" autocomplete="off" spellcheck="false" dir="auto"></div>
+        </div>
         <div class="tr-list" id="trList"></div>
       </div>
       <div class="tr-row">
@@ -2686,6 +2690,7 @@
       document.getElementById("trPrint").checked = localStorage.getItem(TR_PRINT_KEY) !== "0";
     } catch (e) {}
     document.getElementById("trSearch").value = "";
+    document.getElementById("trName").value = "";
     document.getElementById("trQty").value = "0";
     var t = new Date(); document.getElementById("trDate").value = t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate());
     trDlg.hidden = false; trRender();
@@ -2707,10 +2712,10 @@
       b.addEventListener("click", function () { trState.line = l; trRender(); });
       lBox.appendChild(b);
     });
-    var box = document.getElementById("trPartBox"), search = document.getElementById("trSearch"), list = document.getElementById("trList");
+    var box = document.getElementById("trPartBox"), search = document.getElementById("trSearch"), nameIn = document.getElementById("trName"), row = document.getElementById("trSearchRow"), list = document.getElementById("trList");
     var old = document.getElementById("trPicked"); if (old) old.remove();
     if (trState.part) {
-      search.hidden = true; list.innerHTML = "";
+      row.hidden = true; list.innerHTML = "";
       var r = trState.part, pk = document.createElement("div"); pk.className = "tr-picked"; pk.id = "trPicked";
       pk.innerHTML = '<div><div class="n"></div><div class="r"></div></div><div class="stock">In stock<b></b></div>';
       pk.querySelector(".n").textContent = r.name || "(no name)"; pk.querySelector(".r").textContent = r.reference;
@@ -2721,14 +2726,15 @@
       pk.addEventListener("click", function () { trState.part = null; trRender(); search.focus(); });
       box.appendChild(pk);
     } else {
-      search.hidden = false;
+      row.hidden = false;
       // spare parts of the open month, then Used parts
       var all = trState.machine === "All", pool = [];
       MACHINES.forEach(function (m) { if (all || trState.machine === m) (data[m] || []).forEach(function (r) { if (hasContent(r)) pool.push({ kind: "part", r: r }); }); });
       sideLists.used.forEach(function (r) { if ((all || trState.machine === r.machine) && sideHasContent("used", r)) pool.push({ kind: "used", r: r }); });
-      var q = norm(search.value.trim()), hits = pool.filter(function (h) {
-        return !q || norm(h.r.reference).indexOf(q) !== -1 || norm(h.r.name).indexOf(q) !== -1;
-      }).slice(0, q ? 30 : 0);
+      // Reference and Part name are searched separately; fill one or both
+      var qr = norm(search.value.trim()), qn = norm(nameIn.value.trim()), hits = pool.filter(function (h) {
+        return (!qr || norm(h.r.reference).indexOf(qr) !== -1) && (!qn || norm(h.r.name).indexOf(qn) !== -1);
+      }).slice(0, qr || qn ? 30 : 0);
       list.innerHTML = "";
       hits.forEach(function (h) {
         var r = h.r, b = document.createElement("button"); b.type = "button"; b.className = "tr-opt";
@@ -2856,6 +2862,8 @@
   document.getElementById("trCancel").addEventListener("click", function () { trDlg.hidden = true; });
   document.getElementById("trSave").addEventListener("click", trSave);
   document.getElementById("trSearch").addEventListener("input", trRender);
+  document.getElementById("trName").addEventListener("input", trRender);
+  document.getElementById("trName").addEventListener("keydown", function (e) { if (e.key === "Enter") { var f = document.querySelector("#trList .tr-opt"); if (f) f.click(); } });
   document.getElementById("trSearch").addEventListener("keydown", function (e) { if (e.key === "Enter") { var f = document.querySelector("#trList .tr-opt"); if (f) f.click(); } });
   document.getElementById("trQty").addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); trCheck(); });
   document.getElementById("trQty").addEventListener("keydown", function (e) { if (e.key === "Enter") trSave(); });
