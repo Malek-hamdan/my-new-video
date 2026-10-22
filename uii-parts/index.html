@@ -214,7 +214,9 @@
   /* Issue slip: only this prints */
   #printArea { display: none; }
   @media print {
-    @page { size: A4 portrait; margin: 10mm; }
+    @page { size: A4 portrait; margin: 0; }
+    body.printing #printArea .spage, body.printing #printArea .bpage { box-sizing: border-box; padding: 10mm; }
+    body.printing #printArea .bpage { height: 297mm; }
     body.printing > *:not(#printArea) { display: none !important; }
     body.printing { background: #fff !important; }
     body.printing #printArea { display: block !important; }
@@ -249,7 +251,8 @@
   .confirm-card.blank-card { max-width: 820px; padding: 26px 28px; }
   .blank-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: #cfe0ff; margin-bottom: 6px; }
   .blank-help { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
-  .blank-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .blank-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+  .slip .s-wval { display: inline-block; width: 36mm; border-bottom: 1px solid #333; font-size: 14px; font-weight: 700; color: #111; text-align: left; }
   .blank-pages { margin: 10px 0 2px; color: var(--muted); font-size: 13px; }
   .blank-preview { height: 250px; overflow: hidden; border-radius: 10px; background: #fff; padding: 12px; }
   .blank-scale { transform: scale(.66); transform-origin: top left; width: 190mm; }
@@ -1093,6 +1096,7 @@
       <p class="blank-help">Empty slips for the store room. Two slips on each A4 page, with a cut line between them.</p>
       <div class="blank-row">
         <div><span class="tr-label">Recorded by</span><input class="tr-input" id="blankMe" placeholder="Your name" autocomplete="off" spellcheck="false" dir="auto"></div>
+        <div><span class="tr-label">Date</span><input class="tr-input" type="date" id="blankDate"></div>
         <div><span class="tr-label">Store / place</span><input class="tr-input" id="blankPlace" placeholder="Store room" autocomplete="off" spellcheck="false" dir="auto"></div>
         <div><span class="tr-label">How many slips</span><div class="tr-qty"><button type="button" id="blankMinus">&minus;</button><input class="tr-input" id="blankCount" value="16" inputmode="numeric"><button type="button" id="blankPlus">+</button></div></div>
       </div>
@@ -2902,10 +2906,10 @@
   }
   // ---- Blank slips: empty issue slips to fill by hand in the store room ----
   var BLANK_PLACE_KEY = "uii-blank-place";
-  function blankSlipHtml(me, place) {
+  function blankSlipHtml(me, place, date) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 Spare Part Issue Slip</div><div class="s-sub">' + e(place || "Store room") + "</div></div>" +
-      '<div class="s-no"><span class="s-k">Date</span> <span class="s-wline"></span><br><span class="s-k">Time</span> <span class="s-wline"></span></div></div>' +
+      '<div class="s-no"><span class="s-k">Date</span> ' + (date ? '<span class="s-wval">' + e(date) + '</span>' : '<span class="s-wline"></span>') + '<br><span class="s-k">Time</span> <span class="s-wline"></span></div></div>' +
       '<div class="s-grid">' +
       '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-blank"></div></div>' +
       '<div class="s-cell s-linebox">LINE<span class="s-lnspace"></span></div>' +
@@ -2920,7 +2924,7 @@
   function blankCount() { var n = parseInt(document.getElementById("blankCount").value, 10) || 0; return Math.max(1, Math.min(100, n)); }
   function renderBlank() {
     var me = document.getElementById("blankMe").value.trim(), place = document.getElementById("blankPlace").value.trim(), n = blankCount();
-    document.getElementById("blankPreview").innerHTML = blankSlipHtml(me, place);
+    document.getElementById("blankPreview").innerHTML = blankSlipHtml(me, place, document.getElementById("blankDate").value);
     var pages = Math.ceil(n / 2);
     document.getElementById("blankPages").textContent = n + (n === 1 ? " slip" : " slips") + " \u00B7 " + pages + (pages === 1 ? " A4 page" : " A4 pages");
   }
@@ -2928,11 +2932,13 @@
     try {
       document.getElementById("blankMe").value = localStorage.getItem(TR_ME_KEY) || "";
       document.getElementById("blankPlace").value = localStorage.getItem(BLANK_PLACE_KEY) || "";
+      var td = new Date(); document.getElementById("blankDate").value = td.getFullYear() + "-" + pad(td.getMonth() + 1) + "-" + pad(td.getDate());
     } catch (e) {}
     blankDlg.hidden = false;
     renderBlank();
     document.getElementById("blankMe").focus();
   });
+  document.getElementById("blankDate").addEventListener("change", renderBlank);
   ["blankMe", "blankPlace", "blankCount"].forEach(function (id) { document.getElementById(id).addEventListener("input", function () {
     if (id === "blankCount") this.value = this.value.replace(/\D/g, "");
     renderBlank();
@@ -2944,7 +2950,7 @@
   document.getElementById("blankPrint").addEventListener("click", function () {
     var me = document.getElementById("blankMe").value.trim(), place = document.getElementById("blankPlace").value.trim(), n = blankCount(), html = "";
     try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(BLANK_PLACE_KEY, place); } catch (e) {}
-    var one = blankSlipHtml(me, place);
+    var one = blankSlipHtml(me, place, document.getElementById("blankDate").value);
     for (var i = 0; i < n; i += 2) html += '<div class="bpage">' + one + (i + 1 < n ? '<div class="slip-cut">\u2702 cut here</div>' + one : "") + "</div>";
     blankDlg.hidden = true;
     printHtml(html);
@@ -2959,7 +2965,7 @@
   }
   function printSlip(t) {
     var area = document.getElementById("printArea");
-    area.innerHTML = slipHtml(t);
+    area.innerHTML = '<div class="spage">' + slipHtml(t) + "</div>";
     document.body.classList.add("printing");
     var done = function () { document.body.classList.remove("printing"); window.removeEventListener("afterprint", done); };
     window.addEventListener("afterprint", done);
