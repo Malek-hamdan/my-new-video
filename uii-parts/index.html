@@ -246,6 +246,20 @@
   .slip .s-lab { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1F3864; }
   .slip .s-name { height: 9mm; border-bottom: 1px solid #333; font-size: 15px; display: flex; align-items: flex-end; padding-bottom: 1mm; }
   .slip .s-line { height: 11mm; border-bottom: 1px solid #333; font-size: 10px; color: #777; display: flex; align-items: flex-end; padding-bottom: 1mm; }
+  .confirm-card.blank-card { max-width: 820px; padding: 26px 28px; }
+  .blank-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: #cfe0ff; margin-bottom: 6px; }
+  .blank-help { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+  .blank-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .blank-pages { margin: 10px 0 2px; color: var(--muted); font-size: 13px; }
+  .blank-preview { height: 250px; overflow: hidden; border-radius: 10px; background: #fff; padding: 12px; }
+  .blank-scale { transform: scale(.66); transform-origin: top left; width: 190mm; }
+  @media (max-width: 560px) { .blank-row { grid-template-columns: 1fr; } .blank-scale { transform: scale(.42); } .blank-preview { height: 170px; } }
+  .slip .s-blank { min-height: 9mm; }
+  .slip .s-lnspace { display: inline-block; width: 14mm; }
+  .slip .s-blank.big { min-height: 11mm; }
+  .slip .s-wline { display: inline-block; width: 36mm; border-bottom: 1px solid #333; height: 15px; vertical-align: bottom; }
+  .bpage { height: 277mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; break-after: page; }
+  .bpage:last-child { page-break-after: auto; break-after: auto; }
   .slip-cut { width: 190mm; margin-top: 5mm; text-align: center; font: 11px Arial, sans-serif; color: #777; border-top: 1.5px dashed #999; padding-top: 1.5mm; }
   .confirm-card.tr-card { max-width: 820px; padding: 26px 28px; }
   .tr-card .tr-chip { padding: 8px 16px; }
@@ -872,6 +886,10 @@
       <p class="subtitle">Machine Spare Parts Register</p>
     </div>
     <div class="header-actions">
+    <button class="btn" id="blankBtn" type="button" title="Print empty issue slips for the store room">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+      <span>Blank slips</span>
+    </button>
     <button class="btn" id="backupBtn" type="button" title="Full backup, restore and daily copies">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z"/><path d="M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
       <span>Backups</span>
@@ -1066,6 +1084,24 @@
       <div class="confirm-actions" style="margin-top:18px">
         <button class="btn" id="trCancel" type="button">Cancel</button>
         <button class="btn btn-primary" id="trSave" type="button">Save transfer</button>
+      </div>
+    </div>
+  </div>
+  <div class="confirm" id="blankDlg" hidden role="dialog" aria-modal="true" aria-labelledby="blankTitle">
+    <div class="confirm-card blank-card">
+      <div class="tr-title" id="blankTitle">Blank issue slips</div>
+      <p class="blank-help">Empty slips for the store room. Two slips on each A4 page, with a cut line between them.</p>
+      <div class="blank-row">
+        <div><span class="tr-label">Recorded by</span><input class="tr-input" id="blankMe" placeholder="Your name" autocomplete="off" spellcheck="false" dir="auto"></div>
+        <div><span class="tr-label">Store / place</span><input class="tr-input" id="blankPlace" placeholder="Store room" autocomplete="off" spellcheck="false" dir="auto"></div>
+        <div><span class="tr-label">How many slips</span><div class="tr-qty"><button type="button" id="blankMinus">&minus;</button><input class="tr-input" id="blankCount" value="16" inputmode="numeric"><button type="button" id="blankPlus">+</button></div></div>
+      </div>
+      <div class="blank-pages" id="blankPages"></div>
+      <span class="tr-label">Preview</span>
+      <div class="blank-preview"><div class="blank-scale" id="blankPreview"></div></div>
+      <div class="confirm-actions" style="margin-top:18px">
+        <button class="btn" id="blankCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="blankPrint" type="button">Print</button>
       </div>
     </div>
   </div>
@@ -2863,6 +2899,63 @@
       '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name">' + e(t.by) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Received by</div><div class="s-name">' + e(t.to) + '</div><div class="s-line">Signature</div></div></div></div>' +
       '<div class="slip-cut">\u2702 cut here</div>';
+  }
+  // ---- Blank slips: empty issue slips to fill by hand in the store room ----
+  var BLANK_PLACE_KEY = "uii-blank-place";
+  function blankSlipHtml(me, place) {
+    var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+    return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 Spare Part Issue Slip</div><div class="s-sub">' + e(place || "Store room") + "</div></div>" +
+      '<div class="s-no"><span class="s-k">Date</span> <span class="s-wline"></span><br><span class="s-k">Time</span> <span class="s-wline"></span></div></div>' +
+      '<div class="s-grid">' +
+      '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-blank"></div></div>' +
+      '<div class="s-cell s-linebox">LINE<span class="s-lnspace"></span></div>' +
+      '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-blank"></div></div>' +
+      '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-blank big"></div></div></div>' +
+      '<div class="s-sign">' +
+      '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(me) + '</div><div class="s-line">Signature</div></div>' +
+      '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name"></div><div class="s-line">Signature</div></div>' +
+      '<div class="s-box"><div class="s-lab">Received by</div><div class="s-name"></div><div class="s-line">Signature</div></div></div></div>';
+  }
+  var blankDlg = document.getElementById("blankDlg");
+  function blankCount() { var n = parseInt(document.getElementById("blankCount").value, 10) || 0; return Math.max(1, Math.min(100, n)); }
+  function renderBlank() {
+    var me = document.getElementById("blankMe").value.trim(), place = document.getElementById("blankPlace").value.trim(), n = blankCount();
+    document.getElementById("blankPreview").innerHTML = blankSlipHtml(me, place);
+    var pages = Math.ceil(n / 2);
+    document.getElementById("blankPages").textContent = n + (n === 1 ? " slip" : " slips") + " \u00B7 " + pages + (pages === 1 ? " A4 page" : " A4 pages");
+  }
+  document.getElementById("blankBtn").addEventListener("click", function () {
+    try {
+      document.getElementById("blankMe").value = localStorage.getItem(TR_ME_KEY) || "";
+      document.getElementById("blankPlace").value = localStorage.getItem(BLANK_PLACE_KEY) || "";
+    } catch (e) {}
+    blankDlg.hidden = false;
+    renderBlank();
+    document.getElementById("blankMe").focus();
+  });
+  ["blankMe", "blankPlace", "blankCount"].forEach(function (id) { document.getElementById(id).addEventListener("input", function () {
+    if (id === "blankCount") this.value = this.value.replace(/\D/g, "");
+    renderBlank();
+  }); });
+  document.getElementById("blankMinus").addEventListener("click", function () { var q = document.getElementById("blankCount"); q.value = Math.max(1, blankCount() - 2); renderBlank(); });
+  document.getElementById("blankPlus").addEventListener("click", function () { var q = document.getElementById("blankCount"); q.value = Math.min(100, blankCount() + 2); renderBlank(); });
+  document.getElementById("blankCancel").addEventListener("click", function () { blankDlg.hidden = true; });
+  blankDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") blankDlg.hidden = true; });
+  document.getElementById("blankPrint").addEventListener("click", function () {
+    var me = document.getElementById("blankMe").value.trim(), place = document.getElementById("blankPlace").value.trim(), n = blankCount(), html = "";
+    try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(BLANK_PLACE_KEY, place); } catch (e) {}
+    var one = blankSlipHtml(me, place);
+    for (var i = 0; i < n; i += 2) html += '<div class="bpage">' + one + (i + 1 < n ? '<div class="slip-cut">\u2702 cut here</div>' + one : "") + "</div>";
+    blankDlg.hidden = true;
+    printHtml(html);
+  });
+  function printHtml(html) {
+    var area = document.getElementById("printArea");
+    area.innerHTML = html;
+    document.body.classList.add("printing");
+    var done = function () { document.body.classList.remove("printing"); window.removeEventListener("afterprint", done); };
+    window.addEventListener("afterprint", done);
+    setTimeout(function () { window.print(); setTimeout(done, 500); }, 60);
   }
   function printSlip(t) {
     var area = document.getElementById("printArea");
