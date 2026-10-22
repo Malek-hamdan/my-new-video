@@ -48,7 +48,24 @@ object Enhancer {
         if (p.air != 0.0) y = biquad(y, "shelf", 5000.0, 0.707, p.air)
         p.topCut?.let { y = biquad(y, "lp", it) }
         y = compress(y, p.thr, p.ratio, p.expRatio)
+        y = normalize(y)
         return limit(y)
+    }
+
+    /** Bring the voiced level up to a consistent, healthy loudness so the cleaned
+     *  file is never quieter than the raw one. */
+    private fun normalize(x: FloatArray, targetDb: Double = -12.0): FloatArray {
+        var peak = 0f
+        for (s in x) { val a = Math.abs(s); if (a > peak) peak = a }
+        if (peak < 1e-4f) return x
+        val thr = peak * 0.12f
+        var sum = 0.0; var cnt = 0
+        for (s in x) if (Math.abs(s) > thr) { sum += s.toDouble() * s; cnt++ }
+        if (cnt == 0) return x
+        val rms = sqrt(sum / cnt)
+        val target = Math.pow(10.0, targetDb / 20.0)
+        val g = (target / (rms + 1e-9)).coerceIn(0.2, 12.0).toFloat()
+        return FloatArray(x.size) { x[it] * g }
     }
 
     // AI path: RNNoise as the core remover, blended with a little dry signal to stay natural.
@@ -78,6 +95,7 @@ object Enhancer {
         if (p.air != 0.0) y = biquad(y, "shelf", 5000.0, 0.707, p.air)
         p.topCut?.let { y = biquad(y, "lp", it) }
         y = compress(y, p.thr, p.ratio, p.expRatio)
+        y = normalize(y)
         return limit(y)
     }
 
@@ -209,7 +227,7 @@ object Enhancer {
         return out
     }
 
-    private fun limit(x: FloatArray, ceiling: Double = 0.89): FloatArray {
+    private fun limit(x: FloatArray, ceiling: Double = 0.97): FloatArray {
         val out = FloatArray(x.size)
         for (i in x.indices) out[i] = (ceiling * tanh(x[i] / ceiling)).toFloat()
         return out

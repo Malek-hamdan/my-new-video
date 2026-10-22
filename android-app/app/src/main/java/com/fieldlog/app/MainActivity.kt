@@ -274,14 +274,21 @@ class MainActivity : AppCompatActivity() {
         }.onFailure { Toast.makeText(this, "Can't play", Toast.LENGTH_SHORT).show() }
     }
 
+    private fun originalOf(f: File) = File(f.parent, f.name.replace(Regex("__[\\w-]+\\.wav"), "__ORIGINAL.wav"))
+
     private fun itemMenu(f: File) {
         AlertDialog.Builder(this)
-            .setItems(arrayOf("Split by speaker", "Share", "Rename", "Delete")) { _, which ->
+            .setItems(arrayOf("▶ Play ORIGINAL (before)", "Split by speaker", "Share", "Rename", "Delete")) { _, which ->
                 when (which) {
-                    0 -> splitBySpeaker(f)
-                    1 -> share(f)
-                    2 -> rename(f)
-                    3 -> { f.delete(); File(f.parent, f.name.replace(Regex("__[\\w-]+\\.wav"), "__ORIGINAL.wav")).delete(); loadList() }
+                    0 -> {
+                        val orig = originalOf(f)
+                        if (orig.exists()) { play(orig); Toast.makeText(this, "Playing ORIGINAL (raw) — tap the card to hear the cleaned one", Toast.LENGTH_LONG).show() }
+                        else Toast.makeText(this, "No original saved. Turn on 'Keep original copy' before recording.", Toast.LENGTH_LONG).show()
+                    }
+                    1 -> splitBySpeaker(f)
+                    2 -> share(f)
+                    3 -> rename(f)
+                    4 -> { f.delete(); originalOf(f).delete(); loadList() }
                 }
             }.show()
     }
