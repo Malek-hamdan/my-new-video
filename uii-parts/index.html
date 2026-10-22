@@ -231,7 +231,17 @@
   .slip td { font-size: 15px; padding: 2.4mm 3mm; border: 1px solid #8a97b3; }
   .slip td.s-qty { font-size: 20px; font-weight: 700; }
   .slip .s-used { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1.5px solid #a0661b; border-radius: 4px; color: #a0661b; font-size: 11px; font-weight: 700; vertical-align: 2px; }
-  .slip .s-sign { display: flex; gap: 8mm; margin-top: 5mm; }
+  .slip .s-grid { display: grid; grid-template-columns: 1fr 1fr 40mm; gap: 3mm; }
+  .slip .s-cell { border: 1px solid #8a97b3; border-radius: 4px; padding: 2.6mm 3.5mm; }
+  .slip .s-cell.wide { grid-column: span 2; }
+  .slip .s-val { margin-top: 1.4mm; font-size: 17px; font-weight: 600; color: #111; }
+  .slip .s-val.big { font-size: 26px; font-weight: 700; }
+  .slip .s-linebox { display: flex; align-items: center; justify-content: center; border: 2.5px solid #1F3864; color: #1F3864; font-size: 24px; font-weight: 700; letter-spacing: .5px; }
+  .tr-dt { display: flex; gap: 8px; }
+  .tr-dt input[type="date"] { flex: 1.3; min-width: 0; }
+  .tr-dt input[type="time"] { flex: 1; min-width: 0; }
+  .tr-card.in .tr-dt input[type="time"] { display: none; }
+  .slip .s-sign { display: flex; gap: 6mm; margin-top: 5mm; }
   .slip .s-box { flex: 1; border: 1px solid #8a97b3; border-radius: 4px; padding: 2.5mm 3mm; }
   .slip .s-lab { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1F3864; }
   .slip .s-name { height: 9mm; border-bottom: 1px solid #333; font-size: 15px; display: flex; align-items: flex-end; padding-bottom: 1mm; }
@@ -1043,7 +1053,7 @@
       <div class="tr-row">
         <div><span class="tr-label">Quantity</span><div class="tr-qty"><button type="button" id="trMinus">&minus;</button><input class="tr-input" id="trQty" value="0" inputmode="numeric"><button type="button" id="trPlus">+</button></div></div>
         <div class="tr-line-box"><span class="tr-label">Line</span><div class="tr-chips" id="trLines"></div></div>
-        <div><span class="tr-label">Date</span><input class="tr-input" type="date" id="trDate"></div>
+        <div><span class="tr-label">Date &amp; time</span><div class="tr-dt"><input class="tr-input" type="date" id="trDate"><input class="tr-input" type="time" id="trTime"></div></div>
       </div>
       <div class="tr-row tr-row2 tr-out-only">
         <div><span class="tr-label">Recorded by</span><input class="tr-input" id="trMe" placeholder="Your name" autocomplete="off" spellcheck="false" dir="auto"></div>
@@ -1200,6 +1210,7 @@
       source: t.source === "used" || t.source === "equip" ? t.source : "",
       // issue slip printed for this transaction, and who gave the part out
       slip: String(t.slip || ""),
+      time: /^\d{2}:\d{2}$/.test(t.time) ? t.time : "",
       me: String(t.me || ""),
       by: String(t.by || ""),
       to: String(t.to || "")
@@ -1210,7 +1221,7 @@
     return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", me: t.me || "", by: t.by || "", to: t.to || "" };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "" };
   }
   function ymd(ts) {
     var d = new Date(ts);
@@ -2693,6 +2704,7 @@
     document.getElementById("trName").value = "";
     document.getElementById("trQty").value = "0";
     var t = new Date(); document.getElementById("trDate").value = t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate());
+    document.getElementById("trTime").value = pad(t.getHours()) + ":" + pad(t.getMinutes());
     trDlg.hidden = false; trRender();
     document.getElementById("trSearch").focus();
   }
@@ -2831,6 +2843,7 @@
     });
     tx.slip = prefix + ("00" + (top + 1)).slice(-3);
     tx.me = me; tx.by = by; tx.to = to;
+    tx.time = document.getElementById("trTime").value || "";
     try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(TR_BY_KEY, by); localStorage.setItem(TR_PRINT_KEY, document.getElementById("trPrint").checked ? "1" : "0"); } catch (e) {}
   }
   function slipHtml(t) {
@@ -2839,12 +2852,14 @@
     var part = t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId);
     var name = part && part.name ? part.name : t.name, ref = part && part.reference ? part.reference : t.reference;
     return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 Spare Part Issue Slip</div><div class="s-sub">Store room</div></div>' +
-      '<div class="s-no"><span class="s-k">Date</span> <b>' + e(txDate(t)) + '</b><br><span class="s-k">Time</span> <b>' + pad(d.getHours()) + ":" + pad(d.getMinutes()) + "</b></div></div>" +
-      '<table><tr><th>Part name</th><td colspan="3">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + "</td></tr>" +
-      '<tr><th>Reference</th><td colspan="3">' + e(ref || "\u2014") + "</td></tr>" +
-      '<tr><th>Quantity</th><td class="s-qty">' + Math.abs(t.change) + '</td><th>Line</th><td class="s-qty">' + (t.line ? "Line " + e(t.line) : "\u2014") + "</td></tr></table>" +
+      '<div class="s-no"><span class="s-k">Date</span> <b>' + e(txDate(t)) + '</b><br><span class="s-k">Time</span> <b>' + e(t.time || pad(d.getHours()) + ":" + pad(d.getMinutes())) + "</b></div></div>" +
+      '<div class="s-grid">' +
+      '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-val">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + "</div></div>" +
+      '<div class="s-cell s-linebox">' + (t.line ? "LINE " + e(t.line) : "\u2014") + "</div>" +
+      '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-val">' + e(ref || "\u2014") + "</div></div>" +
+      '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-val big">' + Math.abs(t.change) + "</div></div></div>" +
       '<div class="s-sign">' +
-      '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(t.me) + '</div></div>' +
+      '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(t.me) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name">' + e(t.by) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Received by</div><div class="s-name">' + e(t.to) + '</div><div class="s-line">Signature</div></div></div></div>' +
       '<div class="slip-cut">\u2702 cut here</div>';
