@@ -11,8 +11,8 @@ android {
         applicationId = "com.fieldlog.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "2.6"
+        versionCode = 10
+        versionName = "2.7"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
@@ -31,9 +31,22 @@ android {
     }
     ndkVersion = "26.3.11579264"
 
+    signingConfigs {
+        create("stable") {
+            storeFile = file("fieldlog.keystore")
+            storePassword = "fieldlog123"
+            keyAlias = "fieldlog"
+            keyPassword = "fieldlog123"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("stable")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
