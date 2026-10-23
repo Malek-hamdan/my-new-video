@@ -395,6 +395,10 @@
   .result .r-go { color: var(--accent); font-size: 13px; font-weight: 600; white-space: nowrap; }
   .result mark { background: rgba(255,214,102,0.28); color: inherit; border-radius: 3px; padding: 0 1px; }
   .chip.chip-month { background: rgba(255,255,255,0.06); border-color: var(--border-strong); color: var(--text); }
+  .chip.chip-now { background: rgba(80,200,120,0.16); border-color: rgba(80,200,120,0.55); color: #a8f0c0; }
+  .chip.chip-old { background: transparent; border-color: var(--border); color: var(--muted); }
+  .result.old { opacity: 0.55; }
+  .result.old:hover { opacity: 0.85; }
   @media (max-width: 760px) {
     .result { grid-template-columns: 1fr 1fr; }
     .result > :first-child { grid-column: 1 / -1; }
@@ -667,6 +671,14 @@
   .tx-text { display: block; padding: 8px 10px; min-height: 39px; overflow-wrap: anywhere; }
   .tx-text.muted { color: var(--muted); }
   .tx-text.qty { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button.tx-fix { font: inherit; background: transparent; border: 1px dashed transparent; border-radius: 8px; cursor: pointer; text-align: left; }
+  button.tx-fix:hover, button.tx-fix:focus-visible { border-color: var(--border-strong); outline: none; }
+  button.tx-fix .pen { margin-left: 6px; font-size: 12px; color: var(--muted); opacity: 0; }
+  button.tx-fix:hover .pen, button.tx-fix:focus-visible .pen { opacity: 1; }
+  .fix-qty { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; }
+  .fix-qty input { width: 90px; text-align: center; font-size: 20px; font-weight: 700; }
+  .fix-stock { color: var(--muted); font-size: 14px; }
+  .fix-stock b { color: var(--text); }
   body.tx-view .cell.date { border-color: var(--border-strong); background: rgba(255,255,255,0.03); }
   .chip {
     display: inline-block;
@@ -1104,6 +1116,19 @@
       <div class="confirm-actions" style="margin-top:18px">
         <button class="btn" id="blankCancel" type="button">Cancel</button>
         <button class="btn btn-primary" id="blankPrint" type="button">Print</button>
+      </div>
+    </div>
+  </div>
+  <div class="confirm" id="txFixDlg" hidden role="dialog" aria-modal="true" aria-labelledby="txFixTitle">
+    <div class="confirm-card">
+      <strong id="txFixTitle">Fix the quantity</strong>
+      <p id="txFixText"></p>
+      <div class="fix-qty tr-qty"><button type="button" id="txFixMinus">&minus;</button><input class="tr-input" id="txFixQty" inputmode="numeric" autocomplete="off"><button type="button" id="txFixPlus">+</button></div>
+      <div class="fix-stock" id="txFixStock"></div>
+      <div class="pass-err" id="txFixErr" hidden></div>
+      <div class="confirm-actions">
+        <button class="btn" id="txFixNo" type="button">Cancel</button>
+        <button class="btn btn-primary" id="txFixYes" type="button">Save and fix the stock</button>
       </div>
     </div>
   </div>
@@ -1806,8 +1831,12 @@
       resultsEl.querySelector("strong").textContent = "Not found: \u201C" + raw + "\u201D";
       return;
     }
-    var machinesHit = {};
-    hits.forEach(function (r) { machinesHit[r.machine] = 1; });
+    var machinesHit = {}, newest = {};
+    hits.forEach(function (r) {
+      machinesHit[r.machine] = 1;
+      var k = r.machine + "|" + norm(r.reference || r.name);
+      if (!newest[k] || r.month > newest[k]) newest[k] = r.month;
+    });
     var head = document.createElement("div");
     head.className = "results-head";
     head.innerHTML = "<strong></strong> \u00B7 <span></span>";
@@ -1817,12 +1846,13 @@
     hits.slice(0, 60).forEach(function (r) {
       var b = document.createElement("button");
       b.type = "button";
-      b.className = "result";
+      var isNow = newest[r.machine + "|" + norm(r.reference || r.name)] === r.month;
+      b.className = "result" + (isNow ? "" : " old");
       var first = document.createElement("div");
       var nm = document.createElement("div"); nm.className = "r-name"; nm.dir = "auto";
       nm.appendChild(highlight(r.name || "(no name)", raw));
       var tags = document.createElement("div"); tags.className = "r-tags";
-      [[r.machine, "chip"], [monthLabel(r.month), "chip chip-month"]].concat(r.arrival ? [["New arrival", "chip chip-in"]] : []).forEach(function (t) {
+      [[r.machine, "chip"], [monthLabel(r.month), "chip chip-month"], isNow ? ["Stock now", "chip chip-now"] : ["End of " + monthLabel(r.month).split(" ")[0], "chip chip-old"]].concat(r.arrival ? [["New arrival", "chip chip-in"]] : []).forEach(function (t) {
         var c = document.createElement("span"); c.className = t[1]; c.textContent = t[0]; tags.appendChild(c);
       });
       first.appendChild(nm); first.appendChild(tags);
@@ -2037,7 +2067,18 @@
       ttd.setAttribute("data-label", "Type");
       ttd.innerHTML = '<span class="tx-text"><span class="chip ' + (isIn ? "chip-in" : "chip-out") + '">' + (isIn ? "In" : "Out") + "</span></span>";
       tr.appendChild(ttd);
-      tr.appendChild(txCell("Quantity", (isIn ? "+" : "−") + Math.abs(t.change), "qty " + (isIn ? "pos" : "neg")));
+      var qcell = txCell("Quantity", (isIn ? "+" : "−") + Math.abs(t.change), "qty " + (isIn ? "pos" : "neg"));
+      if (!ro()) {
+        var qb = document.createElement("button");
+        qb.type = "button";
+        qb.className = qcell.firstChild.className + " tx-fix";
+        qb.title = "Fix this quantity";
+        qb.textContent = qcell.firstChild.textContent;
+        var pen = document.createElement("span"); pen.className = "pen"; pen.textContent = "\u270E"; qb.appendChild(pen);
+        qb.addEventListener("click", function () { fixTx(t.id); });
+        qcell.replaceChild(qb, qcell.firstChild);
+      }
+      tr.appendChild(qcell);
       if (isIn) tr.appendChild(txCell("Line", ""));
       else {
         // Line can be set or fixed here too
@@ -2256,6 +2297,63 @@
     deleteDoc("transactions", t.id);
     return "";
   }
+  // ---- Fix a transaction's quantity: the stock and the later "Stock after" follow ----
+  var txFixDlg = document.getElementById("txFixDlg"), txFixPending = null;
+  function fixPart(t) { return t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId); }
+  function fixNow(part) { return part && /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : null; }
+  function fixRender() {
+    var t = txFixPending, part = fixPart(t), now = fixNow(part), q = parseInt(document.getElementById("txFixQty").value, 10) || 0;
+    var delta = (t.change > 0 ? q : -q) - t.change, err = document.getElementById("txFixErr");
+    document.getElementById("txFixStock").innerHTML = now === null ? "The part is no longer on the list, so only the transaction changes."
+      : "Stock now <b>" + now + "</b> \u2192 <b>" + (now + delta) + "</b>";
+    var bad = q < 1 ? "The quantity must be at least 1. To remove it, delete the transaction." : now !== null && now + delta < 0 ? "Not enough in stock: only " + now + " now." : "";
+    err.textContent = bad; err.hidden = !bad;
+    document.getElementById("txFixYes").disabled = !!bad || delta === 0;
+  }
+  function fixTx(id) {
+    if (ro()) return;
+    var t = txList.find(function (x) { return x.id === id; });
+    if (!t) return;
+    var part = fixPart(t);
+    txFixPending = t;
+    document.getElementById("txFixText").textContent = (t.change > 0 ? "In" : "Out") + " \u00B7 " + (part && part.name ? part.name : t.name || t.reference) + " \u00B7 " + t.machine + " \u00B7 " + txDate(t).split("-").reverse().join("/");
+    document.getElementById("txFixQty").value = Math.abs(t.change);
+    txFixDlg.hidden = false;
+    fixRender();
+    document.getElementById("txFixQty").select();
+  }
+  document.getElementById("txFixQty").addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); fixRender(); });
+  document.getElementById("txFixMinus").addEventListener("click", function () { var q = document.getElementById("txFixQty"); q.value = Math.max(1, (parseInt(q.value, 10) || 0) - 1); fixRender(); });
+  document.getElementById("txFixPlus").addEventListener("click", function () { var q = document.getElementById("txFixQty"); q.value = (parseInt(q.value, 10) || 0) + 1; fixRender(); });
+  document.getElementById("txFixNo").addEventListener("click", function () { txFixDlg.hidden = true; txFixPending = null; });
+  txFixDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { txFixDlg.hidden = true; txFixPending = null; } if (e.key === "Enter" && !document.getElementById("txFixYes").disabled) document.getElementById("txFixYes").click(); });
+  document.getElementById("txFixYes").addEventListener("click", function () {
+    var t = txFixPending; if (!t) return;
+    var q = parseInt(document.getElementById("txFixQty").value, 10) || 0, delta = (t.change > 0 ? q : -q) - t.change;
+    var part = fixPart(t), now = fixNow(part);
+    if (q < 1 || delta === 0 || (now !== null && now + delta < 0)) return;
+    txFixDlg.hidden = true; txFixPending = null;
+    if (part) {
+      part.quantity = String((now || 0) + delta);
+      if (t.source) {
+        clearTimeout(sideTimers[part.id]); delete sideTimers[part.id];
+        writeSide(t.source, part);
+      } else {
+        part.loggedQty = part.quantity;
+        clearTimeout(editTimers[part.id]); delete editTimers[part.id];
+        writeRow(part);
+      }
+    }
+    // this entry and every later entry of the same part in that month
+    (allTx[t.month] || []).forEach(function (x) {
+      if (x.partId !== t.partId || (x.source || "") !== (t.source || "") || (x !== t && x.ts < t.ts)) return;
+      x.after = x.after + delta;
+      if (x === t) x.change = t.change > 0 ? q : -q;
+      saveDoc("transactions", x.id, txBody(x));
+    });
+    renderTransactions();
+    setStatus("Quantity fixed: " + (t.change > 0 ? "+" : "\u2212") + q + (part ? " \u00B7 stock now " + part.quantity : ""), "saved");
+  });
   var txDelDlg = document.getElementById("txDelDlg"), txDelPending = null;
   function deleteTx(id) {
     if (ro()) return;
