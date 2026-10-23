@@ -465,6 +465,29 @@
   .cell.pass { margin-bottom: 8px; padding: 12px; border-color: var(--border-strong); font-size: 20px; letter-spacing: 0.3em; text-align: center; }
   .restore-opts { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
   .restore-opts[hidden] { display: none; }
+  .arch-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .arch-row select { font-size: 14px; padding: 7px 10px; }
+  .arch-row .muted-p { margin: 0; }
+  .arch-actions .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.btn-danger { border-color: rgba(255,120,120,0.55); color: #ffb4b4; }
+  .ysum { width: 190mm; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+  .ysum h1 { margin: 0; font-size: 22px; color: #1F3864; }
+  .ysum .y-sub { color: #555; font-size: 12px; margin: 1mm 0 5mm; border-bottom: 2.5px solid #1F3864; padding-bottom: 3mm; }
+  .ysum h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .4px; color: #1F3864; margin: 4.5mm 0 2mm; }
+  .ysum table { width: 100%; border-collapse: collapse; }
+  .ysum th { background: #E8EDF6; color: #1F3864; font-size: 10.5px; text-transform: uppercase; padding: 2mm 2mm; border: 1px solid #8a97b3; text-align: center; }
+  .ysum td { padding: 1.8mm 2mm; border: 1px solid #8a97b3; text-align: center; font-variant-numeric: tabular-nums; }
+  .ysum td.l { text-align: left; }
+  .ysum tr.tot td { font-weight: 700; background: #F3F5FA; }
+  .ysum .y-m { font-weight: 700; }
+  .ysum .y-tops { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 5mm; }
+  .ysum .y-tops table { table-layout: fixed; }
+  .ysum .y-tops th, .ysum .y-tops td { font-size: 9.5px; padding: 1.2mm 1.5mm; }
+  .ysum .y-tops td.l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ysum .y-tops col.n { width: 52%; } .ysum .y-tops col.r { width: 34%; } .ysum .y-tops col.q { width: 14%; }
+  .ysum .y-sign { display: flex; gap: 6mm; margin-top: 6mm; }
+  .ysum .y-sign div { flex: 1; border: 1px solid #8a97b3; border-radius: 4px; padding: 2.5mm 3mm; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: #1F3864; }
+  .ysum .y-sign span { display: block; height: 9mm; border-bottom: 1px solid #333; }
   .restore-opts .opt { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
   .restore-opts .opt.target { justify-content: space-between; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border); font-weight: 600; }
   .restore-opts select { font-size: 14px; padding: 6px 8px; flex: 1; min-width: 0; max-width: 100%; }
@@ -1056,6 +1079,14 @@
         <button class="btn btn-primary" id="fullBackupBtn" type="button">Download full backup</button>
         <button class="btn" id="restoreFileBtn" type="button">Restore from file…</button>
         <input type="file" id="restoreFile" accept=".xlsx,.json" hidden>
+      </div>
+      <h4>Year archive</h4>
+      <p class="muted-p">Keeps the site light for years. The site holds last year and this year; an older year goes into its own Excel file, gets a printed summary for the file, and then leaves the site.</p>
+      <div class="arch-row"><select id="archYear" class="cur"></select><span class="muted-p" id="archInfo"></span></div>
+      <div class="dlg-actions arch-actions">
+        <button class="btn" id="archXlsx" type="button">1. Download archive (Excel)</button>
+        <button class="btn" id="archPrint" type="button">2. Print year summary</button>
+        <button class="btn btn-danger" id="archDelete" type="button" disabled>3. Remove from the site</button>
       </div>
       <div id="undoWrap" hidden>
         <h4>Undo last restore</h4>
@@ -3894,11 +3925,12 @@
   // Overview, All parts and All transactions for people; a hidden "_data" sheet
   // holds the exact data so Restore can read the same file back.
   var BACKUP_MARK = "UII-BACKUP-v1";
-  function buildBackupWorkbook() {
-    var all = serializeAll();
+  // year: only that year's months (a year archive), without the lists outside the months
+  function buildBackupWorkbook(year) {
+    var all = year ? archiveData(year) : serializeAll();
     var stamp = "Saved " + fmtTime(all.savedAt).replace("  ", " at ");
     function z(name, i) { return name + (i % 2 ? "Z" : ""); }
-    var keys = MONTHS.filter(function (k) { return allParts[k] || allTx[k]; });
+    var keys = MONTHS.filter(function (k) { return (allParts[k] || allTx[k]) && (!year || k.slice(0, 4) === String(year)); });
 
     // Overview: one row per month
     var ov = [];
@@ -3911,7 +3943,8 @@
     });
     ov.forEach(function (r, i) { r.forEach(function (c) { c.s = c.s.replace(/Z$/, "") + (i % 2 ? "Z" : ""); }); });
     var sheets = [{ name: "Overview", xml: sheetXml({
-      title: "UII \u2014 Full backup", subtitle: stamp + " \u00B7 " + all.parts.length + " parts \u00B7 " + all.transactions.length + " transactions \u00B7 all months \u00B7 " + all.consumables.length + " consumables",
+      title: year ? "UII \u2014 Archive " + year : "UII \u2014 Full backup",
+      subtitle: stamp + " \u00B7 " + all.parts.length + " parts \u00B7 " + all.transactions.length + " transactions \u00B7 " + (year ? "every month of " + year : "all months \u00B7 " + all.consumables.length + " consumables"),
       rows: ov,
       columns: [{ name: "Month", width: 20 }].concat(MACHINES.map(function (m) { return { name: m + " parts", width: 13 }; }),
         [{ name: "In (pcs)", width: 11 }, { name: "Out (pcs)", width: 11 }, { name: "Transactions", width: 14 }])
@@ -3957,7 +3990,7 @@
         { name: "Type", width: 9 }, { name: "Quantity", width: 11 }, { name: "Line", width: 9 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Stock after", width: 12 }]
     }) });
 
-    SIDE_KEYS.forEach(function (k) {
+    if (!year) SIDE_KEYS.forEach(function (k) {
       sheets.push(sideSheet(k, SIDE[k].label, "UII \u2014 " + SIDE[k].label, sideLists[k].filter(function (r) { return sideHasContent(k, r); }), true, stamp, SIDE[k].theme));
     });
     sheets.push(dataSheet(BACKUP_MARK, all));
@@ -4416,6 +4449,134 @@
   }
   document.getElementById("reminderBtn").addEventListener("click", function () { downloadFullBackup(this); });
 
+  // ---- Year archive: an old year leaves the site into its own Excel file ----
+  var archDone = {};
+  function yearMonths(y) { return MONTHS.filter(function (k) { return k.slice(0, 4) === String(y); }); }
+  function yearCounts(y) {
+    var np = 0, nt = 0;
+    yearMonths(y).forEach(function (k) {
+      if (allParts[k]) MACHINES.forEach(function (m) { np += allParts[k][m].filter(hasContent).length; });
+      nt += (allTx[k] || []).length;
+    });
+    return { parts: np, tx: nt };
+  }
+  // years that may leave: older than last year, with something in them
+  function archYears() {
+    var last = new Date().getFullYear() - 2, out = [];
+    for (var y = FIRST_YEAR; y <= last; y++) { var c = yearCounts(y); if (c.parts || c.tx) out.push(y); }
+    return out;
+  }
+  function archiveData(y) {
+    var all = serializeAll(), pre = String(y) + "-";
+    all.parts = all.parts.filter(function (r) { return r.month.indexOf(pre) === 0; });
+    all.transactions = all.transactions.filter(function (t) { return t.month.indexOf(pre) === 0; });
+    delete all.consumables; delete all.usedParts; delete all.equipment;
+    all.archiveYear = y;
+    return all;
+  }
+  function renderArch() {
+    var sel = document.getElementById("archYear"), years = archYears(), keep = sel.value;
+    sel.innerHTML = "";
+    years.forEach(function (y) { var o = document.createElement("option"); o.value = y; o.textContent = y; sel.appendChild(o); });
+    if (years.indexOf(parseInt(keep, 10)) !== -1) sel.value = keep;
+    var y = parseInt(sel.value, 10), info = document.getElementById("archInfo");
+    sel.hidden = !years.length;
+    ["archXlsx", "archPrint"].forEach(function (id) { document.getElementById(id).disabled = !years.length || readOnly; });
+    document.getElementById("archDelete").disabled = !years.length || readOnly || !archDone[y];
+    if (!years.length) {
+      var first = Math.max(FIRST_YEAR, new Date().getFullYear() - 1);
+      info.textContent = "Nothing to archive yet. " + first + " can be archived from January " + (first + 2) + ".";
+      return;
+    }
+    var c = yearCounts(y);
+    info.textContent = c.parts + " parts \u00B7 " + c.tx + " transactions in " + y + (archDone[y] ? " \u00B7 archive downloaded \u2713" : " \u00B7 download the archive first");
+  }
+  document.getElementById("archYear").addEventListener("change", renderArch);
+  document.getElementById("archXlsx").addEventListener("click", function () {
+    var y = parseInt(document.getElementById("archYear").value, 10), btn = this;
+    if (!y) return;
+    flushWrites();
+    saveFile("UII-Archive-" + y + ".xlsx", buildBackupWorkbook(y), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", btn, "Archive").then(function (ok) {
+      if (ok) archDone[y] = true;
+      renderArch();
+    });
+  });
+  document.getElementById("archPrint").addEventListener("click", function () {
+    var y = parseInt(document.getElementById("archYear").value, 10);
+    if (!y) return;
+    document.getElementById("backupDlg").hidden = true;
+    printHtml('<div class="spage">' + yearSummaryHtml(y) + "</div>");
+  });
+  document.getElementById("archDelete").addEventListener("click", function () {
+    var y = parseInt(document.getElementById("archYear").value, 10), c = yearCounts(y);
+    if (!y || !archDone[y]) return;
+    askCode("Remove " + y + " from the site: " + c.parts + " parts and " + c.tx + " transactions. They stay in UII-Archive-" + y + ".xlsx. Keep that file on Google Drive and a USB stick.", function () { removeYear(y); });
+  });
+  function removeYear(y) {
+    flushWrites();
+    takeSnapshot("pre-" + Date.now(), "pre", "Before removing " + y + " (year archive)").then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
+      var c = yearCounts(y);
+      yearMonths(y).forEach(function (k) {
+        if (allParts[k]) { if (db) MACHINES.forEach(function (m) { allParts[k][m].forEach(function (r) { deleteDoc("parts", r.id); }); }); delete allParts[k]; }
+        if (allTx[k]) { if (db) allTx[k].forEach(function (t) { deleteDoc("transactions", t.id); }); delete allTx[k]; }
+      });
+      if (month.slice(0, 4) === String(y)) { month = CURRENT_MONTH; try { localStorage.setItem(MONTH_KEY, month); } catch (e) {} }
+      openSheet();
+      if (!db) saveLocal();
+      renderMonths(); renderTabs(); renderRows(); renderArch(); renderBackupDlg();
+      setStatus(y + " removed from the site: " + c.parts + " parts, " + c.tx + " transactions. They are in UII-Archive-" + y + ".xlsx.", "saved");
+    });
+  }
+  // One page for the file: what each machine used and received in the year
+  function yearSummaryHtml(y) {
+    var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+    var ks = yearMonths(y), per = {}, tot = { n: 0, outQty: 0, inQty: 0, outVal: {}, inVal: {}, stock: {} };
+    MACHINES.forEach(function (m) { per[m] = { n: 0, outQty: 0, inQty: 0, outVal: {}, inVal: {}, stock: {}, months: {}, used: {} }; });
+    ks.forEach(function (k) {
+      var st = monthStats(k);
+      MACHINES.forEach(function (m) {
+        var a = st[m], b = per[m];
+        b.n += a.n; b.outQty += a.outQty; b.inQty += a.inQty;
+        Object.keys(a.outVal).forEach(function (c) { addMoney(b.outVal, c, a.outVal[c]); addMoney(tot.outVal, c, a.outVal[c]); });
+        Object.keys(a.inVal).forEach(function (c) { addMoney(b.inVal, c, a.inVal[c]); addMoney(tot.inVal, c, a.inVal[c]); });
+        b.months[k] = a.outQty;
+        Object.keys(a.used).forEach(function (id) {
+          var u = a.used[id], part = partIn(k, id), key = (part && part.reference) || u.name || id;
+          b.used[key] = b.used[key] || { name: u.name || (part && part.name) || "", ref: (part && part.reference) || "", qty: 0 };
+          b.used[key].qty += u.qty;
+        });
+      });
+      tot.n += st.all.n; tot.outQty += st.all.outQty; tot.inQty += st.all.inQty;
+    });
+    // stock value at the end of the year: the last month that has parts
+    var lastK = ks.filter(function (k) { return allParts[k] && MACHINES.some(function (m) { return allParts[k][m].some(hasContent); }); }).pop();
+    if (lastK) MACHINES.forEach(function (m) {
+      allParts[lastK][m].forEach(function (r) {
+        var p = unitPrice(r), q = /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : 0;
+        if (p !== null && q) { addMoney(per[m].stock, r.currency, q * p); addMoney(tot.stock, r.currency, q * p); }
+      });
+    });
+    var h = '<div class="ysum"><h1>UII \u2014 Year Summary ' + y + '</h1><div class="y-sub">Spare parts per machine \u00B7 ' + monthLabel(ks[0]) + " to " + monthLabel(ks[ks.length - 1]) +
+      " \u00B7 every detail is in UII-Archive-" + y + ".xlsx</div>";
+    h += "<h2>Per machine</h2><table><tr><th>Machine</th><th>Transactions</th><th>Parts out</th><th>Value out</th><th>Parts in</th><th>Value in</th><th>Stock value at year end</th></tr>";
+    MACHINES.forEach(function (m) {
+      var b = per[m];
+      h += '<tr><td class="y-m">' + m + "</td><td>" + b.n + "</td><td>" + b.outQty + "</td><td>" + moneyBag(b.outVal) + "</td><td>" + b.inQty + "</td><td>" + moneyBag(b.inVal) + "</td><td>" + moneyBag(b.stock) + "</td></tr>";
+    });
+    h += '<tr class="tot"><td>Total</td><td>' + tot.n + "</td><td>" + tot.outQty + "</td><td>" + moneyBag(tot.outVal) + "</td><td>" + tot.inQty + "</td><td>" + moneyBag(tot.inVal) + "</td><td>" + moneyBag(tot.stock) + "</td></tr></table>";
+    h += "<h2>Parts out, month by month</h2><table><tr><th>Machine</th>" + ks.map(function (k) { return "<th>" + MONTH_NAMES[parseInt(k.slice(5), 10) - 1].slice(0, 3) + "</th>"; }).join("") + "<th>Total</th></tr>";
+    MACHINES.forEach(function (m) {
+      h += '<tr><td class="y-m">' + m + "</td>" + ks.map(function (k) { return "<td>" + (per[m].months[k] || "\u2013") + "</td>"; }).join("") + "<td><b>" + per[m].outQty + "</b></td></tr>";
+    });
+    h += "</table><h2>Most used parts</h2><div class=\"y-tops\">";
+    MACHINES.forEach(function (m) {
+      var top = Object.keys(per[m].used).map(function (k) { return per[m].used[k]; }).sort(function (a, b) { return b.qty - a.qty; }).slice(0, 5);
+      h += '<table><colgroup><col class="n"><col class="r"><col class="q"></colgroup><tr><th colspan="2">' + m + "</th><th>Pcs</th></tr>" + (top.length ? top.map(function (u) { return '<tr><td class="l">' + e(u.name || "\u2014") + '</td><td class="l">' + e(u.ref) + "</td><td>" + u.qty + "</td></tr>"; }).join("") : '<tr><td colspan="3">Nothing used</td></tr>') + "</table>";
+    });
+    h += '</div><div class="y-sign"><div>Archived on<span></span></div><div>Reviewed by<span></span></div><div>Signature<span></span></div></div></div>';
+    return h;
+  }
+
   // ---- Backups dialog ----
   var backupDlg = document.getElementById("backupDlg");
   function fmtDay(key) {
@@ -4423,6 +4584,7 @@
     return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   }
   function renderBackupDlg() {
+    renderArch();
     document.getElementById("lastBackup").textContent = lastBackupAt
       ? "Last full backup: " + fmtTime(lastBackupAt).replace("  ", " at ")
       : "No full backup downloaded yet.";
@@ -4438,7 +4600,7 @@
       undoEl.innerHTML = "";
       document.getElementById("undoWrap").hidden = !pre.length;
       pre.forEach(function (m) {
-        undoEl.appendChild(snapRow(m, "Before restoring " + (m.note || "a copy"), "the state from before the last restore"));
+        undoEl.appendChild(snapRow(m, /^Before /.test(m.note || "") ? m.note : "Before restoring " + (m.note || "a copy"), "the state from before the last restore"));
       });
       if (!daily.length) { listEl.innerHTML = '<div class="snap-empty">No daily copies yet. The first one is made the next time the site opens with data in it.</div>'; return; }
       var today = ymd(Date.now());
@@ -4582,6 +4744,7 @@
       tgtSel.value = month;
       var isFull = snap.kind !== "month";
       document.getElementById("whatGroup").hidden = !isFull;
+      document.querySelector('input[name="restoreWhat"][value="everything"]').parentNode.style.display = snap.archiveYear ? "none" : "";
       document.querySelectorAll('input[name="restoreWhat"]').forEach(function (r) {
         r.onchange = function () { document.getElementById("monthOpts").hidden = document.querySelector('input[name="restoreWhat"]:checked').value === "everything"; };
       });
