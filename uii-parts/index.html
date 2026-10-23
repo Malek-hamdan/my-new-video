@@ -456,6 +456,8 @@
   .shake { animation: shake 0.35s ease; }
   @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
   .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .del-ask { margin: 4px 0 14px; font-weight: 600; }
+  .del-ask b { color: var(--text); }
 
   /* Summary tab */
   .summary { padding: 18px; }
@@ -1138,6 +1140,7 @@
       <p id="txDelText"></p>
       <div class="confirm-actions">
         <button class="btn" id="txDelNo" type="button">Cancel</button>
+        <button class="btn" id="txDelOnly" type="button">Delete only, keep the stock</button>
         <button class="btn btn-primary" id="txDelYes" type="button">Delete and fix the stock</button>
       </div>
     </div>
@@ -2361,14 +2364,35 @@
     if (!t) return;
     var part = t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId), now = part && /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : null;
     var what = (t.change > 0 ? "In +" : "Out \u2212") + Math.abs(t.change) + " \u00B7 " + (part && part.name ? part.name : t.name || t.reference) + " \u00B7 " + t.machine + (t.source ? " (" + SIDE[t.source].label + ")" : "") + (t.line ? " \u00B7 Line " + t.line : "") + ".";
-    document.getElementById("txDelText").textContent = what + (part && now !== null
-      ? " " + (t.change < 0 ? Math.abs(t.change) + (t.change === -1 ? " goes" : " go") + " back into stock" : t.change + (t.change === 1 ? " comes" : " come") + " off the stock") + ": " + now + " \u2192 " + (now - t.change) + "."
-      : " The part is no longer on the list, so only the transaction is removed.");
+    var txt = document.getElementById("txDelText"), yes = document.getElementById("txDelYes"), only = document.getElementById("txDelOnly");
+    txt.textContent = what;
+    if (part && now !== null) {
+      var ask = document.createElement("div"); ask.className = "del-ask";
+      ask.textContent = t.change < 0 ? "Put the " + Math.abs(t.change) + " back on the part?" : "Take the " + t.change + " off the part?";
+      txt.appendChild(document.createElement("br")); txt.appendChild(ask);
+      yes.textContent = (t.change < 0 ? "Yes, put back: " : "Yes, take off: ") + now + " \u2192 " + (now - t.change);
+      only.textContent = "No, keep the stock at " + now;
+      only.hidden = false;
+      yes.disabled = now - t.change < 0;
+    } else {
+      txt.textContent = what + " The part is no longer on the list, so only the transaction is removed.";
+      yes.textContent = "Delete"; only.hidden = true; yes.disabled = false;
+    }
     txDelPending = t;
     txDelDlg.hidden = false;
     document.getElementById("txDelYes").focus();
   }
   document.getElementById("txDelNo").addEventListener("click", function () { txDelDlg.hidden = true; txDelPending = null; });
+  // remove the entry only; the part keeps the quantity it has now
+  document.getElementById("txDelOnly").addEventListener("click", function () {
+    var t = txDelPending; txDelDlg.hidden = true; txDelPending = null;
+    if (!t) return;
+    var list = allTx[t.month] || [], idx = list.findIndex(function (x) { return x.id === t.id; });
+    if (idx !== -1) list.splice(idx, 1);
+    deleteDoc("transactions", t.id);
+    renderTransactions();
+    setStatus("Transaction deleted, stock not changed", "saved");
+  });
   txDelDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { txDelDlg.hidden = true; txDelPending = null; } });
   document.getElementById("txDelYes").addEventListener("click", function () {
     var t = txDelPending; txDelDlg.hidden = true; txDelPending = null;
