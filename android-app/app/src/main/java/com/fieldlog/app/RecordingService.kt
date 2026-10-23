@@ -113,20 +113,32 @@ class RecordingService : Service() {
         RecorderBus.notifyChanged()
         val pcm = pcmFile
         thread(name = "finish") {
-            Thread.sleep(250) // let the capture loop flush
+            Thread.sleep(300) // let the capture loop flush and close the file
             if (save && pcm != null && pcm.length() > 0) {
                 RecorderBus.processing = true; RecorderBus.notifyChanged()
-                runCatching {
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val dir = recordingsDir(this)
+                val level = prefs.level
+
+                // 1) ALWAYS save the raw recording first (streamed, low memory) so it is
+                //    never lost, even if enhancement later fails or the app is killed.
+                val rawFile = File(dir, "FieldLog_${stamp}__RAW.wav")
+                val rawOk = runCatching { WavIo.pcmToWav(pcm, rawFile) }.isSuccess
+
+                // 2) Try to enhance into the main (cleaned) file.
+                val enhanced = runCatching {
                     val raw = WavIo.readPcm16(pcm)
-                    val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                    val level = prefs.level
-                    val dir = recordingsDir(this)
                     val ai = prefs.aiEnabled
                     val cleaned = Enhancer.process(raw, level, ai)
                     val tag = if (ai && Rnnoise.available) "${level.name}-AI" else level.name
                     WavIo.writeWav(File(dir, "FieldLog_${stamp}__${tag}.wav"), cleaned)
-                    if (prefs.keepOriginal) WavIo.writeWav(File(dir, "FieldLog_${stamp}__ORIGINAL.wav"), raw)
-                }
+                    if (prefs.keepOriginal && rawOk) rawFile.renameTo(File(dir, "FieldLog_${stamp}__ORIGINAL.wav"))
+                    else rawFile.delete()
+                }.isSuccess
+
+                // 3) If enhancement failed but we saved raw, keep raw as the recording.
+                if (!enhanced && rawOk) rawFile.renameTo(File(dir, "FieldLog_${stamp}__${level.name}.wav"))
+
                 RecorderBus.processing = false; RecorderBus.notifyChanged()
             }
             pcm?.delete()

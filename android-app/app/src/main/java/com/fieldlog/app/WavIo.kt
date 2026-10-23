@@ -31,6 +31,23 @@ object WavIo {
         raf.write(buf, 0, len)
     }
 
+    /** Wrap a raw 16-bit PCM file into a WAV, streamed in blocks (constant memory). */
+    fun pcmToWav(pcm: File, out: File, sampleRate: Int = SR) {
+        val dataLen = pcm.length().toInt()
+        BufferedOutputStream(FileOutputStream(out)).use { o ->
+            fun i32(v: Int) { o.write(v and 0xff); o.write((v shr 8) and 0xff); o.write((v shr 16) and 0xff); o.write((v shr 24) and 0xff) }
+            fun i16(v: Int) { o.write(v and 0xff); o.write((v shr 8) and 0xff) }
+            o.write("RIFF".toByteArray()); i32(36 + dataLen); o.write("WAVE".toByteArray())
+            o.write("fmt ".toByteArray()); i32(16); i16(1); i16(1)
+            i32(sampleRate); i32(sampleRate * 2); i16(2); i16(16)
+            o.write("data".toByteArray()); i32(dataLen)
+            pcm.inputStream().use { input ->
+                val buf = ByteArray(1 shl 16)
+                while (true) { val n = input.read(buf); if (n <= 0) break; o.write(buf, 0, n) }
+            }
+        }
+    }
+
     fun readPcm16(file: File): FloatArray {
         val bytes = file.readBytes()
         val n = bytes.size / 2
