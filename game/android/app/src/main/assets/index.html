@@ -1256,7 +1256,7 @@ function applyTheme(id) {
   MAT.jet.color.set(gold ? 0xffd166 : 0xff5a00); MAT.jetCore.color.set(gold ? 0xffffff : 0xffe08a);
   // a far-away floor under the floating track, and falling snow (golden sparkles in the Kingdom)
   const gcol = { ice: 0x9fcff0, lava: 0xff4800, golden: 0xf0b0a0, neon: 0x0a0418 }[id];
-  ground.visible = gcol != null; if (gcol != null) ground.material.color.set(gcol);
+  ground.userData.on = gcol != null; if (gcol != null) ground.material.color.set(gcol);
   ground.material.map = id === 'lava' ? (MAT.lavaTex || (MAT.lavaTex = canvasTex(256, 256, (g, w, h) => {
     g.fillStyle = '#ff4800'; g.fillRect(0, 0, w, h);
     for (let k = 0; k < 70; k++) { g.fillStyle = ['#ffb000', '#ff2a00', '#2a0a00'][k % 3]; g.globalAlpha = 0.6; g.beginPath(); g.arc(rand(0, w), rand(0, h), rand(6, 28), 0, 6.3); g.fill(); }
@@ -1422,6 +1422,7 @@ function render() {
     if (r.dropMeshes) { const y = clamp((i * ROW - b.z - 24) * 0.55, 0, 10); for (const [m, x] of r.dropMeshes) Wp(x, BLOCK_H / 2 - 0.04 + y, i * ROW + 1, m.position); }
     for (const [jt, f, c] of r.jetMeshes) { const lit = jetLit(jt), k = lit ? 1 + 0.12 * Math.sin(time * 37 + i) : 0.04; f.scale.set(k, k, k); c.scale.set(1, lit ? 1 : 0.02, 1); }
   }
+  ground.visible = ground.userData.on && !rhythm;   // the Rhythm World floats in open sky
   if (ground.visible) {
     ground.position.set(camera.position.x, elev(b.z) - (TH.decor === 'golden' ? 7 : TH.decor === 'neon' ? 3 : 5), camera.position.z - 200);
     if (ground.material.map) ground.material.map.offset.set(time * 0.02, time * 0.013);
