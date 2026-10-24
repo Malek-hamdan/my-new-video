@@ -119,11 +119,12 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 // The game runs in "track space": x across the 5 lanes, y up from the track, z distance travelled.
 // Rendering bends that space into hills and curves; the rules never see them.
 const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 80;
+const viewDist = () => clamp(VIEW + (ball.speed - 24) * 2.5, VIEW, 150);
 const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
 // the Mighty Level starts at full speed in hard mode
-const speedAt = z => Math.min(30, (S.mighty ? 22 : 12) + z * 0.02);
+const speedAt = z => Math.min(40, (S.mighty ? 28 : 14) + z * 0.026);   // 14 m/s at the start, 40 m/s by about 1000 m
 const LEVEL_LEN = 3000, MIGHTY_LEVEL = 10;
 // lasers from level 10 (and in the Mighty Level): a low fence to jump (some blink off and on)
 // and a tall beam that sweeps across the lanes, which has to be dodged
@@ -132,6 +133,7 @@ const lasersOn = () => S.mighty || S.level >= LASER_LEVEL;
 const laserLit = l => l.type !== 'fence' || !l.blink || Math.sin(time * l.w + l.ph) > -0.2;
 const sweepX = l => Math.sin(time * l.w + l.ph) * 2.2;
 const HARD_AT = 3000, HARD_SPEED = 6;   // hard mode starts 3000 m down the track (level 2); extra speed once fully hard (7000 m+)
+const TURBO_AT = 5000, TURBO_SPEED = 15;   // at 5000 m the speed jumps by 15 m/s over the next 300 m: around 60 m/s
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
@@ -181,7 +183,7 @@ const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vi
 // ---------- state ----------
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), bestMighty: +(load('rb_best_mighty') || 0), mightyOpen: load('rb_mighty') === '1',
   mighty: false, level: 1, levelZ: 0, startZ: 0, savedLevel: Math.max(1, +(load('rb_level') || 1)), shake: 0, combo: 0,
-  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0 };
+  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power: null, movers: [], tunnel: false, group: null, dirty: false }; }
@@ -205,7 +207,7 @@ function makeRow(i) {
     return row;
   }
   // space obstacles by time, not distance, so faster runs still leave time to react
-  const v = speedAt(z) + HARD_SPEED * S.hard, h = S.hard;
+  const v = speedAt(z) + HARD_SPEED * S.hard + TURBO_SPEED * (z >= TURBO_AT ? 1 : 0), h = S.hard;
   gen.gap = Math.max(3, Math.round(v * (0.8 - diff * 0.2 - 0.12 * h) / ROW) + ri(0, 1));
   const kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
@@ -260,6 +262,7 @@ function reset() {
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
   S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0;
+  S.turbo = S.startZ >= TURBO_AT ? 1 : 0;
   S.hard = S.mighty ? 1 : clamp01Hard(S.startZ); S.level = S.mighty ? MIGHTY_LEVEL : 1 + Math.round(S.startZ / LEVEL_LEN); S.levelZ = S.startZ;
 }
 
@@ -479,6 +482,10 @@ function overHole() {
 }
 
 function update(dt) {
+  const n = Math.max(1, Math.ceil(ball.speed * dt / 0.4));   // at most 40 cm of travel per step
+  for (let i = 0; i < n; i++) step(dt / n);
+}
+function step(dt) {
   time += dt;
   if (S.msgT > 0) { S.msgT -= dt; if (S.msgT <= 0) $('msg').classList.remove('show'); }
   if (S.phase === 'ending') { S.endT -= dt; if (S.endT <= 0) showOver(S.endFell); }
@@ -487,7 +494,7 @@ function update(dt) {
     const b = ball;
     if (!b.dead && !b.fall) {
       b.slowF += ((b.slow > 0 ? 0.6 : 1) - b.slowF) * Math.min(1, dt * 4);
-      b.speed = (speedAt(b.z) + HARD_SPEED * S.hard) * b.slowF;
+      b.speed = (speedAt(b.z) + HARD_SPEED * S.hard + TURBO_SPEED * S.turbo) * b.slowF;
       b.prevZ = b.z;
       b.z += b.speed * dt;
       b.rot += b.speed * dt / R;
@@ -604,6 +611,10 @@ function update(dt) {
       if (b.z >= HARD_AT) {
         if (!S.hard) { say('HARD MODE 💀', '#ff3355'); sfx.level(); buzz([80, 60, 80]); }
         S.hard = Math.max(S.hard, clamp01Hard(b.z));
+      }
+      if (b.z >= TURBO_AT) {
+        if (!S.turbo) { say('TURBO! 🔥🔥', '#ff9e00'); sfx.boost(); buzz([60, 40, 60, 40, 200]); }
+        S.turbo = Math.max(S.turbo, clamp((b.z - TURBO_AT) / 300, 0.05, 1));
       }
       // gems caught by the magnet fly into the ball
       pulled = pulled.filter(g => {
@@ -926,7 +937,7 @@ function hideGemMesh(r, k) { const m = r.gemMeshes && r.gemMeshes[k]; if (m) m.v
 
 function render() {
   const b = ball;
-  const first = Math.max(0, Math.floor((b.z - 10) / ROW)), last = Math.floor((b.z + VIEW) / ROW);
+  const first = Math.max(0, Math.floor((b.z - 10) / ROW)), last = Math.floor((b.z + viewDist()) / ROW);
   for (const r of rows) if (r.group && (r.index < first || r.index > last || r.dirty)) dropRow(r);
   for (let i = first; i <= last; i++) { const r = rowAt(i); if (!r.group) buildRow(i); }
   // animate pickups and sliding walls in view
@@ -976,6 +987,10 @@ function render() {
   sun.position.copy(ballGroup.position).add(new THREE.Vector3(3, 12, 5));
   hemi.intensity = 0.8 - 0.45 * S.dark;
   scene.fog.color.lerpColors(FOG_N, FOG_H, Math.min(1, S.hard * 2));
+  scene.fog.far = viewDist(); scene.fog.near = scene.fog.far * 0.5;
+  // widen the view as speed builds, so it feels as fast as it is
+  const fov = 62 + clamp((b.speed - 24) * 0.45, 0, 16);
+  if (Math.abs(camera.fov - fov) > 0.1) { camera.fov += (fov - camera.fov) * 0.1; camera.updateProjectionMatrix(); }
   sun.intensity = 0.85 - 0.5 * S.dark;
   renderer.render(scene, camera);
 }
