@@ -363,7 +363,7 @@ function jump() {
 }
 cv.addEventListener('pointerdown', e => {
   ac();
-  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
+  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0, trail: [], flicked: false };
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
 });
 cv.addEventListener('pointermove', e => {
@@ -371,12 +371,18 @@ cv.addEventListener('pointermove', e => {
   const dx = e.clientX - touch.x;
   touch.moved += Math.hypot(dx, e.clientY - touch.y);
   touch.x = e.clientX; touch.y = e.clientY;
+  // a quick upward flick while steering jumps, without lifting the finger: the finger has to rise
+  // 40 px within a quarter second, so drifting slowly upward while steering does not count
+  const now = performance.now();
+  touch.trail.push([now, e.clientY]);
+  while (touch.trail.length && now - touch.trail[0][0] > 250) touch.trail.shift();
+  if (Math.max(...touch.trail.map(p => p[1])) - e.clientY > 40) { jump(); touch.flicked = true; touch.trail = [[now, e.clientY]]; }
   if (S.phase === 'play' && !ball.fall) ball.x = clamp(ball.x + dx * (COLS / (W * 0.75)), -HALF + R, HALF - R);
 });
 // a tap (no real drag) is a jump
 const up = e => {
   if (!touch || e.pointerId !== touch.id) return;
-  if (e.type === 'pointerup' && touch.moved < 14 && performance.now() - touch.t < 350) jump();
+  if (e.type === 'pointerup' && !touch.flicked && touch.moved < 14 && performance.now() - touch.t < 350) jump();
   touch = null;
 };
 cv.addEventListener('pointerup', up);
