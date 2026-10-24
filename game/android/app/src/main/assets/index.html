@@ -45,6 +45,41 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 .bar i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#4cc9f0,#f72585);transition:width .25s}
 #spin{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#e0fbff,#4cc9f0 45%,#1e3a8a);box-shadow:0 0 30px #4cc9f088;animation:roll 1s linear infinite}
 @keyframes roll{to{transform:rotate(360deg)}}
+/* shop and worlds */
+.btn.shop{background:linear-gradient(180deg,#ffe08a,#ffb703);color:#3a2000;box-shadow:0 6px 0 #a06500;font-size:21px;padding:11px 30px}
+.btn.worlds{background:linear-gradient(180deg,#7ae582,#25a244);box-shadow:0 6px 0 #156b2c;font-size:21px;padding:11px 30px}
+.menuRow{display:flex;gap:10px}
+#shop{justify-content:flex-start;padding:calc(env(safe-area-inset-top) + 14px) 0 0;gap:10px;background:radial-gradient(circle at 70% 15%,#2b1c82 0%,#07051a 70%);touch-action:pan-y}
+.shopTop{width:calc(100% - 28px);display:flex;justify-content:space-between;align-items:center}
+.shopTitle{font-size:28px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,#4cc9f0,#c77dff,#f72585);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bankPill{background:linear-gradient(180deg,#ffffff22,#ffffff0c);border:1px solid #ffffff30;border-radius:20px;padding:6px 14px;font-weight:900;font-size:18px}
+.tabs{display:flex;gap:6px;background:#ffffff14;border-radius:14px;padding:5px;width:calc(100% - 28px);box-sizing:border-box}
+.tabs button{flex:1;border:0;background:none;color:#fff;font:800 15px system-ui;padding:9px 0;border-radius:10px;opacity:.7}
+.tabs button.on{background:linear-gradient(180deg,#4cc9f0,#3a86ff);opacity:1}
+#shopList{flex:1;width:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:4px 14px 18px;box-sizing:border-box}
+.sgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.card{position:relative;border-radius:18px;padding:6px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;background:linear-gradient(180deg,#ffffff16,#ffffff06);border:1.5px solid var(--c);border-bottom-color:transparent}
+.card.eq{box-shadow:0 0 16px #4cc9f077}
+.card img{width:84px;height:84px}
+.card .nm{font-weight:900;font-size:14px}
+.card .rl{font-size:9px;font-weight:900;letter-spacing:1.5px;color:var(--c)}
+.buy{width:100%;border:0;color:#fff;font:900 14px system-ui;border-radius:11px;padding:7px 0;margin-top:4px;background:linear-gradient(180deg,#ff5fa2,#f72585);box-shadow:0 4px 0 #a0105a}
+.buy.gold{background:linear-gradient(180deg,#ffe08a,#ffb703);color:#3a2000;box-shadow:0 4px 0 #a06500}
+.buy.eq{background:linear-gradient(180deg,#4cc9f0,#3a86ff);box-shadow:0 4px 0 #2457b3}
+.buy.own{background:#ffffff22;box-shadow:none}
+.buy.green{background:linear-gradient(180deg,#7ae582,#25a244);box-shadow:0 4px 0 #156b2c}
+.buy:disabled{filter:grayscale(.9);opacity:.5}
+.wcard{position:relative;height:128px;border-radius:18px;overflow:hidden;margin-bottom:10px;border:1.5px solid var(--c);background:#000 center/cover}
+.wcard.big{height:220px;box-shadow:0 0 24px #ffd16655}
+.wcard .shade{position:absolute;inset:0;background:linear-gradient(90deg,#000d 0%,#0007 50%,transparent 78%)}
+.wcard .info{position:absolute;left:12px;top:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;max-width:62%;text-align:left}
+.wcard .wn{font-size:21px;font-weight:900;text-shadow:0 2px 10px #000}
+.wcard .chips span{display:inline-block;font-size:10.5px;font-weight:800;background:#ffffff22;border-radius:8px;padding:3px 7px;margin:0 4px 4px 0}
+.wcard .note{font-size:11.5px;line-height:1.35;opacity:.95}
+.wcard .act{position:absolute;right:10px;bottom:10px;width:120px}
+.rar{align-self:flex-start;font-size:10px;font-weight:900;letter-spacing:1.5px;padding:2px 7px;border-radius:7px;color:#1a1030}
+.skull{font-size:11px;letter-spacing:1px}.skull i{opacity:.25;font-style:normal}
+#wdone .big{font-size:72px}
 </style>
 </head>
 <body>
@@ -70,6 +105,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <h1>Rolling Ball</h1>
   <button class="btn" id="play">Play</button>
   <button class="btn small hidden" id="playFresh">Start from Level 1</button>
+  <div class="menuRow"><button class="btn worlds" id="openWorlds">🌍 Worlds</button><button class="btn shop" id="openShop">🛒 Shop</button></div>
   <button class="btn mighty" id="playMighty">💀 Mighty Level</button>
   <p id="mightyNote"></p>
   <button class="btn small" id="openSettings">⚙️ Settings</button>
@@ -94,6 +130,19 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <button class="btn small" id="pauseMenu">Menu</button>
 </div>
 
+<div id="shop" class="overlay hidden">
+  <div class="shopTop"><div class="shopTitle" id="shopTitle">SHOP</div><div class="bankPill" id="shopBank">💎 0</div></div>
+  <div class="tabs"><button data-t="balls" class="on">🔵 Balls</button><button data-t="worlds">🌍 Worlds</button></div>
+  <div id="shopList"></div>
+  <button class="btn" id="shopClose" style="margin:0 0 calc(env(safe-area-inset-bottom) + 14px)">Done</button>
+</div>
+<div id="wdone" class="overlay hidden">
+  <div class="big" id="wdIcon">❄️</div>
+  <h1 id="wdTitle">World Complete!</h1>
+  <p id="wdInfo"></p>
+  <button class="btn worlds" id="wdNext">🌍 Worlds</button>
+  <button class="btn small" id="wdMenu">Menu</button>
+</div>
 <div id="settings" class="overlay hidden">
   <h1>Settings</h1>
   <div class="set">
@@ -123,7 +172,7 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 // Rendering bends that space into hills and curves; the rules never see them.
 const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 80;
 const viewDist = () => clamp(VIEW + (ball.speed - 24) * 2.5, VIEW, 150);
-const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;
+const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;   // and CRACK (worlds)
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
 // the Mighty Level starts at full speed in hard mode
@@ -132,9 +181,29 @@ const LEVEL_LEN = 3000, MIGHTY_LEVEL = 10;
 // lasers from level 10 (and in the Mighty Level): a low fence to jump (some blink off and on)
 // and a tall beam that sweeps across the lanes, which has to be dodged
 const LASER_LEVEL = 10, LASER_Y = 0.45;
-const lasersOn = () => S.mighty || S.level >= LASER_LEVEL;
+const lasersOn = () => S.mighty || S.level >= LASER_LEVEL || !!(curW() && curW().lasers);
+// ---------- worlds ----------
+// Five worlds from the shop, each harder than the last, with their own track, sky, obstacles and song:
+// a few levels of track, then the track ends in that world's Rhythm World finale.
+// The Golden Kingdom is secret: only the Royal Crown ball opens it.
+const WORLDS = {
+  ice: { n: 'Ice World', icon: '❄️', price: 1200, levels: 3, len: 2000, mul: 1.2, cap: 46, hard: 0.2, hop: 7, reward: 300,
+    slide: true, icicles: true, chips: ['🧊 Slippery turns', '❄️ Falling icicles'] },
+  lava: { n: 'Lava World', icon: '🔥', price: 1800, levels: 3, len: 2000, mul: 1.4, cap: 52, hard: 0.45, hop: 8, reward: 500,
+    cracks: true, jets: true, fade: true, chips: ['🔥 Floor cracks', '🌋 Lava bursts'] },
+  neon: { n: 'Neon City', icon: '🌃', price: 2400, levels: 3, len: 2000, mul: 1.6, cap: 58, hard: 0.7, hop: 9, reward: 800,
+    lasers: true, walls: true, sway: true, chips: ['🚧 Moving walls', '🔴 More lasers'] },
+  space: { n: 'Space', icon: '🪐', price: 3200, levels: 3, len: 2000, mul: 1.8, cap: 62, hard: 0.85, hop: 10, reward: 1200,
+    lasers: true, lowG: true, gaps: true, chips: ['🪐 Low gravity', '🕳️ Gaps everywhere'] },
+  golden: { n: 'Golden Kingdom', icon: '👑', needBall: 'royal', levels: 4, len: 2000, mul: 2.0, cap: 68, hard: 1, hop: 11, reward: 3000,
+    icicles: true, cracks: true, jets: true, lasers: true, walls: true, sway: true, fade: true, chips: ['👑 Hardest track', '⚡ Everything at once'] } };
+const WORLD_ORDER = ['ice', 'lava', 'neon', 'space', 'golden'];
+function curW() { return S.wid ? WORLDS[S.wid] : null; }
+const loadJSON = (k, d) => { try { return JSON.parse(load(k)) || d; } catch (e) { return d; } };
+const CRACK = 4;   // lava floor that glows, then gives way just before the ball gets there
 const laserLit = l => l.type !== 'fence' || !l.blink || Math.sin(time * l.w + l.ph) > -0.2;
 const sweepX = l => Math.sin(time * l.w + l.ph) * 2.2;
+const jetLit = j => Math.sin(time * j.w + j.ph) > 0.15;
 const HARD_AT = 3000, HARD_SPEED = 6;   // hard mode starts 3000 m down the track (level 2); extra speed once fully hard (7000 m+)
 const TURBO_AT = 5000, TURBO_SPEED = 15;   // at 5000 m the speed jumps by 15 m/s over the next 300 m: around 60 m/s
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
@@ -184,10 +253,22 @@ let vibeOff = load('rb_vibe') === '0';
 // Music for the Rhythm World. The song's clock drives the ball there, so tiles placed on the beats
 // are landed on the beats. Without audio the same clock just runs on frame time.
 const M = { src: null, gain: null, t0: 0, pos0: 0, fpos: 0, on: false };
+// song 1 is the main track's; each world has its own, loaded when the world is first played
+const curSong = () => window.SONGS && SONGS[S.wid || 0];
+async function loadSong(id) {
+  try {
+    if (!(window.SONGS && SONGS[id])) await loadScript(id === 0 ? 'song1.js' : `song_${id}.js`);
+    const song = SONGS[id], a = ac();
+    if (song.buf || !song.audio || !a) return;
+    const bin = atob(song.audio), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    song.audio = null; song.buf = await a.decodeAudioData(u8.buffer);
+  } catch (e) {}
+}
 function musicStart(pos) {
   musicStop();
   M.fpos = pos; M.pos0 = pos; M.on = false;
-  const a = ac(), song = window.SONGS && SONGS[0];
+  const a = ac(), song = curSong();
   if (!a || !song || !song.buf || window.__dtClock) return;
   if (!M.gain) { M.gain = a.createGain(); M.gain.connect(a.destination); }
   M.gain.gain.cancelScheduledValues(a.currentTime); M.gain.gain.setValueAtTime(muted ? 0 : 0.7, a.currentTime);
@@ -209,7 +290,8 @@ const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vi
 // ---------- state ----------
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), bestMighty: +(load('rb_best_mighty') || 0), mightyOpen: load('rb_mighty') === '1',
   mighty: false, level: 1, levelZ: 0, startZ: 0, savedLevel: Math.max(1, +(load('rb_level') || 1)), shake: 0, combo: 0,
-  bank: +(load('rb_bank') || 0), banked: 0, continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0, world: 'run', wt: 0, pulse: 0, rpts: 0 };
+  bank: +(load('rb_bank') || 0), banked: 0, wid: null, wOwned: loadJSON('rb_wown', []), wDone: loadJSON('rb_wdone', []),
+  balls: loadJSON('rb_balls', ['classic']), skin: load('rb_skin') || 'classic', continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0, world: 'run', wt: 0, pulse: 0, rpts: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power: null, movers: [], tunnel: false, group: null, dirty: false }; }
@@ -221,7 +303,7 @@ function makeRow(i) {
   row.hard = S.hard > 0;
   if (i * ROW < S.startZ + (S.startZ ? 60 : 24)) return row;   // a calm stretch where each run starts (longer when resuming at speed)
   if (gen.queue.length) { gen.queue.shift()(row); return row; }
-  const diff = S.mighty ? 1 : clamp((i - 12) / 200, 0, 1), z = i * ROW;
+  const w = curW(), diff = S.mighty || (w && w.hard >= 0.7) ? 1 : clamp((i - 12) / 200, 0, 1), z = i * ROW;
   gen.gap--;
   if (gen.gap > 0) {
     // calm row: drift the safe path and maybe lay a gem or a power-up on it
@@ -233,34 +315,40 @@ function makeRow(i) {
     return row;
   }
   // space obstacles by time, not distance, so faster runs still leave time to react
-  const v = speedAt(z) + HARD_SPEED * S.hard + TURBO_SPEED * (z >= TURBO_AT ? 1 : 0), h = S.hard;
+  const v = runSpeed(z), h = S.hard, air = w && w.lowG ? 1.5 : 1;   // low gravity: longer jumps need longer landings
   gen.gap = Math.max(3, Math.round(v * (0.8 - diff * 0.2 - 0.12 * h) / ROW) + ri(0, 1));
   const kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
-  if (lasersOn() && Math.random() < 0.3) {
+  if (w && w.jets && Math.random() < 0.14) {
+    // lava jets: columns of fire that burst up from a lane or two on and off
+    row.jets = others().slice(0, ri(1, 2)).concat(Math.random() < 0.4 ? [gen.safe] : []).map(c => ({ c, w: rand(2.4, 3.4), ph: rand(0, 6) }));
+    return row;
+  }
+  if (lasersOn() && Math.random() < (w && w.lasers ? 0.34 : 0.3)) {
     if (Math.random() < 0.5) {
       row.laser = { type: 'fence', blink: Math.random() < 0.5, w: rand(2.2, 3), ph: rand(0, 6), gone: false };
-      gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 / ROW) + 2);   // room to land after jumping it
+      gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 * air / ROW) + 2);   // room to land after jumping it
     } else row.laser = { type: 'sweep', w: rand(1.6, 2.4) * (1 + 0.3 * h), ph: rand(0, 6), gone: false };
   } else if (z > 120 && kind < 0.08) {
     // jump pad in front of a wide gap
     row.cells[gen.safe] = PAD;
     for (let k = 0; k < 3; k++) gen.queue.push(r => r.cells.fill(HOLE));   // a well-timed normal jump also clears it
     gen.gap = Math.max(3, Math.ceil(v * 1.05 / ROW) - 3 + Math.round(v * 0.6 / ROW));
-  } else if (z > 100 && kind < 0.24) {
+  } else if (z > 100 && kind < (w && w.walls ? 0.4 : 0.24)) {
     // sliding walls sweep across the lanes
     const n = h > 0 ? ri(2, 3) : diff > 0.5 && Math.random() < 0.5 ? 2 : 1;
     for (let k = 0; k < n; k++) row.movers.push({ c: rand(-1, 1), amp: rand(1.2, 2), w: rand(1.3, 2.2) * (1 + 0.6 * h), ph: rand(0, 6), gone: false });
-  } else if (diff > 0.08 && kind < 0.32 + diff * 0.1 + h * 0.1) {
+  } else if (diff > 0.08 && kind < (w && w.walls ? 0.48 : 0.32) + diff * 0.1 + h * 0.1 + (w && w.gaps ? 0.14 : 0)) {
     row.cells.fill(HOLE);                                         // full gap: must jump
-    if (h > 0.5 && Math.random() < 0.4) gen.queue.push(r => r.cells.fill(HOLE));   // hard mode: a double-length gap
-    gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 / ROW) + 2);   // room to land after the jump
+    if (h > 0.5 && Math.random() < (w && w.gaps ? 0.7 : 0.4)) gen.queue.push(r => r.cells.fill(HOLE));   // hard mode: a double-length gap
+    gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 * air / ROW) + 2);   // room to land after the jump
   } else if (kind < 0.66) {
     const n = clamp(ri(2, 3) + Math.round(diff * 1.5) + (h > 0 ? 1 : 0), 2, 4), o = others();
     for (let k = 0; k < n; k++) row.cells[o[k]] = BLOCK;
+    if (w && w.icicles && Math.random() < 0.45) row.drop = true;   // these fall from the sky as the ball comes
   } else {
     const n = clamp(ri(2, 3) + Math.round(diff), 2, 4), o = others();
-    for (let k = 0; k < n; k++) row.cells[o[k]] = HOLE;
+    for (let k = 0; k < n; k++) row.cells[o[k]] = w && w.cracks && Math.random() < 0.7 ? CRACK : HOLE;
   }
   if (row.cells[gen.safe] === FLOOR && !row.movers.length && Math.random() < 0.5) row.gems.push(gen.safe);
   return row;
@@ -282,21 +370,24 @@ const CAM_BACK = 5.4, CAM_H = 3.1;
 function reset() {
   if (rows) for (const r of rows) dropRow(r);
   for (const g of pulled || []) scene.remove(g.mesh);
-  ball = { x: 0, y: 0, z: S.startZ, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0 };
+  ball = { x: 0, tx: 0, vx: 0, y: 0, z: S.startZ, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0 };
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
   S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0; S.world = 'run'; S.rpts = 0;
   if (typeof hopClear === 'function') hopClear();
-  S.turbo = S.startZ >= TURBO_AT ? 1 : 0;
-  S.hard = S.mighty ? 1 : clamp01Hard(S.startZ); S.level = S.mighty ? MIGHTY_LEVEL : 1 + Math.round(S.startZ / LEVEL_LEN); S.levelZ = S.startZ;
+  const w = curW();
+  S.turbo = !w && S.startZ >= TURBO_AT ? 1 : 0;
+  S.hard = w ? w.hard : S.mighty ? 1 : clamp01Hard(S.startZ);
+  S.level = w ? 1 + Math.round(S.startZ / w.len) : S.mighty ? MIGHTY_LEVEL : 1 + Math.round(S.startZ / LEVEL_LEN); S.levelZ = S.startZ;
 }
 
 function hud() {
   $('dist').textContent = Math.floor(ball.z) + ' m';
-  $('lvl').textContent = (S.mighty ? '💀 ' : '') + 'Lv ' + S.level;
-  if (S.world !== 'rhythm') $('lvbar').firstChild.style.width = clamp((ball.z - S.levelZ) / LEVEL_LEN, 0, 1) * 100 + '%';
+  const w = curW();
+  $('lvl').textContent = w ? `${w.icon} ${Math.min(S.level, w.levels)}/${w.levels}` : (S.mighty ? '💀 ' : '') + 'Lv ' + S.level;
+  if (S.world !== 'rhythm') $('lvbar').firstChild.style.width = clamp((ball.z - S.levelZ) / (w ? w.len : LEVEL_LEN), 0, 1) * 100 + '%';
   $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
   $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
   $('slow').textContent = ball.slow > 0 ? '🐢 ' + Math.ceil(ball.slow) : '';
@@ -312,27 +403,40 @@ function say(text, color) {
 }
 // only the distance covered in this run counts, so starting from a saved level gives no free points
 function score() { return Math.floor(ball.z - S.startZ) + S.gems * 10 + S.rpts; }
+// track speed: a world speeds up its run (and stays at its own difficulty); the main track turns hard and turbo
+function runSpeed(z) {
+  const w = curW();
+  if (w) return Math.min(w.cap, speedAt(z) * w.mul + HARD_SPEED * w.hard);
+  return speedAt(z) + HARD_SPEED * S.hard + TURBO_SPEED * (z >= TURBO_AT ? 1 : 0);
+}
 const clamp01Hard = z => z >= HARD_AT ? 0.35 + 0.65 * clamp((z - HARD_AT) / 4000, 0, 1) : 0;
 
-function start(mighty, fresh) {
-  if (typeof mighty === 'boolean') S.mighty = mighty;   // Play Again keeps the current mode
+function start(mighty, fresh, wid) {
+  if (typeof mighty === 'boolean') { S.mighty = mighty; S.wid = wid || null; }   // Play Again keeps the current mode
   if (S.mighty && !S.mightyOpen) return;
-  // normal runs start at the furthest level reached so far, unless asked to start over
-  S.startZ = S.mighty || fresh ? 0 : (S.savedLevel - 1) * LEVEL_LEN;
+  const w = curW();
+  // normal runs start at the furthest level reached so far, unless asked to start over; worlds at their own
+  S.startZ = w ? (clamp(+load('rb_wlv_' + S.wid) || 1, 1, w.levels + 1) - 1) * w.len : S.mighty || fresh ? 0 : (S.savedLevel - 1) * LEVEL_LEN;
+  applyTheme(S.wid || 'classic');
   ac(); reset();
   S.phase = 'play';
   for (const id of ['menu', 'over']) $(id).classList.add('hidden');
   for (const id of ['hud', 'powers', 'lvbar']) $(id).classList.remove('hidden');
-  if (S.mighty) say('MIGHTY LEVEL 💀', '#ff3355');
+  for (const id of ['shop', 'wdone']) $(id).classList.add('hidden');
+  if (w) {
+    loadSong(S.wid);
+    if (S.level > w.levels) startDrop();   // resuming at the world's finale
+    else say(`${w.icon} ${w.n}\nLevel ${S.level}/${w.levels}`, TH.msg);
+  } else if (S.mighty) say('MIGHTY LEVEL 💀', '#ff3355');
   else if (S.startZ > 0) say(`Level ${S.level}`, '#80ffdb');
-  if (!S.mighty && isRhythmLevel(S.level)) startDrop();   // resuming at a Rhythm World level
+  if (!w && !S.mighty && isRhythmLevel(S.level)) startDrop();   // resuming at a Rhythm World level
   hud();
 }
 function goMenu() {
   musicStop(); if (AC && AC.state === 'suspended') AC.resume();
-  S.mighty = false; S.startZ = 0; reset(); S.phase = 'menu';
+  S.mighty = false; S.wid = null; S.startZ = 0; applyTheme('classic'); reset(); S.phase = 'menu';
   $('msg').classList.remove('show'); S.msgT = 0;
-  for (const id of ['over', 'hud', 'powers', 'lvbar']) $(id).classList.add('hidden');
+  for (const id of ['over', 'hud', 'powers', 'lvbar', 'wdone', 'shop']) $(id).classList.add('hidden');
   menuUI(); $('menu').classList.remove('hidden');
 }
 function menuUI() {
@@ -343,6 +447,80 @@ function menuUI() {
   $('mightyNote').textContent = S.mightyOpen ? 'Full speed, hard mode from the start' : `Reach Level ${MIGHTY_LEVEL} to unlock`;
   $('menuBest').innerHTML = [S.best && 'Best: ' + S.best, S.bestMighty && '💀 Best: ' + S.bestMighty, S.bank && '💎 ' + S.bank].filter(Boolean).join('<br>');
 }
+// ---------- shop ----------
+// balls are looks only; the Royal Crown also opens the secret Golden Kingdom
+const BALLS = [['classic', 'Classic', 'common', 0], ['ice', 'Ice', 'common', 200], ['chess', 'Chess', 'common', 300], ['gold', 'Gold', 'rare', 400],
+  ['neon', 'Neon', 'rare', 500], ['lava', 'Lava', 'epic', 700], ['earth', 'Earth', 'epic', 800], ['disco', 'Disco', 'epic', 900],
+  ['galaxy', 'Galaxy', 'legend', 1000], ['diamond', 'Diamond', 'legend', 2500], ['royal', 'Royal Crown', 'royal', 10000]];
+const RARITY = { common: ['#9fb3d1', 'COMMON'], rare: ['#4cc9f0', 'RARE'], epic: ['#c77dff', 'EPIC'], legend: ['#ffd166', 'LEGENDARY'], royal: ['#ffd166', '👑 ROYAL'] };
+const WORLD_RAR = { ice: 'rare', lava: 'epic', neon: 'epic', space: 'legend', golden: 'royal' };
+let shopTab = 'balls';
+function openShop(tab) {
+  shopTab = tab || 'balls';
+  for (const id of ['menu', 'wdone', 'over']) $(id).classList.add('hidden');
+  $('shop').classList.remove('hidden'); renderShop(); $('shopList').scrollTop = 0;
+}
+function closeShop() { $('shop').classList.add('hidden'); if (S.phase === 'menu') { menuUI(); $('menu').classList.remove('hidden'); } else goMenu(); }
+const spend = n => { if (S.bank < n) return false; S.bank -= n; save('rb_bank', S.bank); return true; };
+function worldState(id) {
+  const w = WORLDS[id], i = WORLD_ORDER.indexOf(id), prev = WORLD_ORDER[i - 1];
+  if (w.needBall) return S.balls.includes(w.needBall) ? 'play' : 'crown';
+  if (S.wOwned.includes(id)) return 'play';
+  return i === 0 || S.wDone.includes(prev) ? 'buy' : 'locked';
+}
+function renderShop() {
+  $('shopBank').textContent = '💎 ' + S.bank.toLocaleString();
+  $('shopTitle').textContent = shopTab === 'balls' ? 'SHOP' : 'WORLDS';
+  for (const b of document.querySelectorAll('#shop .tabs button')) b.classList.toggle('on', b.dataset.t === shopTab);
+  const L = $('shopList');
+  if (shopTab === 'balls') {
+    L.innerHTML = '<div class="sgrid">' + BALLS.map(([id, n, r, p]) => {
+      const own = S.balls.includes(id), eq = S.skin === id, [c, label] = RARITY[r];
+      const btn = eq ? '<button class="buy eq">Equipped</button>' : own ? `<button class="buy own" data-use="${id}">Use</button>`
+        : `<button class="buy ${r === 'royal' || r === 'legend' ? 'gold' : ''}" data-ball="${id}" ${S.bank < p ? 'disabled' : ''}>💎 ${p.toLocaleString()}</button>`;
+      return `<div class="card ${eq ? 'eq' : ''}" style="--c:${c}${r === 'royal' ? ';grid-column:span 3;box-shadow:0 0 22px #ffd16655' : ''}"><img src="shop/ball_${id}.png" alt="">` +
+        `<div class="nm">${n}</div><div class="rl">${label}</div>${r === 'royal' ? '<div style="font-size:11px;opacity:.9;margin:2px 0">Opens the secret 👑 Golden Kingdom</div>' : ''}${btn}</div>`;
+    }).join('') + '</div>';
+  } else {
+    L.innerHTML = WORLD_ORDER.map((id, i) => {
+      const w = WORLDS[id], st = worldState(id), [c, label] = RARITY[WORLD_RAR[id]], done = S.wDone.includes(id), lv = clamp(+load('rb_wlv_' + id) || 1, 1, w.levels + 1);
+      const skulls = `<span class="skull">${'💀'.repeat(i + 1)}<i>${'💀'.repeat(4 - i)}</i></span>`;
+      const btn = st === 'play' ? `<button class="buy green" data-play="${id}">▶ ${lv > 1 && lv <= w.levels ? 'Level ' + lv : lv > w.levels ? 'Finale' : 'Play'}</button>`
+        : st === 'buy' ? `<button class="buy ${i >= 3 ? 'gold' : ''}" data-world="${id}" ${S.bank < w.price ? 'disabled' : ''}>💎 ${w.price.toLocaleString()}</button>`
+        : st === 'crown' ? '<button class="buy gold" data-crown="1">👑 Royal Crown</button>'
+        : `<button class="buy own" disabled>🔒 Locked</button>`;
+      const note = st === 'locked' ? `<div class="note">🔒 Finish ${WORLDS[WORLD_ORDER[i - 1]].n} first</div>`
+        : st === 'crown' ? '<div class="note">🔒 Opens <b style="color:#ffd166">only</b> with the <b style="color:#ffd166">Royal Crown</b> ball</div>'
+        : `<div class="note">${w.levels} levels + 🎵 finale · Speed ×${w.mul.toFixed(1)}${done ? ' · ✅ Done' : ''}</div>`;
+      return `<div class="wcard ${id === 'golden' ? 'big' : ''}" style="--c:${c};background-image:url(shop/world_${id}.jpg)"><div class="shade"></div>` +
+        `<div class="info"><span class="rar" style="background:${c}">${i + 1} · ${id === 'golden' ? 'SECRET WORLD' : label}</span>${skulls}<div class="wn">${w.icon} ${w.n}</div>` +
+        `<div class="chips">${w.chips.map(x => `<span>${x}</span>`).join('')}</div>${note}</div><div class="act">${btn}</div></div>`;
+    }).join('');
+  }
+}
+$('shopList').onclick = e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  const d = b.dataset;
+  if (d.ball) {
+    const it = BALLS.find(x => x[0] === d.ball);
+    if (!spend(it[3])) return;
+    S.balls.push(d.ball); save('rb_balls', JSON.stringify(S.balls)); S.skin = d.ball; save('rb_skin', d.ball); applySkin();
+    sfx.power(); buzz([30, 30, 60]);
+  } else if (d.use) { S.skin = d.use; save('rb_skin', d.use); applySkin(); sfx.gem(); }
+  else if (d.world) {
+    if (!spend(WORLDS[d.world].price)) return;
+    S.wOwned.push(d.world); save('rb_wown', JSON.stringify(S.wOwned)); sfx.power(); buzz([30, 30, 60]);
+  } else if (d.play) { $('shop').classList.add('hidden'); start(false, false, d.play); return; }
+  else if (d.crown) { shopTab = 'balls'; renderShop(); $('shopList').scrollTop = 1e5; return; }
+  renderShop();
+};
+for (const b of document.querySelectorAll('#shop .tabs button')) b.onclick = () => { shopTab = b.dataset.t; renderShop(); $('shopList').scrollTop = 0; };
+$('shopClose').onclick = closeShop;
+$('openShop').onclick = () => openShop('balls');
+$('openWorlds').onclick = () => openShop('worlds');
+$('wdNext').onclick = () => { $('wdone').classList.add('hidden'); S.wid = null; S.phase = 'menu'; applyTheme('classic'); reset(); for (const id of ['hud', 'powers', 'lvbar']) $(id).classList.add('hidden'); openShop('worlds'); };
+$('wdMenu').onclick = goMenu;
+
 const contCost = () => 20 * 2 ** S.continues;   // 20, 40, 80... per run
 function revive() {
   const cost = contCost();
@@ -408,8 +586,13 @@ cv.addEventListener('pointermove', e => {
   touch.trail.push([now, e.clientY]);
   while (touch.trail.length && now - touch.trail[0][0] > 250) touch.trail.shift();
   if (Math.max(...touch.trail.map(p => p[1])) - e.clientY > 40) { jump(); touch.flicked = true; touch.trail = [[now, e.clientY]]; }
-  if (S.phase === 'play' && !ball.fall) ball.x = clamp(ball.x + dx * (COLS / (W * 0.75)), -HALF + R, HALF - R);
+  if (S.phase === 'play' && !ball.fall) {
+    const nx = clamp((slides() ? ball.tx : ball.x) + dx * (COLS / (W * 0.75)), -HALF + R, HALF - R);
+    if (slides()) ball.tx = nx; else ball.x = nx;
+  }
 });
+// on ice the ball slides after the finger instead of following it exactly
+const slides = () => S.world === 'run' && !!(curW() && curW().slide);
 // a tap (no real drag) is a jump
 const up = e => {
   if (!touch || e.pointerId !== touch.id) return;
@@ -464,6 +647,8 @@ document.addEventListener('visibilitychange', () => {
 window.onBack = () => {
   if (S.phase === 'play') { pause(); return 'stay'; }
   if (!$('settings').classList.contains('hidden')) { $('setClose').click(); return 'stay'; }
+  if (!$('shop').classList.contains('hidden')) { closeShop(); return 'stay'; }
+  if (S.phase === 'done') { goMenu(); return 'stay'; }
   if (S.phase === 'paused' || S.phase === 'over') { $('paused').classList.add('hidden'); goMenu(); return 'stay'; }
   return 'exit';
 };
@@ -535,13 +720,22 @@ function step(dt) {
     const b = ball;
     if (!b.dead && !b.fall) {
       b.slowF += ((b.slow > 0 ? 0.6 : 1) - b.slowF) * Math.min(1, dt * 4);
-      b.speed = (speedAt(b.z) + HARD_SPEED * S.hard + TURBO_SPEED * S.turbo) * b.slowF;
+      b.speed = (curW() ? runSpeed(b.z) : speedAt(b.z) + HARD_SPEED * S.hard + TURBO_SPEED * S.turbo) * b.slowF;
       b.prevZ = b.z;
       b.z += b.speed * dt;
       b.rot += b.speed * dt / R;
-      if (keys.ArrowLeft) b.x -= 6 * dt;
-      if (keys.ArrowRight) b.x += 6 * dt;
-      b.x = clamp(b.x, -HALF + R, HALF - R);
+      if (slides()) {
+        if (keys.ArrowLeft) b.tx -= 6 * dt;
+        if (keys.ArrowRight) b.tx += 6 * dt;
+        b.tx = clamp(b.tx, -HALF + R, HALF - R);
+        b.vx += ((b.tx - b.x) * 55 - b.vx * 6.5) * dt;   // a soft, underdamped spring: it drifts and overshoots
+        b.x += b.vx * dt;
+        if (Math.abs(b.x) > HALF - R) { b.x = clamp(b.x, -HALF + R, HALF - R); b.vx *= -0.3; }
+      } else {
+        if (keys.ArrowLeft) b.x -= 6 * dt;
+        if (keys.ArrowRight) b.x += 6 * dt;
+        b.x = clamp(b.x, -HALF + R, HALF - R); b.tx = b.x; b.vx = 0;
+      }
     }
     if (b.fall) {
       // roll on towards the far wall of the hole while sinking
@@ -551,7 +745,7 @@ function step(dt) {
       b.x += (h.c - HALF + 0.5 - b.x) * Math.min(1, dt * 4);
       b.rot += 6 * dt;
     } else if (b.air) {
-      b.vy -= (b.vy > 0 ? 22 : 32) * dt; b.y += b.vy * dt;   // drops faster than it rises: feels heavy
+      b.vy -= (b.vy > 0 ? 22 : 32) * (curW() && curW().lowG ? 0.62 : 1) * dt; b.y += b.vy * dt;   // drops faster than it rises: feels heavy (floaty in space)
       const under = rowAt(Math.floor(b.z / ROW)).cells[clamp(Math.floor(b.x + HALF), 0, COLS - 1)];
       const overRow = rowAt(Math.floor(b.z / ROW));
       if (under !== FLOOR || (overRow.laser && overRow.laser.type === 'fence')) b.cleared = true;
@@ -600,6 +794,25 @@ function step(dt) {
         sfx.crash(); buzz([60, 40, 120]); say('Crash! 💥', '#ffd60a'); end(false);
         return true;
       });
+      // lava: glowing floor gives way just before the ball reaches it
+      if (curW() && curW().cracks) for (let j = i; j <= i + Math.ceil(b.speed * 0.45 / ROW) + 1; j++) {
+        const r = rowAt(j);
+        if (!r.cells.includes(CRACK) || j * ROW - b.z > b.speed * 0.42) continue;
+        r.cells.forEach((v, k) => { if (v === CRACK) { r.cells[k] = HOLE; burst(k - HALF + 0.5, 0.1, j * ROW + 1, [0xff6a00, 0xffb000, 0x3a1008], 6, 2); } });
+        r.dirty = true;
+      }
+      // lava jets burst up in their lane on and off, high enough that only dodging gets past
+      for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
+        const r = rowAt(j);
+        if (b.dead || !r.jets || b.z < j * ROW + 0.3 || b.z > j * ROW + 1.7) continue;
+        for (const jt of r.jets) {
+          if (jt.gone || !jetLit(jt) || b.y > 2.4 || Math.abs(b.x - (jt.c - HALF + 0.5)) > 0.42 + R * 0.6) continue;
+          if (b.shield > 0) { jt.gone = true; r.dirty = true; b.shield = 0; S.shake = 0.2; burst(b.x, 0.8, b.z, [0xff6a00, 0xffffff], 24, 4); sfx.crash(); say('Shield saved you! 🛡️', '#80ffdb'); continue; }
+          b.dead = true; S.shake = 0.5;
+          burst(b.x, b.y + R, b.z, [0xff6a00, 0xffb000, 0xffffff, 0x3a1008], 40, 4);
+          sfx.crash(); buzz([60, 40, 120]); say('Burned! 🔥', '#ff6a00'); end(false);
+        }
+      }
       // lasers: the fence hits a ball below its beam while lit; the sweeping beam hits at any height.
       // Beams are thin, so check the whole stretch the ball covered this frame, not just where it ended up.
       const z0 = Math.min(b.prevZ ?? b.z, b.z) - R * 0.8, z1 = b.z + R * 0.8;
@@ -649,11 +862,11 @@ function step(dt) {
       if (b.slow > 0) b.slow = Math.max(0, b.slow - dt);
       if (b.double > 0) b.double = Math.max(0, b.double - dt);
       // 5000 m down the track the game turns hard, and keeps getting harder up to 9000 m
-      if (b.z >= HARD_AT) {
+      if (!curW() && b.z >= HARD_AT) {
         if (!S.hard) { say('HARD MODE 💀', '#ff3355'); sfx.level(); buzz([80, 60, 80]); }
         S.hard = Math.max(S.hard, clamp01Hard(b.z));
       }
-      if (b.z >= TURBO_AT) {
+      if (!curW() && b.z >= TURBO_AT) {
         if (!S.turbo) { say('TURBO! 🔥🔥', '#ff9e00'); sfx.boost(); buzz([60, 40, 60, 40, 200]); }
         S.turbo = Math.max(S.turbo, clamp((b.z - TURBO_AT) / 300, 0.05, 1));
       }
@@ -666,7 +879,14 @@ function step(dt) {
         if (g.mesh) scene.remove(g.mesh);
         return false;
       });
-      if (b.z - S.levelZ >= LEVEL_LEN) {
+      const w = curW();
+      if (w && b.z - S.levelZ >= w.len && S.world === 'run') {
+        S.level++; S.levelZ += w.len; sfx.level();
+        if (S.level > (+load('rb_wlv_' + S.wid) || 1)) save('rb_wlv_' + S.wid, S.level);
+        S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
+        if (S.level > w.levels) startDrop();   // the world's finale: off the end of the track into its Rhythm World
+        else say(`Level ${S.level}/${w.levels}\n${LEVEL_WORDS[(S.level - 2) % LEVEL_WORDS.length]}`, TH.msg);
+      } else if (!w && b.z - S.levelZ >= LEVEL_LEN) {
         S.level++; S.levelZ += LEVEL_LEN; sfx.level();
         if (!S.mighty && S.level > S.savedLevel) { S.savedLevel = S.level; save('rb_level', S.level); }
         S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
@@ -704,9 +924,32 @@ function step(dt) {
   parts = parts.filter(p => p.life > 0);
 }
 
+// ---------- world looks ----------
+// colours for the track, sky, obstacles and Rhythm World tiles of the main track and of each world
+const THEMES = {
+  classic: { sky: [[0, '#07051a'], [0.3, '#1d0b52'], [0.46, '#5a1291'], [0.5, '#3a1078'], [1, '#14082e']], fog: 0x3a1078, fogH: 0x4a0c24,
+    a: 0x3d2aa8, b: 0x2b1c82, side: 0x1e1250, ta: 0x2a1d70, tb: 0x221760, rail: 0x4cc9f0, hemi: [0xb8a8ff, 0x1a0630], sun: '247,37,133', stars: 1,
+    box: [0xd61a8a, 0x5a0838, 0xff9ad5], mover: [0xff8a00, 0x6a2a00, 0xffd29a], tiles: { a: 0x3d2aa8, b: 0x2b1c82, rail: 0x4cc9f0 }, fast: 0xff5fa2, msg: '#80ffdb', decor: null },
+  ice: { sky: [[0, '#0b1d3a'], [0.3, '#1d4e89'], [0.48, '#7cc6fe'], [0.52, '#5fa8d3'], [1, '#0b2545']], fog: 0x5fa8d3, fogH: 0x5fa8d3,
+    a: 0xd6efff, b: 0xa9d8f5, side: 0x4a7fb0, ta: 0x8fc4ea, tb: 0x7ab4de, rail: 0xffffff, hemi: [0xe8f6ff, 0x1d4e89], sun: '200,240,255', stars: 0.6,
+    box: [0x9fe6ff, 0x1a6a90, 0xffffff], mover: [0x4cc9f0, 0x0a3a5a, 0xe0fbff], tiles: { a: 0xd6f0ff, b: 0x6fb0e0, rail: 0xffffff }, fast: 0x4cc9f0, msg: '#bde0fe', decor: 'ice' },
+  lava: { sky: [[0, '#0a0000'], [0.32, '#3a0500'], [0.47, '#ff4d00'], [0.52, '#8a1a00'], [1, '#1a0300']], fog: 0x5a1200, fogH: 0x5a1200,
+    a: 0x3a1c14, b: 0x2a140e, side: 0x120604, ta: 0x2a120c, tb: 0x220e0a, rail: 0xff6a00, hemi: [0xffb08a, 0x2a0500], sun: '255,110,20', stars: 0.25,
+    box: [0x2a1a1a, 0x5a1000, 0xff6a00], mover: [0xff4800, 0x7a1a00, 0xffd29a], tiles: { a: 0x3a1810, b: 0x8a2000, rail: 0xff6a00 }, fast: 0xffb000, msg: '#ffb000', decor: 'lava' },
+  neon: { sky: [[0, '#02000a'], [0.32, '#14062a'], [0.47, '#5a0a6a'], [0.52, '#2a0640'], [1, '#05010f']], fog: 0x1a0830, fogH: 0x1a0830,
+    a: 0x140c2a, b: 0x0d071b, side: 0x05020c, ta: 0x100820, tb: 0x0a0518, rail: 0xff4fd8, hemi: [0xc8a8ff, 0x0a0018], sun: '255,79,216', stars: 0.5,
+    box: [0x0a0a14, 0x101030, 0x4cc9f0], mover: [0xff4fd8, 0x6a0a50, 0xffffff], tiles: { a: 0x1a0a2a, b: 0x5a0a6a, rail: 0xff4fd8 }, fast: 0x4cc9f0, msg: '#ff4fd8', decor: 'neon' },
+  space: { sky: [[0, '#000003'], [0.35, '#05031a'], [0.48, '#2a1060'], [0.52, '#120830'], [1, '#000003']], fog: 0x0a0620, fogH: 0x0a0620,
+    a: 0x2d2466, b: 0x211a52, side: 0x0c0826, ta: 0x241c58, tb: 0x1c1648, rail: 0x4cc9f0, hemi: [0xb8c8ff, 0x05031a], sun: '120,180,255', stars: 1.6,
+    box: [0x6a5acd, 0x2a1a7a, 0xc77dff], mover: [0xc77dff, 0x4a1a7a, 0xffffff], tiles: { a: 0x2d2466, b: 0x4a2a9a, rail: 0x4cc9f0 }, fast: 0xc77dff, msg: '#c77dff', decor: 'space' },
+  golden: { sky: [[0, '#1a0830'], [0.3, '#4a1a6b'], [0.47, '#ff8c5a'], [0.52, '#c8648a'], [1, '#2a0a30']], fog: 0xc8648a, fogH: 0xc8648a,
+    a: 0xfff4d6, b: 0xe0a83a, side: 0x8a5a10, ta: 0xd8b878, tb: 0xc09040, rail: 0xffd166, hemi: [0xfff0c8, 0x4a1a30], sun: '255,200,90', stars: 0.4,
+    box: [0xfffaf0, 0x6a4a10, 0xffd166], mover: [0xffc300, 0x7a5000, 0xffffff], tiles: { a: 0xffe8a3, b: 0xb36b00, rail: 0xffd166 }, fast: 0xffffff, msg: '#ffd166', decor: 'golden' } };
+let TH = THEMES.classic, RHYTHM_THEME = TH.tiles;
+
 // ---------- 3D ----------
 let FOG_N, FOG_H;
-let renderer, scene, camera, hemi, sun, ballMesh, ballGroup, ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite;
+let renderer, scene, camera, hemi, sun, ballMesh, ballGroup, ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite, ground, snow, skyArt;
 const GEO = {}, MAT = {};
 let partPool = [];
 function Wp(x, y, z, v) { return (v || new THREE.Vector3()).set(bend(z) + x, elev(z) + y, -z); }
@@ -832,6 +1075,39 @@ function initWorld() {
   MAT.beamOff = new THREE.MeshBasicMaterial({ color: 0xff2a3a, transparent: true, opacity: 0.15, depthWrite: false });
   MAT.post = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, metalness: 0.6, roughness: 0.3 });
   MAT.emitter = new THREE.MeshBasicMaterial({ color: 0xff5566 });
+  // world objects: icicles, lava jets, scenery beside the track, a ground far below, snow
+  GEO.icicle = new THREE.ConeGeometry(0.42, 1.25, 6); GEO.icicle.translate(0, 0.215, 0);
+  MAT.icicle = new THREE.MeshStandardMaterial({ color: 0xbfefff, emissive: 0x2a7aa0, roughness: 0.1, metalness: 0.3, flatShading: true });
+  GEO.nozzle = new THREE.CylinderGeometry(0.35, 0.42, 0.12, 12);
+  MAT.nozzle = new THREE.MeshStandardMaterial({ color: 0x2a1a14, metalness: 0.6, roughness: 0.4, emissive: 0x3a0a00 });
+  GEO.jet = new THREE.CylinderGeometry(0.2, 0.42, 2.6, 12, 1, true);
+  MAT.jet = new THREE.MeshBasicMaterial({ color: 0xff5a00, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  GEO.jetCore = new THREE.CylinderGeometry(0.07, 0.2, 2.6, 8);
+  MAT.jetCore = new THREE.MeshBasicMaterial({ color: 0xffe08a });
+  GEO.spire = new THREE.ConeGeometry(1, 1, 6); GEO.spire.translate(0, 0.5, 0);
+  GEO.rock = new THREE.DodecahedronGeometry(1, 0);
+  GEO.tower = new THREE.BoxGeometry(1, 1, 1); GEO.tower.translate(0, 0.5, 0);
+  GEO.pillar = new THREE.CylinderGeometry(0.28, 0.34, 1, 12); GEO.pillar.translate(0, 0.5, 0);
+  GEO.cap = new THREE.OctahedronGeometry(0.42, 0);
+  GEO.cloud = new THREE.SphereGeometry(1, 12, 8);
+  GEO.pool = new THREE.CircleGeometry(1, 16); GEO.pool.rotateX(-Math.PI / 2);
+  MAT.iceSpire = new THREE.MeshStandardMaterial({ color: 0xcfeeff, emissive: 0x1d5a8a, roughness: 0.15, metalness: 0.2, flatShading: true });
+  MAT.rock = new THREE.MeshStandardMaterial({ color: 0x1a0c08, roughness: 0.9, flatShading: true });
+  MAT.pool = new THREE.MeshBasicMaterial({ color: 0xff5a00 });
+  MAT.tower = new THREE.MeshStandardMaterial({ color: 0x0a0614, roughness: 0.6, emissive: 0xffffff, emissiveIntensity: 1.4,
+    emissiveMap: canvasTex(64, 128, (g, w, h) => {
+      g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+      for (let y = 4; y < h; y += 10) for (let x = 4; x < w; x += 10) if (Math.random() < 0.45) { g.fillStyle = ['#ff4fd8', '#4cc9f0', '#ffd166'][ri(0, 2)]; g.fillRect(x, y, 5, 6); }
+    }) });
+  MAT.asteroid = new THREE.MeshStandardMaterial({ color: 0x5a4a7a, roughness: 0.9, flatShading: true });
+  MAT.marble = new THREE.MeshStandardMaterial({ color: 0xfffaf0, roughness: 0.3 });
+  MAT.goldCap = new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xa06000, roughness: 0.2, metalness: 0.8, flatShading: true });
+  MAT.cloud = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd6a5, emissiveIntensity: 0.35, roughness: 1 });
+  ground = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  ground.rotation.x = -Math.PI / 2; ground.visible = false; scene.add(ground);
+  { const n = 500, p = new Float32Array(n * 3); for (let k = 0; k < n * 3; k++) p[k] = Math.random();
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3)); g.base = p;
+    snow = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, transparent: true, opacity: 0.9, depthWrite: false })); snow.visible = false; snow.frustumCulled = false; scene.add(snow); }
 
   // the ball: beach-ball segments make the roll easy to see
   const ballTex = canvasTex(256, 128, (g, w, h) => {
@@ -839,7 +1115,8 @@ function initWorld() {
     cols.forEach((c, i) => { g.fillStyle = c; g.fillRect(i * w / cols.length, 0, w / cols.length + 1, h); });
   });
   GEO.ball = new THREE.SphereGeometry(R, 32, 20); GEO.ball.rotateZ(Math.PI / 2);   // poles on the sides
-  ballMesh = new THREE.Mesh(GEO.ball, new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.22, metalness: 0.1, emissive: 0x0a2440 }));
+  MAT.classicBall = new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.22, metalness: 0.1, emissive: 0x0a2440 });
+  ballMesh = new THREE.Mesh(GEO.ball, MAT.classicBall);
   ballMesh.castShadow = true;
   ballLight = new THREE.PointLight(0x4cc9f0, 1.4, 5);
   shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 1.5, 24, 16),
@@ -860,6 +1137,64 @@ function initWorld() {
   for (let i = 0; i < 160; i++) partPool.push(new THREE.Mesh(GEO.part, MAT.boxEdge));
   partPool.forEach(m => { m.visible = false; scene.add(m); });
   MAT.partFor = c => partMats[c] || (partMats[c] = new THREE.MeshBasicMaterial({ color: c }));
+  applySkin();
+}
+
+// ---------- ball skins ----------
+// shiny skins reflect a soft studio light made once, so metal and gems look like metal and gems
+let skinEnv = null;
+function studioEnv() {
+  if (skinEnv) return skinEnv;
+  const es = new THREE.Scene(), g = new THREE.SphereGeometry(20, 32, 16), col = [], c = new THREE.Color(), pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) { const y = pos.getY(i) / 20; c.setRGB(...(y > 0 ? [0.25 + 0.45 * y, 0.2 + 0.35 * y, 0.45 + 0.55 * y] : [0.18, 0.1, 0.3])); col.push(c.r, c.g, c.b); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  es.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  for (const [cl, p, w, h] of [[[9, 8.5, 8], [4, 6, 6], 5, 3.5], [[0.8, 3, 5], [-9, 0, 3], 1.2, 9], [[5, 0.8, 3.2], [8, -1, -5], 1.2, 8], [[3, 2.6, 2.2], [0, 3, -9], 6, 2]]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(...cl), side: THREE.DoubleSide }));
+    m.position.set(...p); m.lookAt(0, 0, 0); es.add(m);
+  }
+  skinEnv = new THREE.PMREMGenerator(renderer).fromScene(es, 0.03).texture;
+  return skinEnv;
+}
+const skinTex = (w, h, f) => canvasTex(w, h, (g) => f(g, w, h));
+const SKINS = {
+  ice: () => new THREE.MeshPhysicalMaterial({ color: 0x6cc8f5, roughness: 0.06, clearcoat: 1, emissive: 0x0a5a8a, emissiveIntensity: 0.5, envMap: studioEnv(), envMapIntensity: 0.8 }),
+  chess: () => new THREE.MeshPhysicalMaterial({ map: skinTex(256, 128, (g) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 16; x++) { g.fillStyle = (x + y) % 2 ? '#111' : '#f4f4f4'; g.fillRect(x * 16, y * 16, 16, 16); } }), roughness: 0.3, clearcoat: 1, envMap: studioEnv() }),
+  gold: () => new THREE.MeshPhysicalMaterial({ color: 0xffb800, metalness: 1, roughness: 0.2, emissive: 0x4a2a00, emissiveIntensity: 0.5, envMap: studioEnv(), envMapIntensity: 1.4 }),
+  neon: () => new THREE.MeshPhysicalMaterial({ color: 0x14001f, emissive: 0xffffff, emissiveIntensity: 1.5, clearcoat: 1, roughness: 0.35, envMap: studioEnv(), emissiveMap: skinTex(512, 256, (g, w, h) => {
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.shadowBlur = 14; g.lineWidth = 7;
+    for (let k = 0; k < 4; k++) { g.strokeStyle = g.shadowColor = k % 2 ? '#4cc9f0' : '#ff4fd8'; g.beginPath(); for (let x = 0; x <= w; x += 4) g.lineTo(x, h * (k + 0.5) / 4 + Math.sin(x / w * 12.56 + k) * 16); g.stroke(); } }) }),
+  lava: () => new THREE.MeshStandardMaterial({ color: 0x2a0a00, emissive: 0xffffff, emissiveIntensity: 1.8, roughness: 0.7, emissiveMap: skinTex(512, 256, (g, w, h) => {
+    g.fillStyle = '#100300'; g.fillRect(0, 0, w, h); g.strokeStyle = '#ff6a00'; g.shadowColor = '#ffb000'; g.shadowBlur = 12;
+    for (let i = 0; i < 50; i++) { g.lineWidth = rand(2, 8); g.beginPath(); let x = rand(0, w), y = rand(0, h); g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += rand(-30, 30); y += rand(-20, 20); g.lineTo(x, y); } g.stroke(); } }) }),
+  earth: () => new THREE.MeshPhysicalMaterial({ roughness: 0.5, clearcoat: 0.4, envMap: studioEnv(), map: skinTex(512, 256, (g, w, h) => {
+    g.fillStyle = '#1565c0'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26; i++) { g.fillStyle = ['#43a047', '#66bb6a', '#2e7d32', '#c8a165'][i % 4]; g.beginPath(); const x = rand(0, w), y = rand(40, h - 40); for (let k = 0; k < 9; k++) { const a = k / 9 * 6.28, r = rand(18, 52); g.lineTo(x + Math.cos(a) * r * 1.4, y + Math.sin(a) * r); } g.fill(); }
+    g.fillStyle = '#fff'; g.fillRect(0, 0, w, 14); g.fillRect(0, h - 14, w, 14); g.globalAlpha = 0.55;
+    for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse(rand(0, w), rand(0, h), rand(20, 60), rand(4, 10), 0, 0, 6.28); g.fill(); } }) }),
+  disco: () => new THREE.MeshPhysicalMaterial({ color: 0xe8e6ff, metalness: 1, roughness: 0.08, flatShading: true, iridescence: 0.6, envMap: studioEnv(), envMapIntensity: 1.6 }),
+  galaxy: () => { const t = skinTex(512, 256, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#10002b'); gr.addColorStop(0.5, '#5a189a'); gr.addColorStop(1, '#240046'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 50; i++) { const x = rand(0, w), y = rand(0, h), r = rand(20, 80), rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, ['#ff4fd8aa', '#4cc9f088', '#c77dffaa'][i % 3]); rg.addColorStop(1, 'transparent'); g.fillStyle = rg; g.fillRect(x - r, y - r, 2 * r, 2 * r); }
+    for (let i = 0; i < 350; i++) { g.fillStyle = '#fff'; g.fillRect(rand(0, w), rand(0, h), 1.5, 1.5); } });
+    return new THREE.MeshPhysicalMaterial({ map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.6, roughness: 0.15, clearcoat: 1, envMap: studioEnv() }); },
+  diamond: () => new THREE.MeshPhysicalMaterial({ color: 0xf4f0ff, metalness: 0.3, roughness: 0, flatShading: true, iridescence: 1, iridescenceIOR: 1.6, clearcoat: 1, envMap: studioEnv(), envMapIntensity: 2.2 }),
+  royal: () => { const t = skinTex(512, 256, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#ffe8a3'); gr.addColorStop(0.5, '#ffb800'); gr.addColorStop(1, '#b36b00'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#fff3c4'; g.lineWidth = 3;
+    for (let x = 0; x < w; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 32, h / 2); g.lineTo(x, h); g.stroke(); g.beginPath(); g.moveTo(x + 64, 0); g.lineTo(x + 32, h / 2); g.lineTo(x + 64, h); g.stroke(); }
+    for (let x = 32; x < w; x += 64) { const c = ['#e0115f', '#4cc9f0', '#7ae582', '#c77dff'][(x / 64 | 0) % 4]; g.fillStyle = g.shadowColor = c; g.shadowBlur = 14;
+      for (const [dx, y, r] of [[0, h / 2, 10], [-32, h * 0.2, 6], [-32, h * 0.8, 6]]) { g.beginPath(); g.arc(x + dx, y, r, 0, 6.28); g.fill(); } } });
+    return new THREE.MeshPhysicalMaterial({ map: t, metalness: 0.85, roughness: 0.18, clearcoat: 1, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.18, envMap: studioEnv(), envMapIntensity: 1.4 }); } };
+const SKIN_LIGHT = { classic: 0x4cc9f0, ice: 0xbde0fe, chess: 0xffffff, gold: 0xffb800, neon: 0xff4fd8, lava: 0xff6a00, earth: 0x4cc9f0, disco: 0xe8e6ff, galaxy: 0xc77dff, diamond: 0xffffff, royal: 0xffd166 };
+const skinMats = {};
+function applySkin() {
+  if (!ballMesh) return;
+  const id = SKINS[S.skin] ? S.skin : 'classic';
+  if (!GEO.disco) { GEO.disco = new THREE.IcosahedronGeometry(R, 3); GEO.diamond = new THREE.IcosahedronGeometry(R, 1); }
+  ballMesh.geometry = id === 'disco' ? GEO.disco : id === 'diamond' ? GEO.diamond : GEO.ball;
+  ballMesh.material = id === 'classic' ? MAT.classicBall : skinMats[id] || (skinMats[id] = SKINS[id]());
+  ballLight.color.set(SKIN_LIGHT[id]);
 }
 
 function dust(x, y, z, p) {
@@ -876,13 +1211,85 @@ function burst(x, y, z, cols, n, sp) {
   }
 }
 
+// scenery beside the track, the same each time a row is rebuilt
+function addDecor(grp, i, zc) {
+  const h = k => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+  const put = (geo, mat, x, y, sx, sy, sz, ry) => { const m = new THREE.Mesh(geo, mat); Wp(x, y, zc, m.position); m.scale.set(sx, sy, sz); m.rotation.y = ry || 0; grp.add(m); return m; };
+  for (const side of [-1, 1]) {
+    const r1 = h(side), r2 = h(side + 3), r3 = h(side + 7);
+    if (TH.decor === 'ice') {
+      put(GEO.spire, MAT.iceSpire, side * (4 + r1 * 5), -0.6, 0.4 + r2 * 0.5, 2 + r3 * 5, 0.4 + r2 * 0.5, r1 * 6);
+      if (r2 > 0.5) put(GEO.spire, MAT.iceSpire, side * (5.5 + r3 * 5), -0.6, 0.3, 1.2 + r1 * 3, 0.3, r2 * 6);
+    } else if (TH.decor === 'lava') {
+      put(GEO.rock, MAT.rock, side * (4.5 + r1 * 6), -1 + r2, 0.8 + r2 * 1.5, 1.4 + r3 * 3, 0.8 + r2 * 1.2, r1 * 6);
+      if (r3 > 0.55) put(GEO.pool, MAT.pool, side * (4 + r2 * 3), -0.55, 1 + r1, 1, 0.6 + r3, 0);
+    } else if (TH.decor === 'neon') {
+      put(GEO.tower, MAT.tower, side * (6 + r1 * 4), -3, 2 + r2 * 2, 6 + r3 * 14, 2 + r1 * 2, 0);
+    } else if (TH.decor === 'space') {
+      if (r3 > 0.35) { const m = put(GEO.rock, MAT.asteroid, side * (5 + r1 * 9), -2 + r2 * 7, 0.4 + r3 * 1.4, 0.4 + r3 * 1.2, 0.4 + r3 * 1.3, r2 * 6); m.rotation.x = r1 * 6; }
+    } else if (TH.decor === 'golden') {
+      put(GEO.pillar, MAT.marble, side * 3.4, -0.6, 1, 4.2, 1, 0);
+      const c = put(GEO.cap, MAT.goldCap, side * 3.4, 3.9, 1, 1.3, 1, 0); c.rotation.y = i;
+      if (r1 > 0.5) put(GEO.cloud, MAT.cloud, side * (7 + r2 * 12), -4 - r3 * 2, 3 + r1 * 3, 1 + r2, 2 + r3 * 2, 0);
+    }
+  }
+}
+const skyTexs = {};
+function applyTheme(id) {
+  TH = THEMES[id] || THEMES.classic; RHYTHM_THEME = TH.tiles;
+  FOG_N.set(TH.fog); FOG_H.set(TH.fogH); scene.fog.color.set(TH.fog);
+  scene.background = skyTexs[id] || (skyTexs[id] = canvasTex(4, 512, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h); for (const [o, c] of TH.sky) gr.addColorStop(o, c); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  }));
+  hemi.color.set(TH.hemi[0]); hemi.groundColor.set(TH.hemi[1]);
+  sunSprite.material.map = canvasTex(128, 128, (g, w) => {
+    const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    gr.addColorStop(0, `rgba(${TH.sun},1)`); gr.addColorStop(0.25, `rgba(${TH.sun},.8)`); gr.addColorStop(1, `rgba(${TH.sun},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, w, w);
+  }); sunSprite.material.needsUpdate = true;
+  const st = starGroup.children[0].material; st.size = 2 * Math.min(1.3, TH.stars); st.transparent = true; st.opacity = Math.min(1, TH.stars);
+  MAT.rail.color.set(TH.rail);
+  MAT.box.color.set(TH.box[0]); MAT.box.emissive.set(TH.box[1]); MAT.boxEdge.color.set(TH.box[2]);
+  MAT.mover.color.set(TH.mover[0]); MAT.mover.emissive.set(TH.mover[1]); MAT.moverEdge.color.set(TH.mover[2]);
+  const gold = id === 'golden';
+  MAT.icicle.color.set(gold ? 0xffd166 : 0xbfefff); MAT.icicle.emissive.set(gold ? 0x8a5a00 : 0x2a7aa0); MAT.icicle.metalness = gold ? 0.8 : 0.3;
+  MAT.jet.color.set(gold ? 0xffd166 : 0xff5a00); MAT.jetCore.color.set(gold ? 0xffffff : 0xffe08a);
+  // a far-away floor under the floating track, and falling snow (golden sparkles in the Kingdom)
+  const gcol = { ice: 0x9fcff0, lava: 0xff4800, golden: 0xf0b0a0, neon: 0x0a0418 }[id];
+  ground.visible = gcol != null; if (gcol != null) ground.material.color.set(gcol);
+  ground.material.map = id === 'lava' ? (MAT.lavaTex || (MAT.lavaTex = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#ff4800'; g.fillRect(0, 0, w, h);
+    for (let k = 0; k < 70; k++) { g.fillStyle = ['#ffb000', '#ff2a00', '#2a0a00'][k % 3]; g.globalAlpha = 0.6; g.beginPath(); g.arc(rand(0, w), rand(0, h), rand(6, 28), 0, 6.3); g.fill(); }
+  }))) : null;
+  if (ground.material.map) { ground.material.map.wrapS = ground.material.map.wrapT = THREE.RepeatWrapping; ground.material.map.repeat.set(30, 30); }
+  ground.material.needsUpdate = true;
+  snow.visible = id === 'ice' || id === 'golden'; snow.material.color.set(gold ? 0xffd166 : 0xffffff); snow.material.size = gold ? 0.07 : 0.09;
+  if (skyArt) { starGroup.remove(skyArt); skyArt = null; }
+  if (id === 'space' || id === 'golden') {
+    skyArt = new THREE.Sprite(new THREE.SpriteMaterial({ fog: false, depthWrite: false, transparent: true, map: canvasTex(256, 256, (g, w) => {
+      if (id === 'space') {
+        const gr = g.createRadialGradient(w * 0.42, w * 0.4, 4, w / 2, w / 2, w * 0.3); gr.addColorStop(0, '#ffd6a5'); gr.addColorStop(0.6, '#ff7b54'); gr.addColorStop(1, '#5a1a40');
+        g.fillStyle = gr; g.beginPath(); g.arc(w / 2, w / 2, w * 0.3, 0, 6.3); g.fill();
+        g.strokeStyle = 'rgba(255,214,165,.7)'; g.lineWidth = 7; g.beginPath(); g.ellipse(w / 2, w / 2, w * 0.47, w * 0.1, -0.3, 0, 6.3); g.stroke();
+      } else {
+        const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, '#fff8e0'); gr.addColorStop(0.3, '#ffd166'); gr.addColorStop(0.55, 'rgba(255,160,60,.5)'); gr.addColorStop(1, 'rgba(255,120,60,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, w, w);
+      }
+    }) }));
+    skyArt.scale.set(id === 'space' ? 120 : 150, id === 'space' ? 120 : 150, 1); skyArt.position.set(id === 'space' ? 70 : 0, id === 'space' ? 60 : 25, -230);
+    starGroup.add(skyArt);
+  }
+  sunSprite.visible = id !== 'golden';
+}
+
 // one mesh group per row of track, built when it comes into view and dropped behind the camera
 function buildRow(i) {
   const row = rowAt(i), grp = new THREE.Group(), next = rowAt(i + 1), prev = i > 0 ? rows[i - 1] : null;
   const z0 = i * ROW, z1 = z0 + ROW, D = 0.6;
   const pos = [], col = [], rail = [];
-  const cA = new THREE.Color(row.hard ? 0x8a1a3a : 0x3d2aa8), cB = new THREE.Color(row.hard ? 0x661030 : 0x2b1c82), cS = new THREE.Color(row.hard ? 0x3a0818 : 0x1e1250);
-  const tA = new THREE.Color(0x2a1d70), tB = new THREE.Color(0x221760);
+  const red = row.hard && !curW();   // the main track turns red in hard mode; worlds keep their own colours
+  const cA = new THREE.Color(red ? 0x8a1a3a : TH.a), cB = new THREE.Color(red ? 0x661030 : TH.b), cS = new THREE.Color(red ? 0x3a0818 : TH.side);
+  const tA = new THREE.Color(TH.ta), tB = new THREE.Color(TH.tb), cC = new THREE.Color(0xff5a00);
   const P = (x, y, z) => Wp(x, y, z);
   const quad = (a, b, c, d, color) => {
     for (const p of [a, b, c, a, c, d]) { pos.push(p.x, p.y, p.z); col.push(color.r, color.g, color.b); }
@@ -890,7 +1297,7 @@ function buildRow(i) {
   for (let k = 0; k < COLS; k++) {
     if (row.cells[k] === HOLE) continue;
     const x0 = k - HALF, x1 = x0 + 1;
-    const top = (i + k) % 2 ? (row.tunnel ? tA : cA) : (row.tunnel ? tB : cB);
+    const top = row.cells[k] === CRACK ? cC.clone().multiplyScalar((i + k) % 2 ? 1 : 0.75) : (i + k) % 2 ? (row.tunnel ? tA : cA) : (row.tunnel ? tB : cB);
     quad(P(x0, 0, z0), P(x1, 0, z0), P(x1, 0, z1), P(x0, 0, z1), top);
     if (!prev || prev.cells[k] === HOLE) quad(P(x0, 0, z0), P(x1, 0, z0), P(x1, -D, z0), P(x0, -D, z0), cS);
     if (next.cells[k] === HOLE) quad(P(x0, 0, z1), P(x1, 0, z1), P(x1, -D, z1), P(x0, -D, z1), cS);
@@ -910,16 +1317,18 @@ function buildRow(i) {
   }
   if (rail.length) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3));
-    grp.add(new THREE.Mesh(g, row.hard ? MAT.railHard : MAT.rail));
+    grp.add(new THREE.Mesh(g, red ? MAT.railHard : MAT.rail));
   }
   const zc = z0 + 1;
-  row.spin = []; row.gemMeshes = {}; row.moverMeshes = []; row.powerMesh = null;
+  row.spin = []; row.gemMeshes = {}; row.moverMeshes = []; row.powerMesh = null; row.dropMeshes = row.drop ? [] : null; row.jetMeshes = [];
   for (let k = 0; k < COLS; k++) {
     const xc = k - HALF + 0.5;
     if (row.cells[k] === BLOCK) {
-      const m = new THREE.Mesh(GEO.box, MAT.box); m.castShadow = m.receiveShadow = true;
-      m.add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge));
+      const ice = TH.decor === 'ice' || (row.drop && TH.decor === 'golden');
+      const m = new THREE.Mesh(ice ? GEO.icicle : GEO.box, ice ? MAT.icicle : MAT.box); m.castShadow = m.receiveShadow = true;
+      if (!ice) m.add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge));
       Wp(xc, BLOCK_H / 2 - 0.04, zc, m.position); grp.add(m);
+      if (row.dropMeshes) row.dropMeshes.push([m, xc]);
     } else if (row.cells[k] === PAD) {
       const m = new THREE.Mesh(GEO.pad, MAT.pad);
       Wp(xc, 0.17, zc, m.position); m.rotation.x = Math.atan2(0.3, 1.5); grp.add(m);
@@ -961,6 +1370,14 @@ function buildRow(i) {
       row.laserMesh = [add(GEO.beamV, MAT.beam, 0, 1.55), add(GEO.beamVGlow, MAT.beamGlow, 0, 1.55), add(GEO.emitter, MAT.emitter, 0, 3.0)];
     }
   } else row.laserMesh = null;
+  for (const jt of row.jets || []) {
+    if (jt.gone) continue;
+    const n = new THREE.Mesh(GEO.nozzle, MAT.nozzle); Wp(jt.c - HALF + 0.5, 0.06, zc, n.position); grp.add(n);
+    const f = new THREE.Mesh(GEO.jet, MAT.jet); Wp(jt.c - HALF + 0.5, 1.3, zc, f.position); grp.add(f);
+    const c = new THREE.Mesh(GEO.jetCore, MAT.jetCore); c.position.copy(f.position); grp.add(c);
+    row.jetMeshes.push([jt, f, c]);
+  }
+  if (TH.decor && i % 3 === 0) addDecor(grp, i, zc);
   if (row.tunnel) {
     const a = new THREE.Mesh(GEO.arch, row.hard ? (i % 2 ? MAT.archHardA : MAT.archHardB) : (i % 2 ? MAT.archA : MAT.archB));
     Wp(0, -0.6, zc, a.position); grp.add(a);
@@ -998,6 +1415,24 @@ function render() {
       if (l.type === 'fence') { const lit = laserLit(l); beam.material = lit ? MAT.beam : MAT.beamOff; glow.visible = lit; }
       else { const x = sweepX(l); Wp(x, 1.55, i * ROW + 1, beam.position); Wp(x, 1.55, i * ROW + 1, glow.position); Wp(x, 3.0, i * ROW + 1, emitter.position); }
     }
+  }
+  for (let i = first; i <= last; i++) {
+    const r = rows[i];
+    // icicles drop out of the sky as the ball comes (landed well before it arrives)
+    if (r.dropMeshes) { const y = clamp((i * ROW - b.z - 24) * 0.55, 0, 10); for (const [m, x] of r.dropMeshes) Wp(x, BLOCK_H / 2 - 0.04 + y, i * ROW + 1, m.position); }
+    for (const [jt, f, c] of r.jetMeshes) { const lit = jetLit(jt), k = lit ? 1 + 0.12 * Math.sin(time * 37 + i) : 0.04; f.scale.set(k, k, k); c.scale.set(1, lit ? 1 : 0.02, 1); }
+  }
+  if (ground.visible) {
+    ground.position.set(camera.position.x, elev(b.z) - (TH.decor === 'golden' ? 7 : TH.decor === 'neon' ? 3 : 5), camera.position.z - 200);
+    if (ground.material.map) ground.material.map.offset.set(time * 0.02, time * 0.013);
+  }
+  if (snow.visible) {
+    const p = snow.geometry.attributes.position, base = snow.geometry.base, gold = TH.decor === 'golden';
+    for (let k = 0; k < p.count; k++) {
+      const fall = gold ? -time * 0.08 : time * 0.15;
+      p.setXYZ(k, (base[k * 3] - 0.5) * 30 + Math.sin(time + k) * 0.3, 12 - ((base[k * 3 + 1] + fall) % 1 + 1) % 1 * 14, -(base[k * 3 + 2] * 40));
+    }
+    p.needsUpdate = true; snow.position.copy(camera.position); snow.position.y -= 3;
   }
   MAT.beamGlow.opacity = 0.3 + 0.1 * Math.sin(time * 40);   // a little flicker
   for (const g of pulled) if (g.mesh) Wp(g.x, g.y, g.z, g.mesh.position);
@@ -1050,7 +1485,6 @@ function render() {
 // When the song ends it is back to the track at the next level.
 const RHYTHM_FIRST = 15, RHYTHM_EVERY = 5;
 const isRhythmLevel = n => n >= RHYTHM_FIRST && (n - RHYTHM_FIRST) % RHYTHM_EVERY === 0;
-const RHYTHM_THEME = { a: 0x3d2aa8, b: 0x2b1c82, rail: 0x4cc9f0 };
 const HOP = { tiles: [], live: [], k: 0, lv: null, perfect: 0 };
 const flash = (on) => $('flash').classList.toggle('on', on);
 
@@ -1064,7 +1498,8 @@ function startDrop() {
     Object.assign(r, { cells: r.cells.fill(j < edge ? FLOOR : j === edge ? PAD : HOLE), movers: [], laser: null, power: null, gems: [], tunnel: false, dirty: true });
   }
   S.edgeZ = edge * ROW + 0.6;
-  say(`Level ${S.level}!\nRhythm World 🎵`, '#c8b6ff'); sfx.level();
+  const w = curW();
+  say(w ? `${w.icon} Finale!\nRhythm World 🎵` : `Level ${S.level}!\nRhythm World 🎵`, w ? TH.msg : '#c8b6ff'); sfx.level();
 }
 function worldStep(dt) {
   const b = ball;
@@ -1096,10 +1531,10 @@ function enterRhythm() {
   // power-ups do nothing among the tiles, so they end here rather than sit frozen on screen
   Object.assign(b, { x: 0, y: 0, vy: 0, fall: false, air: true, hole: null, shield: 0, magnet: 0, slow: 0, double: 0 });
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
-  const song = window.SONGS && SONGS[0];
+  const song = curSong(), w = curW();
   // without the song file, fall back to a steady 82 BPM for 55 s
   const beats = song ? song.beats : Array.from({ length: 75 }, (_, k) => 0.4 + k * 0.73);
-  HOP.lv = { z0: b.z, speed: 7,   // a gentle forward pace: the music sets the hops, not the speed
+  HOP.lv = { z0: b.z, speed: w ? w.hop : 7,   // a gentle forward pace: the music sets the hops, not the speed
     end: song ? song.end : 55, beats, bi: 0,
     strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1) };
   // the rhythm chosen by ear for this song (song1.js "hops", timed to the millisecond on the
@@ -1121,15 +1556,18 @@ function enterRhythm() {
       if (Math.abs(prev.x + vx) > 2) vx = -vx;
       x = prev.x + vx;
     } else x = clamp(prev.x + rand(-1.3, 1.3) * clamp(T / 0.7, 0.3, 1.2), -2.2, 2.2);
-    prev = { t, z: HOP.lv.z0 + t * HOP.lv.speed, x, w: fast ? 0.85 : 1.25, fast, gem: s > 0.6 && Math.random() < 0.5, hit: false, dip: 0, dipV: 0, flash: 0, mesh: null };
+    prev = { t, z: HOP.lv.z0 + t * HOP.lv.speed, x, x0: x, w: fast ? 0.85 : 1.25, fast, gem: s > 0.6 && Math.random() < 0.5, hit: false, dip: 0, dipV: 0, flash: 0, mesh: null,
+      sway: !!(w && w.sway) && !fast && Math.random() < 0.5, ph: rand(0, 6) };   // Neon and the Kingdom: some tiles slide side to side
+    if (prev.sway) prev.x0 = prev.x = clamp(x, -1.6, 1.6);
     HOP.tiles.push(prev);
   }
   musicStart(0);
   setTimeout(() => flash(false), 50);
-  say('RHYTHM WORLD 🎵', '#c8b6ff');
+  say(w ? `${w.icon} ${w.n.toUpperCase()} 🎵` : 'RHYTHM WORLD 🎵', w ? TH.msg : '#c8b6ff');
 }
 function exitRhythm() {
   const b = ball;
+  if (curW()) return worldComplete();
   musicStop(true); hopClear();
   S.world = 'run';
   // back on the track at the next level, with a calm stretch to get going again
@@ -1142,8 +1580,24 @@ function exitRhythm() {
   flash(true); setTimeout(() => flash(false), 120);
   say(`Level ${S.level}!\nBack to speed 🔥`, '#ff9e00'); sfx.boost();
 }
+// the end of a world: a reward the first time, and the next world can be bought
+function worldComplete() {
+  const w = curW(), first = !S.wDone.includes(S.wid);
+  musicStop(true); hopClear();
+  if (first) { S.wDone.push(S.wid); save('rb_wdone', JSON.stringify(S.wDone)); S.gems += w.reward; }
+  save('rb_wlv_' + S.wid, 1);
+  S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
+  const sc = score(); if (sc > S.best) { S.best = sc; save('rb_best', sc); }
+  S.phase = 'done'; $('msg').classList.remove('show');
+  const next = WORLD_ORDER[WORLD_ORDER.indexOf(S.wid) + 1];
+  $('wdIcon').textContent = w.icon; $('wdTitle').textContent = `${w.n} complete!`;
+  $('wdInfo').innerHTML = `Score ${sc}` + (first ? `<br>Reward <b>+${w.reward} 💎</b>` : '') +
+    (next && next !== 'golden' && first ? `<br>🔓 ${WORLDS[next].n} can now be bought` : next === 'golden' && first ? '<br>👑 Only the Royal Crown opens the last world…' : '') + `<br>You have ${S.bank} 💎`;
+  $('wdone').classList.remove('hidden'); sfx.level(); buzz([60, 40, 60, 40, 200]);
+  hud();
+}
 function landTile(t, dx) {
-  t.hit = true; t.dipV = -2.5; t.flash = 0.15;
+  t.hit = true; t.hitT = time; t.dipV = -2.5; t.flash = 0.15;
   const perfect = dx < 0.2;
   S.rpts += perfect ? 20 : 10;
   HOP.perfect = perfect ? HOP.perfect + 1 : 0;
@@ -1177,6 +1631,7 @@ function hopUpdate(dt) {
   let t0 = HOP.tiles[HOP.k], t1 = HOP.tiles[HOP.k + 1];
   if (!t1 || pos >= lv.end) return exitRhythm();
   if (pos >= t1.t) {
+    if (t1.sway) t1.x = tileX(t1);
     const dx = Math.abs(b.x - t1.x);
     if (dx > t1.w / 2 + R * 0.6) {
       b.fall = true; b.air = false; b.z = t1.z; b.y = 0; b.vy = -2;
@@ -1193,6 +1648,7 @@ function hopUpdate(dt) {
   b.z = nz; b.y = Hh * 4 * u * (1 - u); b.vy = Hh * 4 * (1 - 2 * u) / T;
   $('lvbar').firstChild.style.width = clamp(pos / lv.end, 0, 1) * 100 + '%';   // the bar follows the song here
 }
+const tileX = t => t.sway && !t.hit ? t.x0 + Math.sin(time * 1.7 + t.ph) * 0.7 : t.x;
 function hopRevive(cost) {
   const t = HOP.tiles[HOP.k + 1], lv = HOP.lv;
   HOP.k++; t.hit = true; HOP.perfect = 0;
@@ -1224,7 +1680,7 @@ function renderHop() {
     if (!t.mesh && t.z > b.z - 10) {
       const g = new THREE.Group(), depth = t.start ? 3 : t.fast ? 0.45 : 1.25;
       t.box = new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME)); t.box.scale.set(t.w, 1, depth); t.box.receiveShadow = true;
-      const e = new THREE.LineSegments(GEO.tileEdges, glowLine(t.fast ? 0xff5fa2 : RHYTHM_THEME.rail)); e.scale.set(t.w, 1, depth);
+      const e = new THREE.LineSegments(GEO.tileEdges, glowLine(t.fast || t.sway ? TH.fast : RHYTHM_THEME.rail)); e.scale.set(t.w, 1, depth);
       g.add(t.box, e);
       if (t.gem && !t.hit) { t.gemMesh = new THREE.Mesh(GEO.gem, MAT.gem); t.gemMesh.position.y = 0.85; g.add(t.gemMesh); }
       t.mesh = g; scene.add(g); HOP.live.push(t);
@@ -1232,7 +1688,10 @@ function renderHop() {
   }
   HOP.live = HOP.live.filter(t => {
     if (t.z < b.z - 12) { scene.remove(t.mesh); t.mesh = null; return false; }
-    Wp(t.x, -0.12 + t.dip, t.z, t.mesh.position);
+    t.x = tileX(t);
+    // Lava and the Kingdom: tiles crumble away once landed on
+    const gone = t.hitT && curW() && curW().fade && !t.start ? Math.max(0, time - t.hitT - 0.2) : 0;
+    Wp(t.x, -0.12 + t.dip - gone * gone * 9, t.z, t.mesh.position);
     t.box.material = t.flash > 0 ? MAT.tileHit : tileMat(RHYTHM_THEME);
     if (t.gemMesh) t.gemMesh.rotation.y = time * 2.5;
     return true;
@@ -1263,6 +1722,8 @@ function warmUp() {
   for (const [g, m] of [[GEO.beamH, MAT.beam], [GEO.beamHGlow, MAT.beamGlow], [GEO.beamH, MAT.beamOff], [GEO.post, MAT.post], [GEO.emitter, MAT.emitter], [GEO.gantry, MAT.post]]) add(new THREE.Mesh(g, m));
   add(new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(RHYTHM_THEME.rail))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(0xff5fa2))); add(new THREE.Mesh(GEO.tile, MAT.tileHit));
   add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
+  for (const [g, m] of [[GEO.icicle, MAT.icicle], [GEO.nozzle, MAT.nozzle], [GEO.jet, MAT.jet], [GEO.jetCore, MAT.jetCore], [GEO.spire, MAT.iceSpire], [GEO.rock, MAT.rock],
+    [GEO.pool, MAT.pool], [GEO.tower, MAT.tower], [GEO.rock, MAT.asteroid], [GEO.pillar, MAT.marble], [GEO.cap, MAT.goldCap], [GEO.cloud, MAT.cloud]]) add(new THREE.Mesh(g, m));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
   grp.traverse(o => { if (o.isMesh) o.castShadow = true; });
   scene.add(grp);
@@ -1300,11 +1761,7 @@ async function boot() {
   } catch (e) { $('loadTxt').textContent = 'Could not load the game files.'; return; }
   // the Rhythm World's song, decoded once up front
   try {
-    await loadScript('song1.js'); setProgress(25, 'Loading music…');
-    const song = window.SONGS && SONGS[0], a = ac();
-    const bin = atob(song.audio), u8 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    song.buf = await a.decodeAudioData(u8.buffer); song.audio = null;
+    setProgress(25, 'Loading music…'); await loadSong(0);
   } catch (e) {}
   setProgress(35, 'Starting 3D…'); await nextFrame();
   try { initRenderer(); } catch (e) { $('loadTxt').textContent = 'Sorry, 3D is not supported on this phone.'; return; }
