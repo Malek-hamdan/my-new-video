@@ -1088,7 +1088,8 @@ function worldStep(dt) {
 function enterRhythm() {
   const b = ball;
   S.world = 'rhythm';
-  Object.assign(b, { x: 0, y: 0, vy: 0, fall: false, air: true, hole: null });
+  // power-ups do nothing among the tiles, so they end here rather than sit frozen on screen
+  Object.assign(b, { x: 0, y: 0, vy: 0, fall: false, air: true, hole: null, shield: 0, magnet: 0, slow: 0, double: 0 });
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
   const song = window.SONGS && SONGS[0];
   // without the song file, fall back to a steady 82 BPM for 55 s
