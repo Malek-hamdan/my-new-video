@@ -1104,8 +1104,8 @@ function enterRhythm() {
     strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1) };
   // the drum hits, and from where the song picks up (about 23.5 s) a hop on every half beat:
   // the rhythm chosen by ear for this song (song1.js "hops"); without it, the beat
-  // where the tune speeds right up (its long fast passages), the ball speeds up with it: a hop on every
-  // quick note there, on a winding trail of small tiles
+  // where the tune speeds right up (its long fast passages), the ball speeds up with it: a hop on about
+  // every other quick note there (no closer than 0.18 s), on a winding trail of small tiles
   const runs = (song && song.runs || []).filter(r => r.length >= 15);
   const inRun = t => runs.some(r => t > r[0] - 0.12 && t < r[r.length - 1] + 0.12);
   const times = (song && song.hops || beats).filter(t => !inRun(t)).map(t => ({ t, s: 0 }));
@@ -1119,7 +1119,7 @@ function enterRhythm() {
   let prev = HOP.tiles[0], vx = 0;
   for (const { t, s, fast } of times) {
     const T = t - prev.t;
-    if (t > HOP.lv.end - 0.3 || T < (fast ? 0.07 : 0.25)) continue;
+    if (t > HOP.lv.end - 0.3 || T < (fast ? 0.18 : 0.25)) continue;
     let x;
     if (fast) {
       vx = clamp(vx + rand(-0.12, 0.12), -0.2, 0.2);
