@@ -1045,8 +1045,8 @@ function render() {
 }
 
 // ---------- Rhythm World ----------
-// From level 15 (and every 5 levels after), the ball hops three times, the track drops away and it
-// falls into the Rhythm World: tiles in space, one on every beat of the song, landed on the beat.
+// From level 15 (and every 5 levels after), the track ends in a launch ramp: the ball flies off the
+// end and falls into the Rhythm World, tiles in space on the notes of the song's melody.
 // When the song ends it is back to the track at the next level.
 const RHYTHM_FIRST = 15, RHYTHM_EVERY = 5;
 const isRhythmLevel = n => n >= RHYTHM_FIRST && (n - RHYTHM_FIRST) % RHYTHM_EVERY === 0;
@@ -1056,30 +1056,35 @@ const flash = (on) => $('flash').classList.toggle('on', on);
 
 function startDrop() {
   const b = ball, i = Math.floor(b.z / ROW);
-  S.world = 'drop'; S.wt = 0; S.hops = 0;
-  for (let j = i - 2; j < i + 80; j++) { const r = rowAt(j); Object.assign(r, { cells: r.cells.fill(FLOOR), movers: [], laser: null, power: null, gems: [], dirty: true }); }
+  S.world = 'drop'; S.wt = 0; S.launched = 0;
+  // a clear run-up, a ramp across all lanes, then the track simply ends
+  const edge = i + Math.round(50 / ROW);
+  for (let j = i - 2; j < edge + 80; j++) {
+    const r = rowAt(j);
+    Object.assign(r, { cells: r.cells.fill(j < edge ? FLOOR : j === edge ? PAD : HOLE), movers: [], laser: null, power: null, gems: [], tunnel: false, dirty: true });
+  }
+  S.edgeZ = edge * ROW + 0.6;
   say(`Level ${S.level}!\nRhythm World 🎵`, '#c8b6ff'); sfx.level();
 }
 function worldStep(dt) {
   const b = ball;
   if (S.world === 'drop') {
-    // three hops along the cleared track, then the track drops away and the ball falls
-    S.wt += dt; const v = Math.min(b.speed, 30);
-    b.z += v * dt; b.rot += v * dt / R;
-    if (S.wt < 2.1) {
-      const u = (S.wt % 0.7) / 0.7, k = Math.floor(S.wt / 0.7);
-      if (k >= S.hops) { S.hops = k + 1; sfx.jump(); if (k) { b.defV += 20; cam.joltV -= 0.4; } }
-      b.y = 1.8 * 4 * u * (1 - u); b.vy = 1.8 * 4 * (1 - 2 * u) / 0.7; b.air = true;
-    } else {
-      if (!b.fall) {
-        b.fall = true; b.air = false; b.vy = 0; sfx.fall(); buzz([60, 60, 200]);
-        const i = Math.floor(b.z / ROW);
-        for (let j = i - 1; j < i + 80; j++) { const r = rowAt(j); r.cells.fill(HOLE); r.dirty = true; }
-      }
-      b.vy -= 16 * dt; b.y += b.vy * dt;
-      if (S.wt > 3.0) flash(true);
-      if (S.wt > 3.5) enterRhythm();
+    // roll to the end of the track, launch off the ramp, then fall away into the Rhythm World
+    b.speed += (Math.min(b.speed, 26) - b.speed) * Math.min(1, dt * 2);
+    b.z += b.speed * dt; b.rot += b.speed * dt / R;
+    if (keys.ArrowLeft) b.x -= 6 * dt;
+    if (keys.ArrowRight) b.x += 6 * dt;
+    b.x = clamp(b.x, -HALF + R, HALF - R);
+    if (!S.launched && b.z >= S.edgeZ) {
+      S.launched = time; b.air = true; b.vy = 10; b.y = Math.max(b.y, 0.2);
+      sfx.boost(); buzz([40, 40, 120]); cam.joltV -= 0.6;
     }
+    if (S.launched) {
+      b.vy -= 16 * dt; b.y += b.vy * dt;
+      if (b.y < -1.5 && !b.fall) { b.fall = true; b.air = false; sfx.fall(); }
+      if (time - S.launched > 2.2) flash(true);
+      if (time - S.launched > 2.7) enterRhythm();
+    } else b.y = 0;
     return;
   }
   if (S.world === 'rhythm') hopUpdate(dt);
@@ -1096,16 +1101,21 @@ function enterRhythm() {
   const beats = song ? song.beats : Array.from({ length: 75 }, (_, k) => 0.4 + k * 0.73);
   HOP.lv = { z0: b.z, speed: 10, end: song ? song.end : 55, beats, bi: 0,
     strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1) };
+  // the melody's notes, with the beat filling any stretch where the melody rests
+  const notes = song && song.notes || [], times = notes.map((t, k) => ({ t, s: song.noteStrength[k] }));
+  beats.forEach((t, k) => { if (!notes.some(n => Math.abs(n - t) < 0.45)) times.push({ t, s: HOP.lv.strength[k] }); });
+  times.sort((p, q) => p.t - q.t);
   HOP.tiles = [{ t: 0, z: b.z, x: 0, w: 2.4, start: true, hit: true, dip: 0, dipV: 0, flash: 0, mesh: null }];
   HOP.k = 0; HOP.perfect = 0;
-  // one tile per beat (beats closer than 0.3 s apart are merged), drifting sideways
+  // one tile per note, never closer than a quarter second; quick notes only shift a little sideways
   let prev = HOP.tiles[0];
-  beats.forEach((t, k) => {
-    if (t > HOP.lv.end - 0.3 || t - prev.t < 0.3) return;
-    const x = clamp(prev.x + rand(-1.3, 1.3), -2.2, 2.2);
-    prev = { t, z: HOP.lv.z0 + t * HOP.lv.speed, x, w: 1.25, gem: HOP.lv.strength[k] > 0.5 && Math.random() < 0.5, hit: false, dip: 0, dipV: 0, flash: 0, mesh: null };
+  for (const { t, s } of times) {
+    const T = t - prev.t;
+    if (t > HOP.lv.end - 0.3 || T < 0.25) continue;
+    const x = clamp(prev.x + rand(-1.3, 1.3) * clamp(T / 0.7, 0.3, 1.2), -2.2, 2.2);
+    prev = { t, z: HOP.lv.z0 + t * HOP.lv.speed, x, w: 1.25, gem: s > 0.6 && Math.random() < 0.5, hit: false, dip: 0, dipV: 0, flash: 0, mesh: null };
     HOP.tiles.push(prev);
-  });
+  }
   musicStart(0);
   setTimeout(() => flash(false), 50);
   say('RHYTHM WORLD 🎵', '#c8b6ff');
