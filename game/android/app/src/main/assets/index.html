@@ -1102,24 +1102,19 @@ function enterRhythm() {
   HOP.lv = { z0: b.z, speed: 7,   // a gentle forward pace: the music sets the hops, not the speed
     end: song ? song.end : 55, beats, bi: 0,
     strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1) };
-  // the drum hits, and from where the song picks up (about 23.5 s) a hop on every half beat:
-  // the rhythm chosen by ear for this song (song1.js "hops"); without it, the beat
-  // where the tune speeds right up (its long fast passages), the ball speeds up with it: a hop on about
-  // every other quick note there (no closer than 0.18 s), on a winding trail of small tiles
-  const runs = (song && song.runs || []).filter(r => r.length >= 15);
-  const inRun = t => runs.some(r => t > r[0] - 0.12 && t < r[r.length - 1] + 0.12);
-  const times = (song && song.hops || beats).filter(t => !inRun(t)).map(t => ({ t, s: 0 }));
-  for (const r of runs) for (const t of r) times.push({ t, s: 0, fast: true });
-  times.sort((p, q) => p.t - q.t);
+  // the rhythm chosen by ear for this song (song1.js "hops", timed to the millisecond on the
+  // song's own beat grid); without it, the beat. Hops under a quarter second apart are quick ones.
+  const times = (song && song.hops || beats).map(t => ({ t, s: 0 }));
   beats.forEach((t, k) => { const h = times.find(x => Math.abs(x.t - t) < 0.12); if (h) h.s = HOP.lv.strength[k]; });   // strong beats carry gems
   HOP.tiles = [{ t: 0, z: b.z, x: 0, w: 2.4, start: true, hit: true, dip: 0, dipV: 0, flash: 0, mesh: null }];
   HOP.k = 0; HOP.perfect = 0;
-  // one tile per hop, a quarter second apart at least (fast passages: one per quick note, drifting
-  // with some momentum so the trail snakes); quick hops only shift a little sideways
+  // one tile per hop; quick hops land on small tiles drifting with some momentum so the trail
+  // snakes, and only shift a little sideways
   let prev = HOP.tiles[0], vx = 0;
-  for (const { t, s, fast } of times) {
+  for (const { t, s } of times) {
     const T = t - prev.t;
-    if (t > HOP.lv.end - 0.3 || T < (fast ? 0.18 : 0.25)) continue;
+    if (t > HOP.lv.end - 0.3 || T < 0.1) continue;
+    const fast = T < 0.25;
     let x;
     if (fast) {
       vx = clamp(vx + rand(-0.12, 0.12), -0.2, 0.2);
