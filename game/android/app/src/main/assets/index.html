@@ -123,7 +123,7 @@ const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
 // the Mighty Level starts at full speed in hard mode
-const speedAt = z => Math.min(24, (S.mighty ? 17 : 9) + z * 0.016);
+const speedAt = z => Math.min(30, (S.mighty ? 22 : 12) + z * 0.02);
 const LEVEL_LEN = 3000, MIGHTY_LEVEL = 10;
 // lasers from level 10 (and in the Mighty Level): a low fence to jump (some blink off and on)
 // and a tall beam that sweeps across the lanes, which has to be dodged
@@ -131,7 +131,7 @@ const LASER_LEVEL = 10, LASER_Y = 0.45;
 const lasersOn = () => S.mighty || S.level >= LASER_LEVEL;
 const laserLit = l => l.type !== 'fence' || !l.blink || Math.sin(time * l.w + l.ph) > -0.2;
 const sweepX = l => Math.sin(time * l.w + l.ph) * 2.2;
-const HARD_AT = 5000, HARD_SPEED = 7;   // hard mode starts 5000 m down the track; extra speed once fully hard (9000 m+)
+const HARD_AT = 3000, HARD_SPEED = 6;   // hard mode starts 3000 m down the track (level 2); extra speed once fully hard (7000 m+)
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
@@ -193,7 +193,7 @@ function makeRow(i) {
   row.hard = S.hard > 0;
   if (i * ROW < S.startZ + (S.startZ ? 60 : 24)) return row;   // a calm stretch where each run starts (longer when resuming at speed)
   if (gen.queue.length) { gen.queue.shift()(row); return row; }
-  const diff = S.mighty ? 1 : clamp((i - 12) / 350, 0, 1), z = i * ROW;
+  const diff = S.mighty ? 1 : clamp((i - 12) / 200, 0, 1), z = i * ROW;
   gen.gap--;
   if (gen.gap > 0) {
     // calm row: drift the safe path and maybe lay a gem or a power-up on it
@@ -206,7 +206,7 @@ function makeRow(i) {
   }
   // space obstacles by time, not distance, so faster runs still leave time to react
   const v = speedAt(z) + HARD_SPEED * S.hard, h = S.hard;
-  gen.gap = Math.max(3, Math.round(v * (0.9 - diff * 0.2 - 0.15 * h) / ROW) + ri(0, 1));
+  gen.gap = Math.max(3, Math.round(v * (0.8 - diff * 0.2 - 0.12 * h) / ROW) + ri(0, 1));
   const kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
   if (lasersOn() && Math.random() < 0.3) {
@@ -219,7 +219,7 @@ function makeRow(i) {
     row.cells[gen.safe] = PAD;
     for (let k = 0; k < 3; k++) gen.queue.push(r => r.cells.fill(HOLE));   // a well-timed normal jump also clears it
     gen.gap = Math.max(3, Math.ceil(v * 1.05 / ROW) - 3 + Math.round(v * 0.6 / ROW));
-  } else if (z > 200 && kind < 0.22) {
+  } else if (z > 100 && kind < 0.24) {
     // sliding walls sweep across the lanes
     const n = h > 0 ? ri(2, 3) : diff > 0.5 && Math.random() < 0.5 ? 2 : 1;
     for (let k = 0; k < n; k++) row.movers.push({ c: rand(-1, 1), amp: rand(1.2, 2), w: rand(1.3, 2.2) * (1 + 0.6 * h), ph: rand(0, 6), gone: false });
@@ -228,7 +228,7 @@ function makeRow(i) {
     if (h > 0.5 && Math.random() < 0.4) gen.queue.push(r => r.cells.fill(HOLE));   // hard mode: a double-length gap
     gen.gap = Math.max(gen.gap, Math.ceil(v * 0.7 / ROW) + 2);   // room to land after the jump
   } else if (kind < 0.66) {
-    const n = clamp(ri(1, 2) + Math.round(diff * 2) + (h > 0 ? 1 : 0), 1, 4), o = others();
+    const n = clamp(ri(2, 3) + Math.round(diff * 1.5) + (h > 0 ? 1 : 0), 2, 4), o = others();
     for (let k = 0; k < n; k++) row.cells[o[k]] = BLOCK;
   } else {
     const n = clamp(ri(2, 3) + Math.round(diff), 2, 4), o = others();
@@ -271,7 +271,7 @@ function hud() {
   $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
   $('slow').textContent = ball.slow > 0 ? '🐢 ' + Math.ceil(ball.slow) : '';
   $('double').textContent = ball.double > 0 ? '✖️2 ' + Math.ceil(ball.double) : '';
-  $('gems').textContent = '💎 ' + S.gems;
+  $('gems').textContent = '💎 ' + (S.bank + S.gems - S.banked);
   $('best').textContent = '🏆 ' + (S.mighty ? S.bestMighty : S.best);
   $('mute').textContent = muted ? '🔇' : '🔊';
 }
@@ -324,7 +324,7 @@ function revive() {
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
   $('over').classList.add('hidden');
   S.phase = 'play'; S.combo = 0;
-  sfx.power(); buzz([20, 30, 20]); say('Second chance! ❤️', '#ff5fa2');
+  sfx.power(); buzz([20, 30, 20]); say(`Second chance! ❤️\n-${cost} 💎`, '#ff5fa2');
   hud();
 }
 function end(fell) {
