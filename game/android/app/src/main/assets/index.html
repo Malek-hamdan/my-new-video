@@ -1048,7 +1048,7 @@ function render() {
 // From level 15 (and every 5 levels after), the track ends in a launch ramp: the ball flies off the
 // end and falls into the Rhythm World, tiles in space on the notes of the song's melody.
 // When the song ends it is back to the track at the next level.
-const RHYTHM_FIRST = 15, RHYTHM_EVERY = 5;
+const RHYTHM_FIRST = 15, RHYTHM_EVERY = 5, FAST_FROM = 27;
 const isRhythmLevel = n => n >= RHYTHM_FIRST && (n - RHYTHM_FIRST) % RHYTHM_EVERY === 0;
 const RHYTHM_THEME = { a: 0x3d2aa8, b: 0x2b1c82, rail: 0x4cc9f0 };
 const HOP = { tiles: [], live: [], k: 0, lv: null, perfect: 0 };
@@ -1101,19 +1101,29 @@ function enterRhythm() {
   const beats = song ? song.beats : Array.from({ length: 75 }, (_, k) => 0.4 + k * 0.73);
   HOP.lv = { z0: b.z, speed: 10, end: song ? song.end : 55, beats, bi: 0,
     strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1) };
-  // the melody's notes, with the beat filling any stretch where the melody rests
-  const notes = song && song.notes || [], times = notes.map((t, k) => ({ t, s: song.noteStrength[k] }));
-  beats.forEach((t, k) => { if (!notes.some(n => Math.abs(n - t) < 0.45)) times.push({ t, s: HOP.lv.strength[k] }); });
+  // the melody's notes, with the beat filling any stretch where the melody rests; from the second part
+  // of the song (about 27 s in) its fast passages get a tile on every quick note
+  const runs = (song && song.runs || []).filter(r => r.length >= 6 && r[0] >= FAST_FROM);
+  const inRun = t => runs.some(r => t > r[0] - 0.15 && t < r[r.length - 1] + 0.15);
+  const notes = song && song.notes || [], times = notes.map((t, k) => ({ t, s: song.noteStrength[k] })).filter(n => !inRun(n.t));
+  beats.forEach((t, k) => { if (!notes.some(n => Math.abs(n - t) < 0.45) && !inRun(t)) times.push({ t, s: HOP.lv.strength[k] }); });
+  for (const r of runs) for (const t of r) times.push({ t, s: 0, fast: true });
   times.sort((p, q) => p.t - q.t);
   HOP.tiles = [{ t: 0, z: b.z, x: 0, w: 2.4, start: true, hit: true, dip: 0, dipV: 0, flash: 0, mesh: null }];
   HOP.k = 0; HOP.perfect = 0;
-  // one tile per note, never closer than a quarter second; quick notes only shift a little sideways
-  let prev = HOP.tiles[0];
-  for (const { t, s } of times) {
+  // one tile per note, a quarter second apart at least; in fast passages a winding trail of small
+  // tiles, one per quick note
+  let prev = HOP.tiles[0], vx = 0;
+  for (const { t, s, fast } of times) {
     const T = t - prev.t;
-    if (t > HOP.lv.end - 0.3 || T < 0.25) continue;
-    const x = clamp(prev.x + rand(-1.3, 1.3) * clamp(T / 0.7, 0.3, 1.2), -2.2, 2.2);
-    prev = { t, z: HOP.lv.z0 + t * HOP.lv.speed, x, w: 1.25, gem: s > 0.6 && Math.random() < 0.5, hit: false, dip: 0, dipV: 0, flash: 0, mesh: null };
+    if (t > HOP.lv.end - 0.3 || T < (fast ? 0.08 : 0.25)) continue;
+    let x;
+    if (fast) {
+      vx = clamp(vx + rand(-0.12, 0.12), -0.22, 0.22);
+      if (Math.abs(prev.x + vx) > 2) vx = -vx;
+      x = prev.x + vx;
+    } else x = clamp(prev.x + rand(-1.3, 1.3) * clamp(T / 0.7, 0.3, 1.2), -2.2, 2.2);
+    prev = { t, z: HOP.lv.z0 + t * HOP.lv.speed, x, w: fast ? 0.8 : 1.25, fast, gem: s > 0.6 && Math.random() < 0.5, hit: false, dip: 0, dipV: 0, flash: 0, mesh: null };
     HOP.tiles.push(prev);
   }
   musicStart(0);
@@ -1179,7 +1189,7 @@ function hopUpdate(dt) {
     if (!t1) return;
   }
   // a parabola from this tile to the next, timed so it touches down exactly on the next beat
-  const T = t1.t - t0.t, u = clamp((pos - t0.t) / T, 0, 1), Hh = clamp(0.3 + T * 2.4, 0.5, 2.6);
+  const T = t1.t - t0.t, u = clamp((pos - t0.t) / T, 0, 1), Hh = T < 0.2 ? 0.12 + T * 1.5 : clamp(0.3 + T * 2.4, 0.5, 2.6);   // fast passages: tiny bounces
   const nz = t0.z + (t1.z - t0.z) * u;
   if (nz > b.z) b.rot += (nz - b.z) / R;
   b.z = nz; b.y = Hh * 4 * u * (1 - u); b.vy = Hh * 4 * (1 - 2 * u) / T;
@@ -1214,9 +1224,9 @@ function renderHop() {
     const t = HOP.tiles[k];
     if (t.z > b.z + VIEW) break;
     if (!t.mesh && t.z > b.z - 10) {
-      const g = new THREE.Group(), depth = t.start ? 3 : 1.25;
+      const g = new THREE.Group(), depth = t.start ? 3 : t.fast ? 0.55 : 1.25;
       t.box = new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME)); t.box.scale.set(t.w, 1, depth); t.box.receiveShadow = true;
-      const e = new THREE.LineSegments(GEO.tileEdges, glowLine(RHYTHM_THEME.rail)); e.scale.set(t.w, 1, depth);
+      const e = new THREE.LineSegments(GEO.tileEdges, glowLine(t.fast ? 0xff5fa2 : RHYTHM_THEME.rail)); e.scale.set(t.w, 1, depth);
       g.add(t.box, e);
       if (t.gem && !t.hit) { t.gemMesh = new THREE.Mesh(GEO.gem, MAT.gem); t.gemMesh.position.y = 0.85; g.add(t.gemMesh); }
       t.mesh = g; scene.add(g); HOP.live.push(t);
@@ -1253,7 +1263,7 @@ function warmUp() {
   add(new THREE.Mesh(GEO.arch, MAT.archHardA)); add(new THREE.Mesh(GEO.arch, MAT.archHardB));
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
   for (const [g, m] of [[GEO.beamH, MAT.beam], [GEO.beamHGlow, MAT.beamGlow], [GEO.beamH, MAT.beamOff], [GEO.post, MAT.post], [GEO.emitter, MAT.emitter], [GEO.gantry, MAT.post]]) add(new THREE.Mesh(g, m));
-  add(new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(RHYTHM_THEME.rail))); add(new THREE.Mesh(GEO.tile, MAT.tileHit));
+  add(new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(RHYTHM_THEME.rail))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(0xff5fa2))); add(new THREE.Mesh(GEO.tile, MAT.tileHit));
   add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
   grp.traverse(o => { if (o.isMesh) o.castShadow = true; });
