@@ -320,6 +320,7 @@
   .tr-mach.BLM { background: #1F4E8C; } .tr-mach.BCW3 { background: #0E7C66; } .tr-mach.Bonal { background: #B35418; } .tr-mach.Sollas { background: #6B3FA0; }
   .tr-picked .tr-mach { font-size: 13px; padding: 3px 11px; }
   .tr-mach.EQUIP { background: #0F766E; }
+  .tr-mach.Other { background: #5B6475; }
   .tr-src { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-right: 8px; vertical-align: 1px; }
   .tr-src.used { background: rgba(240,170,80,0.2); color: #ffd59a; border: 1px solid rgba(240,170,80,0.55); }
   .tr-src.equip { background: rgba(70,200,180,0.16); color: #bff0e8; border: 1px solid rgba(70,200,180,0.5); }
@@ -349,6 +350,7 @@
   .side-sel[data-state="ok"] { border-color: rgba(127,214,164,0.5); color: #c6f1d8; }
   .side-sel[data-state="warn"] { border-color: rgba(255,196,87,0.6); color: #ffe3a8; }
   .side-sel[data-state="bad"] { border-color: rgba(255,107,107,0.6); color: #ffb4b4; }
+  .side-sel[data-state="new"] { border-color: rgba(91,157,255,0.6); color: #cfe0ff; }
   .side-sel option { background: #141925; color: var(--text); }
   body.side-view .btn-arrival, body.side-view .tx-filter, body.side-view #lockBar, body.side-view #copyBanner { display: none !important; }
   th.col-cname { width: 50%; }
@@ -2056,17 +2058,19 @@
   // "All" or one machine; remembered per browser
   var TXF_KEY = "uii-spare-parts-tx-filter";
   var txFilter = "All";
-  try { var savedF = localStorage.getItem(TXF_KEY); if (savedF === "All" || MACHINES.indexOf(savedF) !== -1) txFilter = savedF; } catch (e) {}
+  try { var savedF = localStorage.getItem(TXF_KEY); if (savedF === "All" || savedF === "Other" || MACHINES.indexOf(savedF) !== -1) txFilter = savedF; } catch (e) {}
   var txFilterEl = document.getElementById("txFilter");
+  // "Other" holds what belongs to no machine: Used parts \u00B7 Other and Equipment
+  function txMatches(t, f) { return f === "Other" ? MACHINES.indexOf(t.machine) === -1 : t.machine === f; }
   function renderTxFilter() {
     txFilterEl.innerHTML = "";
-    ["All"].concat(MACHINES).forEach(function (f) {
+    ["All"].concat(MACHINES, ["Other"]).forEach(function (f) {
       var b = document.createElement("button");
       b.type = "button";
       b.setAttribute("aria-pressed", f === txFilter ? "true" : "false");
       b.innerHTML = '<span></span><span class="count"></span>';
       b.firstChild.textContent = f;
-      b.lastChild.textContent = f === "All" ? txList.length : txList.filter(function (t) { return t.machine === f; }).length;
+      b.lastChild.textContent = f === "All" ? txList.length : txList.filter(function (t) { return txMatches(t, f); }).length;
       b.addEventListener("click", function () {
         txFilter = f;
         try { localStorage.setItem(TXF_KEY, f); } catch (e) {}
@@ -2082,7 +2086,7 @@
     renderTxFilter();
     rowsEl.innerHTML = "";
     var inSum = 0, outSum = 0;
-    var shown = txFilter === "All" ? txList : txList.filter(function (t) { return t.machine === txFilter; });
+    var shown = txFilter === "All" ? txList : txList.filter(function (t) { return txMatches(t, txFilter); });
     shown.forEach(function (t, i) {
       // show the part's current name and reference while it still exists
       var part = findRow(t.partId);
@@ -2933,9 +2937,9 @@
   }
   function trRender() {
     var mBox = document.getElementById("trMachines"); mBox.innerHTML = "";
-    ["All"].concat(MACHINES).forEach(function (m) {
-      var b = document.createElement("button"); b.type = "button"; b.className = "tr-chip"; b.textContent = m === "All" ? "All machines" : m;
-      var on = trState.part ? (trState.kind === "equip" ? m === "All" : trState.part.machine === m) : m === trState.machine;
+    ["All"].concat(MACHINES, ["Other"]).forEach(function (m) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "tr-chip"; b.textContent = m === "All" ? "All machines" : m === "Other" ? "Other (not a machine)" : m;
+      var on = trState.part ? (trOther() ? m === "Other" : trState.part.machine === m) : m === trState.machine;
       b.setAttribute("aria-pressed", on ? "true" : "false");
       b.addEventListener("click", function () { trState.machine = m; trState.part = null; trRender(); document.getElementById("trSearch").focus(); });
       mBox.appendChild(b);
@@ -2963,9 +2967,11 @@
     } else {
       row.hidden = false;
       // spare parts of the open month, then Used parts
-      var all = trState.machine === "All", pool = [];
+      var all = trState.machine === "All", other = trState.machine === "Other", pool = [];
       MACHINES.forEach(function (m) { if (all || trState.machine === m) (data[m] || []).forEach(function (r) { if (hasContent(r)) pool.push({ kind: "part", r: r }); }); });
-      sideLists.used.forEach(function (r) { if ((all || trState.machine === r.machine) && sideHasContent("used", r)) pool.push({ kind: "used", r: r }); });
+      sideLists.used.forEach(function (r) { if (((all && r.machine !== "Other") || trState.machine === r.machine) && sideHasContent("used", r)) pool.push({ kind: "used", r: r }); });
+      // Other: things that belong to no machine (Used parts \u00B7 Other, and all Equipment)
+      if (other) sideLists.equip.forEach(function (r) { if (sideHasContent("equip", r)) pool.push({ kind: "equip", r: r }); });
       // Reference and Part name are searched separately; fill one or both
       var qr = norm(search.value.trim()), qn = norm(nameIn.value.trim()), hits = pool.filter(function (h) {
         return (!qr || norm(h.r.reference).indexOf(qr) !== -1) && (!qn || norm(h.r.name).indexOf(qn) !== -1);
@@ -2995,6 +3001,8 @@
     el.prepend(mb);
   }
   // strict: also say what is missing (on Save); while typing a 0 just shows nothing yet
+  // the picked item belongs to no machine, so a Line is optional
+  function trOther() { return !!trState.part && (trState.kind === "equip" || (trState.kind === "used" && trState.part.machine === "Other")); }
   function trCheck(strict) {
     var after = document.getElementById("trAfter"), err = document.getElementById("trErr"), qty = parseInt(document.getElementById("trQty").value, 10) || 0;
     err.hidden = true; after.hidden = true;
@@ -3017,7 +3025,7 @@
     if (!trCheck(true)) return;
     var err = document.getElementById("trErr");
     var inn = trState.mode === "in";
-    if (!inn && !trState.line) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
+    if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
     if (trState.kind === "used" || trState.kind === "equip") { trSaveSide(inn); return; }
     var row = findRow(trState.part.id) || trState.part, qty = parseInt(document.getElementById("trQty").value, 10);
     var before = trStock(row), after = inn ? before + qty : before - qty, date = document.getElementById("trDate").value;
@@ -3242,22 +3250,22 @@
       blurb: "Parts you use often", one: "part", many: "parts", file: "UII-Consumables.xlsx", title: "Parts you use often, for every machine",
       icon: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
       fields: [{ k: "name", label: "Name", w: 48, cls: "col-cname" }, { k: "reference", label: "Reference", w: 28 }] },
-    used: { label: "Used parts", store: "usedParts", lsKey: "uii-used-parts-v1", tabField: "machine", tabs: MACHINES, theme: "USED",
+    used: { label: "Used parts", store: "usedParts", lsKey: "uii-used-parts-v1", tabField: "machine", tabs: MACHINES.concat(["Other"]), theme: "USED",
       blurb: "Parts taken off a machine that can still be used", one: "part", many: "parts", file: "UII-Used-parts.xlsx", title: "Second-hand parts kept for each machine",
       icon: '<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
       fields: [{ k: "name", label: "Name", w: 40, cls: "col-uname" }, { k: "reference", label: "Reference", w: 24, cls: "col-uref" },
         { k: "quantity", label: "Quantity", w: 11, num: true, cls: "col-uqty" },
         { k: "condition", label: "Condition", w: 16, options: ["Good", "Needs repair"], cls: "col-ucond" },
         { k: "notes", label: "Notes", w: 36 }] },
-    equip: { label: "Equipment", store: "equipment", lsKey: "uii-equipment-v1", tabField: "type", tabs: ["Tools", "Measuring", "Machines", "Safety"], theme: "EQUIP",
+    equip: { label: "Equipment", store: "equipment", lsKey: "uii-equipment-v1", tabField: "type", tabs: ["Tools", "Measuring", "Machines", "Safety", "Supplies"], theme: "EQUIP",
       blurb: "Tools and equipment that are not spare parts", one: "item", many: "items", file: "UII-Equipment.xlsx", title: "Tools, measuring devices and other equipment",
       icon: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
       fields: [{ k: "name", label: "Name", w: 38, cls: "col-ename" }, { k: "reference", label: "Serial / Reference", w: 22, cls: "col-eref" },
         { k: "quantity", label: "Quantity", w: 11, num: true, cls: "col-eqty" },
         { k: "location", label: "Location", w: 20, cls: "col-eloc" },
-        { k: "condition", label: "Condition", w: 16, options: ["Working", "Needs repair", "Broken"], cls: "col-econd" }] }
+        { k: "condition", label: "Condition", w: 16, options: ["New", "Working", "Needs repair", "Broken"], cls: "col-econd" }] }
   };
-  var CONDITION_CLASS = { "Needs repair": "warn", "Broken": "bad" };
+  var CONDITION_CLASS = { "New": "new", "Needs repair": "warn", "Broken": "bad" };
   function sideFieldKeys(key) { return SIDE[key].fields.map(function (f) { return f.k; }); }
   function cleanSide(key, r) {
     var c = SIDE[key];
@@ -3622,7 +3630,7 @@
   function buildSideWorkbook(key) {
     var c = SIDE[key], stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
     var sheets = c.tabs.map(function (t) {
-      return sideSheet(key, t, "UII — " + t + " " + c.label.toLowerCase(), sideOf(key, t).filter(function (r) { return sideHasContent(key, r); }), false, stamp, c.tabField === "machine" ? t : c.theme);
+      return sideSheet(key, t, "UII — " + t + " " + c.label.toLowerCase(), sideOf(key, t).filter(function (r) { return sideHasContent(key, r); }), false, stamp, c.tabField === "machine" && XL_THEMES[t] ? t : c.theme);
     });
     var payload = { app: "UII parts", kind: key === "cons" ? "consumables" : c.store, savedAt: Date.now() };
     payload[c.store] = serializeSide(key);
