@@ -249,6 +249,44 @@
   .slip .s-name { height: 9mm; border-bottom: 1px solid #333; font-size: 15px; display: flex; align-items: flex-end; padding-bottom: 1mm; }
   .slip .s-line { height: 11mm; border-bottom: 1px solid #333; font-size: 10px; color: #777; display: flex; align-items: flex-end; padding-bottom: 1mm; }
   .confirm-card.blank-card { max-width: 820px; padding: 26px 28px; }
+  .confirm-card.order-card { max-width: 1000px; padding: 26px 28px; max-height: 92vh; overflow: auto; }
+  .order-card .tr-title { font-size: 21px; font-weight: 700; color: #cfe0ff; margin-bottom: 6px; }
+  .order-top { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 14px; align-items: end; margin-bottom: 8px; }
+  .order-urgent { display: flex; align-items: center; gap: 8px; font-weight: 700; padding-bottom: 12px; cursor: pointer; }
+  .order-urgent input { width: 18px; height: 18px; accent-color: #ff6b6b; }
+  .order-sug { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; max-height: 210px; overflow: auto; }
+  .order-sug label { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+  .order-sug label input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .order-sug .why { color: #ffb4b4; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .order-sug .why.low { color: #ffe3a8; }
+  .order-sug .r { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .order-empty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
+  .order-sel table { width: 100%; border-collapse: collapse; margin-top: 4px; table-layout: fixed; }
+  .order-sel th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .order-sel td { padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; overflow-wrap: anywhere; }
+  .order-sel td input { width: 72px; padding: 6px 8px; text-align: center; font-weight: 700; }
+  .order-sel .x { background: transparent; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .order-sel .tot { text-align: right; padding: 10px 8px; font-weight: 700; }
+  .prq { width: 190mm; min-height: 277mm; display: flex; flex-direction: column; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+  .prq td { height: 9mm; box-sizing: border-box; }
+  .prq tr.blank td { color: #bbb; }
+  .prq .p-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #1F3864; padding-bottom: 3mm; margin-bottom: 4mm; }
+  .prq h1 { margin: 0; font-size: 22px; color: #1F3864; }
+  .prq .p-sub { color: #555; margin-top: 1mm; }
+  .prq .p-no { text-align: right; line-height: 1.7; }
+  .prq .p-no b { font-size: 16px; }
+  .prq .p-urgent { display: inline-block; margin-top: 1mm; padding: 1mm 3mm; border: 2px solid #c0392b; color: #c0392b; font-weight: 800; border-radius: 4px; letter-spacing: 1px; }
+  .prq table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .prq td { overflow-wrap: anywhere; }
+  .prq th { background: #E8EDF6; color: #1F3864; font-size: 10px; text-transform: uppercase; padding: 2mm 1.5mm; border: 1px solid #8a97b3; }
+  .prq td { padding: 2.2mm 1.5mm; border: 1px solid #8a97b3; text-align: center; font-variant-numeric: tabular-nums; }
+  .prq td.l { text-align: left; }
+  .prq td.q { font-size: 14px; font-weight: 800; }
+  .prq tr.tot td { font-weight: 800; background: #F3F5FA; }
+  .prq .p-sign { display: flex; gap: 5mm; margin-top: auto; padding-top: 6mm; }
+  .prq .p-sign > div { flex: 1; border: 1px solid #8a97b3; border-radius: 4px; padding: 2.5mm 3mm; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: #1F3864; }
+  .prq .p-sign .nm { height: 8mm; border-bottom: 1px solid #333; font-size: 13px; color: #111; text-transform: none; display: flex; align-items: flex-end; }
+  .prq .p-sign .sg { height: 10mm; border-bottom: 1px solid #333; font-size: 9px; color: #777; text-transform: none; display: flex; align-items: flex-end; font-weight: 400; }
   .blank-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: #cfe0ff; margin-bottom: 6px; }
   .blank-help { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
   .blank-row { display: grid; grid-template-columns: 1.2fr 1.2fr 0.8fr 0.9fr 1.2fr; gap: 14px; }
@@ -955,6 +993,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
       <span>Blank slips</span>
     </button>
+    <button class="btn" id="orderBtn" type="button" title="Print a purchase request for parts to order">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h9.6a1 1 0 0 0 1-.8L21 7H6"/></svg>
+      <span>Order parts</span>
+    </button>
     <button class="btn" id="backupBtn" type="button" title="Full backup, restore and daily copies">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z"/><path d="M4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
       <span>Backups</span>
@@ -1157,6 +1199,31 @@
       <div class="confirm-actions" style="margin-top:18px">
         <button class="btn" id="trCancel" type="button">Cancel</button>
         <button class="btn btn-primary" id="trSave" type="button">Save transfer</button>
+      </div>
+    </div>
+  </div>
+  <div class="confirm" id="orderDlg" hidden role="dialog" aria-modal="true" aria-labelledby="orderTitle">
+    <div class="confirm-card order-card">
+      <div class="tr-title" id="orderTitle">Order parts</div>
+      <p class="blank-help">Pick the parts to order and how many, then print a purchase request for approval.</p>
+      <div class="order-top">
+        <div><span class="tr-label">Requested by</span><input class="tr-input" id="ordBy" placeholder="Your name" autocomplete="off" spellcheck="false" dir="auto"></div>
+        <div><span class="tr-label">Request No.</span><input class="tr-input" id="ordNo" inputmode="numeric" autocomplete="off"></div>
+        <label class="order-urgent"><input type="checkbox" id="ordUrgent"> Urgent</label>
+      </div>
+      <span class="tr-label">Out of stock or below Min</span>
+      <div class="order-sug" id="ordSug"></div>
+      <span class="tr-label">Add another part</span>
+      <div class="tr-search2">
+        <div><input class="tr-input" id="ordRef" placeholder="Type the reference" autocomplete="off" spellcheck="false" dir="auto"></div>
+        <div><input class="tr-input" id="ordName" placeholder="Type the part name" autocomplete="off" spellcheck="false" dir="auto"></div>
+      </div>
+      <div class="tr-list" id="ordList"></div>
+      <span class="tr-label">On the request</span>
+      <div class="order-sel" id="ordSel"></div>
+      <div class="confirm-actions" style="margin-top:18px">
+        <button class="btn" id="ordCancel" type="button">Cancel</button>
+        <button class="btn btn-primary" id="ordPrint" type="button">Print request</button>
       </div>
     </div>
   </div>
@@ -3095,6 +3162,132 @@
       '<div class="s-box"><div class="s-lab">Received by</div><div class="s-name">' + e(t.to) + '</div><div class="s-line">Signature</div></div></div></div>' +
       '<div class="slip-cut">\u2702 cut here</div>';
   }
+  // ---- Order parts: a purchase request to print and sign ----
+  var PR_NEXT_KEY = "uii-pr-next", orderDlg = document.getElementById("orderDlg"), orderPick = [];
+  function ordMin(r) { return /^\d+$/.test(String(r.min)) ? parseInt(r.min, 10) : null; }
+  function ordParts() { var out = []; MACHINES.forEach(function (m) { (data[m] || []).forEach(function (r) { if (hasContent(r)) out.push(r); }); }); return out; }
+  // what needs ordering: nothing left, or under its minimum
+  function ordSuggested() {
+    return ordParts().filter(function (r) { var q = trStock(r), mn = ordMin(r); return /^\d+$/.test(String(r.quantity)) && (q === 0 || (mn !== null && q < mn)); });
+  }
+  function ordDefault(r) { var q = trStock(r), mn = ordMin(r); return mn !== null && mn > q ? mn - q : 1; }
+  function ordFind(id) { for (var i = 0; i < orderPick.length; i++) if (orderPick[i].id === id) return orderPick[i]; return null; }
+  function ordToggle(r, on) {
+    var cur = ordFind(r.id);
+    if (on && !cur) orderPick.push({ id: r.id, qty: ordDefault(r) });
+    if (!on && cur) orderPick.splice(orderPick.indexOf(cur), 1);
+    renderOrder();
+  }
+  function renderOrder() {
+    var sug = ordSuggested(), box = document.getElementById("ordSug");
+    box.innerHTML = sug.length ? "" : '<div class="order-empty">Nothing is out of stock or below its Min in ' + monthLabel(month) + ".</div>";
+    sug.forEach(function (r) {
+      var l = document.createElement("label"), q = trStock(r), mn = ordMin(r);
+      l.innerHTML = '<input type="checkbox"><span class="n"></span><span class="why"></span>';
+      l.firstChild.checked = !!ordFind(r.id);
+      var n = l.querySelector(".n"); n.textContent = r.name || "(no name)";
+      var rr = document.createElement("span"); rr.className = "r"; rr.textContent = r.reference; n.appendChild(rr);
+      trBadges(n, "part", r);
+      var why = l.querySelector(".why");
+      why.textContent = q === 0 ? "Out of stock" : "Stock " + q + " \u00B7 Min " + mn;
+      if (q) why.classList.add("low");
+      l.firstChild.addEventListener("change", function () { ordToggle(r, this.checked); });
+      box.appendChild(l);
+    });
+    // search to add any other part
+    var qr = norm(document.getElementById("ordRef").value.trim()), qn = norm(document.getElementById("ordName").value.trim()), list = document.getElementById("ordList");
+    list.innerHTML = "";
+    if (qr || qn) ordParts().filter(function (r) { return !ordFind(r.id) && (!qr || norm(r.reference).indexOf(qr) !== -1) && (!qn || norm(r.name).indexOf(qn) !== -1); }).slice(0, 8).forEach(function (r) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "tr-opt";
+      b.innerHTML = '<span class="n"></span><span class="q"></span><span class="r"></span>';
+      b.querySelector(".n").textContent = r.name || "(no name)"; b.querySelector(".r").textContent = r.reference;
+      trBadges(b.querySelector(".n"), "part", r);
+      b.querySelector(".q").textContent = "In stock " + trStock(r) + " \u00B7 + Add";
+      b.addEventListener("click", function () { ordToggle(r, true); document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = ""; renderOrder(); });
+      list.appendChild(b);
+    });
+    // what goes on the request
+    var sel = document.getElementById("ordSel"), rows = ordRows();
+    if (!rows.length) { sel.innerHTML = '<div class="order-empty">No parts yet. Tick a part above or add one.</div>'; document.getElementById("ordPrint").disabled = true; return; }
+    document.getElementById("ordPrint").disabled = false;
+    var t = document.createElement("table");
+    t.innerHTML = '<colgroup><col style="width:36px"><col style="width:100px"><col><col style="width:200px"><col style="width:90px"><col style="width:120px"><col style="width:40px"></colgroup>' + "<tr><th>#</th><th>Machine</th><th>Part name</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th></th></tr>";
+    rows.forEach(function (x, i) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td></td><td></td><td></td><td></td><td></td><td></td><td></td>";
+      var c = tr.children;
+      c[0].textContent = i + 1;
+      var mb = document.createElement("span"); mb.className = "tr-mach " + x.r.machine; mb.textContent = x.r.machine; c[1].appendChild(mb);
+      c[2].textContent = x.r.name || "\u2014"; c[3].textContent = x.r.reference || "\u2014"; c[4].textContent = trStock(x.r);
+      var inp = document.createElement("input"); inp.className = "tr-input"; inp.inputMode = "numeric"; inp.value = x.qty;
+      inp.addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); x.pick.qty = parseInt(this.value, 10) || 0; ordTotals(); });
+      c[5].appendChild(inp);
+
+
+      var del = document.createElement("button"); del.type = "button"; del.className = "x"; del.textContent = "\u00D7"; del.title = "Take it off the request";
+      del.addEventListener("click", function () { ordToggle(x.r, false); });
+      c[6].appendChild(del);
+      t.appendChild(tr);
+    });
+    sel.innerHTML = ""; sel.appendChild(t);
+    var tot = document.createElement("div"); tot.className = "tot"; tot.id = "ordTot"; sel.appendChild(tot);
+    ordTotals();
+  }
+  // picked parts in machine order
+  function ordRows() {
+    var out = [];
+    orderPick.forEach(function (pk) { var r = findRow(pk.id); if (r) out.push({ pick: pk, r: r, qty: pk.qty }); });
+    out.sort(function (a, b) { return MACHINES.indexOf(a.r.machine) - MACHINES.indexOf(b.r.machine); });
+    return out;
+  }
+  function ordTotals() {
+    var n = 0, rows = ordRows();
+    rows.forEach(function (x) { n += x.qty; });
+    var el = document.getElementById("ordTot"); if (el) el.textContent = rows.length + (rows.length === 1 ? " part" : " parts") + " \u00B7 " + n + " pcs";
+    document.getElementById("ordPrint").disabled = !rows.length || rows.some(function (x) { return x.qty < 1; });
+  }
+  function prNo(n) { return String(n); }
+  function prHtml(no, by, urgent, rows) {
+    var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+    var d = new Date(), pcs = 0;
+    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request</h1><div class="p-sub">Spare parts to order</div>' +
+      (urgent ? '<div class="p-urgent">URGENT</div>' : "") + '</div><div class="p-no">No. <b>' + prNo(no) + "</b><br>Date <b>" + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + "</b></div></div>";
+    h += '<table><colgroup><col style="width:7mm"><col style="width:18mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>Machine</th><th>Part name</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>';
+    rows.forEach(function (x, i) {
+      pcs += x.qty;
+      h += "<tr><td>" + (i + 1) + "</td><td><b>" + e(x.r.machine) + '</b></td><td class="l">' + e(x.r.name || "\u2014") + "</td><td>" + e(x.r.reference || "\u2014") + "</td><td>" + trStock(x.r) +
+        '</td><td class="q">' + x.qty + "</td><td></td></tr>";
+    });
+    // empty lines down the page, to add parts by hand
+    for (var b = rows.length; b < 20; b++) h += '<tr class="blank"><td>' + (b + 1) + "</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
+    h += '<tr class="tot"><td colspan="5" style="text-align:right">Total \u00B7 ' + rows.length + (rows.length === 1 ? " part" : " parts") + "</td><td>" + pcs + "</td><td></td></tr></table>";
+    h += '<div class="p-sign"><div>Requested by<div class="nm">' + e(by) + '</div><div class="sg">Signature</div></div><div>Approved by<div class="nm"></div><div class="sg">Signature</div></div><div>Ordered by<div class="nm"></div><div class="sg">Signature</div></div></div></div>';
+    return h;
+  }
+  document.getElementById("orderBtn").addEventListener("click", function () {
+    if (sideView) leaveConsumables();
+    orderPick = [];
+    try {
+      document.getElementById("ordBy").value = localStorage.getItem(TR_ME_KEY) || "";
+      document.getElementById("ordNo").value = localStorage.getItem(PR_NEXT_KEY) || "1";
+    } catch (e) { document.getElementById("ordNo").value = "1"; }
+    document.getElementById("ordUrgent").checked = false;
+    document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = "";
+    orderDlg.hidden = false;
+    renderOrder();
+  });
+  ["ordRef", "ordName"].forEach(function (id) { document.getElementById(id).addEventListener("input", renderOrder); });
+  document.getElementById("ordNo").addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); });
+  document.getElementById("ordCancel").addEventListener("click", function () { orderDlg.hidden = true; });
+  orderDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") orderDlg.hidden = true; });
+  document.getElementById("ordPrint").addEventListener("click", function () {
+    var rows = ordRows(), no = Math.max(1, parseInt(document.getElementById("ordNo").value, 10) || 1), by = document.getElementById("ordBy").value.trim();
+    if (!rows.length) return;
+    try { localStorage.setItem(PR_NEXT_KEY, String(no + 1)); localStorage.setItem(TR_ME_KEY, by); } catch (e) {}
+    orderDlg.hidden = true;
+    printHtml('<div class="spage">' + prHtml(no, by, document.getElementById("ordUrgent").checked, rows) + "</div>");
+  });
+
   // ---- Blank slips: empty issue slips to fill by hand in the store room ----
   var BLANK_PLACE_KEY = "uii-blank-place", BLANK_NEXT_KEY = "uii-blank-next";
   function slipNo(n) { return String(n); }
