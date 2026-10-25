@@ -67,7 +67,7 @@ class WidgetRenderer(context: Context, private val w: Int, private val h: Int, p
         }
         c.drawText(d.button, btnRect.centerX() - btnTextW / 2, btnRect.centerY() - (btn.ascent() + btn.descent()) / 2, btn)
         val stats = paint(kufi, dp(12f), MUTED)
-        val footer = if (d.streak > 0) "${d.footer}  ·  🔥 ${d.streak}" else d.footer
+        val footer = if (d.streak > 0) "${d.footer}  ·  ${if (d.streakPaused) "⏸" else "🔥"} ${d.streak}" else d.footer
         drawLine(footer, stats, btnRect.right + dp(10f), textRight, btnRect.centerY() - (stats.ascent() + stats.descent()) / 2)
 
         // Phrase fills the space between, shrinking until it fits.
@@ -99,7 +99,7 @@ class WidgetRenderer(context: Context, private val w: Int, private val h: Int, p
         val ofText = "من ${d.total}"
         c.drawText(ofText, cx - of.measureText(ofText) / 2, cy + size * 0.24f, of)
         val label = paint(kufi, dp(11f), MUTED)
-        val text = listOf(if (complete) "تقبّل الله" else d.stageLabel, if (d.streak > 0) "🔥${d.streak}" else "")
+        val text = listOf(if (complete) "تقبّل الله" else d.stageLabel, if (d.streak > 0) "${if (d.streakPaused) "⏸" else "🔥"}${d.streak}" else "")
             .filter { it.isNotEmpty() }.joinToString("  ·  ")
         val lt = TextUtils.ellipsize(text, label, w - dp(20f), TextUtils.TruncateAt.END).toString()
         c.drawText(lt, cx - label.measureText(lt) / 2, h - dp(16f), label)

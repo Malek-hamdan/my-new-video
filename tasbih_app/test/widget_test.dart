@@ -80,7 +80,57 @@ void main() {
       beads(23);
       expect(s.streak, 3);
       now = DateTime(2026, 10, 19, 10);
-      expect(s.streak, 0, reason: 'missed the 18th');
+      expect(s.streak, 3, reason: 'one missed day (the 18th) only pauses it');
+      expect(s.streakPaused, isTrue);
+      beads(33);
+      expect(s.streak, 4);
+      expect(s.streakPaused, isFalse);
+      now = DateTime(2026, 10, 22, 10);
+      expect(s.streak, 0, reason: 'missed the 20th and 21st');
+    });
+
+    test('a lost streak can be restored', () async {
+      var now = DateTime(2026, 10, 10, 10);
+      final s = await freshStore(now);
+      s.now = () => now;
+      for (var day = 10; day <= 14; day++) {
+        now = DateTime(2026, 10, day, 10);
+        for (var i = 0; i < 40; i++) {
+          s.addBead('tahlil');
+        }
+      }
+      now = DateTime(2026, 10, 18, 9); // missed the 15th..17th
+      expect(s.streak, 0);
+      final lost = s.lostStreak!;
+      expect(lost.$1, 5);
+      s.restoreStreak();
+      expect(s.streak, 5);
+      expect(s.lostStreak, isNull);
+      for (var i = 0; i < 33; i++) {
+        s.addBead('tahlil');
+      }
+      expect(s.streak, 6);
+    });
+
+    test('restoring joins the lost streak to a new one', () async {
+      var now = DateTime(2026, 10, 1, 10);
+      final s = await freshStore(now);
+      s.now = () => now;
+      void dayOf(int day) {
+        now = DateTime(2026, 10, day, 10);
+        for (var i = 0; i < 33; i++) {
+          s.addBead('tahlil');
+        }
+      }
+
+      for (final d in [1, 2, 3]) {
+        dayOf(d);
+      }
+      dayOf(7); // came back after missing the 4th..6th
+      expect(s.streak, 1);
+      expect(s.lostStreak!.$1, 3);
+      s.restoreStreak();
+      expect(s.streak, 4);
     });
 
     test('custom tasbih and count change', () async {

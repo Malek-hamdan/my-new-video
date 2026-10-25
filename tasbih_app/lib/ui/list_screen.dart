@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../data/store.dart';
 import '../data/tasbihat.dart';
+import 'streak_sheet.dart';
 import 'theme.dart';
 
 class ListScreen extends StatelessWidget {
@@ -33,7 +34,12 @@ class ListScreen extends StatelessWidget {
                             icon: const Icon(Icons.arrow_forward, color: Palette.cream),
                           ),
                           const Spacer(),
-                          StreakChip(days: store.streak, long: true),
+                          StreakChip(
+                            days: store.streak,
+                            long: true,
+                            paused: store.streakPaused,
+                            onTap: () => showStreakSheet(context, store),
+                          ),
                         ],
                       ),
                     ),

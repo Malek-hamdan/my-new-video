@@ -26,6 +26,7 @@ class Store extends ChangeNotifier {
   final Map<String, int> _days = {};
   final Map<String, int> _roundsDone = {};
   final List<Tasbih> _custom = [];
+  final Set<String> _bridgedDays = {};
   String _lastId = zahraId;
 
   /// Clock, replaceable in tests.
@@ -47,6 +48,7 @@ class Store extends ChangeNotifier {
       _custom.addAll((jsonDecode(custom) as List).map((j) => Tasbih.fromJson(j as Map<String, dynamic>)));
     }
     _lastId = _prefs.getString('last') ?? zahraId;
+    _bridgedDays.addAll(_prefs.getStringList('bridged') ?? const []);
   }
 
   Future<void> _save() async {
@@ -64,6 +66,7 @@ class Store extends ChangeNotifier {
     await _prefs.setString('rounds', jsonEncode(_roundsDone));
     await _prefs.setString('custom', jsonEncode(_custom.map((t) => t.toJson()).toList()));
     await _prefs.setString('last', _lastId);
+    await _prefs.setStringList('bridged', _bridgedDays.toList()..sort());
   }
 
   List<Tasbih> get tasbihat => [
@@ -145,23 +148,89 @@ class Store extends ChangeNotifier {
 
   bool get doneToday => (_roundsDone[dayKey(now())] ?? 0) > 0;
 
-  /// Days in a row with at least [streakThreshold] beads. Today only breaks the
-  /// streak once it is over, so an unfinished today still shows yesterday's run.
-  int get streak {
-    var d = now();
-    if (countOn(d) < streakThreshold) d = d.subtract(const Duration(days: 1));
+  static DateTime _day(DateTime d, [int offset = 0]) => DateTime(d.year, d.month, d.day + offset);
+
+  bool _qualifies(DateTime d) => countOn(d) >= streakThreshold;
+
+  /// A day that keeps the streak going without adding to it (see [restoreStreak]).
+  bool _bridged(DateTime d) => _bridgedDays.contains(dayKey(d));
+
+  /// Walks back from [from] through days that count, letting a single missed
+  /// day pass (the streak pauses) but stopping at two missed days in a row.
+  /// Returns the number of counting days and the earliest one.
+  (int, DateTime?) _run(DateTime from) {
+    final earliest = _days.keys.isEmpty ? null : (_days.keys.toList()..sort()).first;
+    var d = _day(from);
     var n = 0;
-    while (countOn(d) >= streakThreshold) {
-      n++;
-      d = d.subtract(const Duration(days: 1));
+    var misses = 0;
+    DateTime? start;
+    while (earliest != null && dayKey(d).compareTo(earliest) >= 0) {
+      if (_qualifies(d)) {
+        n++;
+        misses = 0;
+        start = d;
+      } else if (_bridged(d)) {
+        misses = 0;
+      } else if (++misses > 1) {
+        break;
+      }
+      d = _day(d, -1);
     }
-    return n;
+    return (n, start);
+  }
+
+  /// The day the streak is counted back from: today once it counts, else
+  /// yesterday, since today only breaks the streak after it is over.
+  DateTime get _streakFrom {
+    final today = _day(now());
+    return _qualifies(today) || _bridged(today) ? today : _day(today, -1);
+  }
+
+  /// Days with at least [streakThreshold] beads. Missing one day pauses the
+  /// streak instead of ending it; it ends after two missed days in a row.
+  int get streak => _run(_streakFrom).$1;
+
+  /// The streak is alive but waiting: yesterday was missed, so today must count.
+  bool get streakPaused {
+    final today = _day(now());
+    final y = _day(today, -1);
+    return streak > 0 && !_qualifies(today) && !_bridged(today) && !_qualifies(y) && !_bridged(y);
+  }
+
+  /// The streak that ended before the current one, if it can be brought back:
+  /// (its length, first missed day, last missed day). Null if nothing was lost.
+  (int, DateTime, DateTime)? get lostStreak {
+    final (n, start) = _run(_streakFrom);
+    // The gap ends the day before the current run, or yesterday when there is none.
+    final gapEnd = n > 0 ? _day(start!, -1) : _day(_streakFrom, _qualifies(_streakFrom) ? -1 : 0);
+    var d = gapEnd;
+    final earliest = _days.keys.isEmpty ? null : (_days.keys.toList()..sort()).first;
+    while (earliest != null && dayKey(d).compareTo(earliest) >= 0 && !_qualifies(d) && !_bridged(d)) {
+      d = _day(d, -1);
+    }
+    if (earliest == null || dayKey(d).compareTo(earliest) < 0) return null;
+    final gapStart = _day(d, 1);
+    // A one-day gap is already covered by the pause.
+    if (gapEnd.difference(gapStart).inHours < 20) return null;
+    final lost = _run(d).$1;
+    return lost > 0 ? (lost, gapStart, gapEnd) : null;
+  }
+
+  /// Brings back [lostStreak] by bridging the missed days, and joins it to the current run.
+  void restoreStreak() {
+    final lost = lostStreak;
+    if (lost == null) return;
+    for (var d = lost.$2; !d.isAfter(lost.$3); d = _day(d, 1)) {
+      _bridgedDays.add(dayKey(d));
+    }
+    _save();
+    notifyListeners();
   }
 
   /// Last 7 days, oldest first: whether each counted toward the streak.
   List<bool> get week {
-    final t = now();
-    return [for (var i = 6; i >= 0; i--) countOn(t.subtract(Duration(days: i))) >= streakThreshold];
+    final t = _day(now());
+    return [for (var i = 6; i >= 0; i--) _qualifies(_day(t, -i)) || _bridged(_day(t, -i))];
   }
 
   /// Most recent day with any beads, or null.
@@ -170,9 +239,9 @@ class Store extends ChangeNotifier {
     return keys.isEmpty ? null : keys.last;
   }
 
-  /// Most recent day that counted toward the streak, or null.
+  /// Most recent day that kept the streak going (counted or bridged), or null.
   String? get lastQualifiedDay {
-    final keys = _days.entries.where((e) => e.value >= streakThreshold).map((e) => e.key).toList()..sort();
+    final keys = [..._days.entries.where((e) => e.value >= streakThreshold).map((e) => e.key), ..._bridgedDays]..sort();
     return keys.isEmpty ? null : keys.last;
   }
 }

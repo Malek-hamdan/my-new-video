@@ -70,17 +70,20 @@ class Chip2 extends StatelessWidget {
 }
 
 class StreakChip extends StatelessWidget {
-  const StreakChip({super.key, required this.days, this.long = false});
+  const StreakChip({super.key, required this.days, this.long = false, this.paused = false, this.onTap});
 
   final int days;
   final bool long;
+  final bool paused;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Chip2(
+    onTap: onTap,
     child: Text.rich(
       TextSpan(
         children: [
-          const TextSpan(text: '🔥 '),
+          TextSpan(text: paused ? '⏸ ' : '🔥 '),
           TextSpan(
             text: '$days',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
@@ -88,7 +91,7 @@ class StreakChip extends StatelessWidget {
           TextSpan(text: long ? ' يوم متتالي' : ' يوم'),
         ],
       ),
-      style: const TextStyle(color: Palette.flame, fontWeight: FontWeight.w700),
+      style: TextStyle(color: paused ? Palette.muted : Palette.flame, fontWeight: FontWeight.w700),
     ),
   );
 }

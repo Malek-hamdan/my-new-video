@@ -50,6 +50,7 @@ class WidgetSync {
         'morning': Phrases.morning,
         'notYet': Phrases.notYet,
         'yesterday': Phrases.yesterday,
+        'paused': Phrases.paused,
         'partial': Phrases.partial,
         'done': Phrases.done,
         'night': Phrases.night,

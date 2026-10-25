@@ -15,6 +15,7 @@ class WidgetData private constructor(
     val button: String,
     val footer: String,
     val streak: Int,
+    val streakPaused: Boolean,
     val todayCount: Int,
     val progress: Int,
     val total: Int,
@@ -35,12 +36,14 @@ class WidgetData private constructor(
 
             val today = dayKey(now)
             val yesterday = dayKey((now.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, -1) })
+            val dayBefore = dayKey((now.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, -2) })
             val savedToday = str("today_key") == today
             val todayCount = if (savedToday) int("today_count") else 0
             val doneToday = savedToday && str("done_today") == "1"
             val lastQualified = str("last_qualified_day")
-            // The saved streak is only still alive if its last day is today or yesterday.
-            val streak = if (lastQualified == today || lastQualified == yesterday) int("streak") else 0
+            // One missed day pauses the streak; two in a row end it (same rule as the app).
+            val streakPaused = lastQualified == dayBefore
+            val streak = if (lastQualified == today || lastQualified == yesterday || streakPaused) int("streak") else 0
             val progress = int("progress")
             val total = int("total").coerceAtLeast(1)
             val title = str("title")
@@ -97,6 +100,7 @@ class WidgetData private constructor(
                     state = State.NOT_YET
                     phrase = fill(
                         when {
+                            streakPaused && streak > 0 -> pick("paused", "الستريك واقف ⏸ سبّح اليوم حتى ما يروح")
                             str("last_active_day") == yesterday -> pick("yesterday", "سبّحت مبارح، شو رأيك تكمّل اليوم كمان؟")
                             hour < 12 -> pick("morning", "صباحك نور.. شو رأيك تفتح نهارك بتسبيحة الزهراء؟")
                             else -> pick("notYet", "لسا ما سبّحت اليوم.. شو رأيك هلق؟")
@@ -118,6 +122,7 @@ class WidgetData private constructor(
                 button = button,
                 footer = footer,
                 streak = streak,
+                streakPaused = streakPaused && streak > 0,
                 todayCount = todayCount,
                 progress = progress.coerceIn(0, total),
                 total = total,

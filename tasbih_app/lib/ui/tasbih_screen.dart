@@ -8,6 +8,7 @@ import '../data/tasbihat.dart';
 import '../services/feedback.dart';
 import 'bead_string.dart';
 import 'list_screen.dart';
+import 'streak_sheet.dart';
 import 'theme.dart';
 
 class TasbihScreen extends StatefulWidget {
@@ -168,7 +169,11 @@ class _TasbihScreenState extends State<TasbihScreen> {
                             ),
                           ),
                         ),
-                        StreakChip(days: store.streak),
+                        StreakChip(
+                          days: store.streak,
+                          paused: store.streakPaused,
+                          onTap: () => showStreakSheet(context, store),
+                        ),
                       ],
                     ),
                   ),
