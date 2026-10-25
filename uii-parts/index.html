@@ -251,6 +251,9 @@
   .confirm-card.blank-card { max-width: 820px; padding: 26px 28px; }
   .confirm-card.order-card { max-width: 1000px; padding: 26px 28px; max-height: 92vh; overflow: auto; }
   .order-card .tr-title { font-size: 21px; font-weight: 700; color: #cfe0ff; margin-bottom: 6px; }
+  .order-mode { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; margin: 2px 0 12px; }
+  .order-mode button { font: inherit; font-size: 14px; font-weight: 700; padding: 8px 18px; background: transparent; color: var(--muted); border: 0; cursor: pointer; }
+  .order-mode button[aria-pressed="true"] { background: var(--accent); color: #0b1220; }
   .order-top { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 14px; align-items: end; margin-bottom: 8px; }
   .order-urgent { display: flex; align-items: center; gap: 8px; font-weight: 700; padding-bottom: 12px; cursor: pointer; }
   .order-urgent input { width: 18px; height: 18px; accent-color: #ff6b6b; }
@@ -1206,12 +1209,13 @@
     <div class="confirm-card order-card">
       <div class="tr-title" id="orderTitle">Order parts</div>
       <p class="blank-help">Pick the parts to order and how many, then print a purchase request for approval.</p>
+      <div class="order-mode"><button type="button" id="ordModeParts" aria-pressed="true">Spare parts</button><button type="button" id="ordModeEquip" aria-pressed="false">Equipment</button></div>
       <div class="order-top">
         <div><span class="tr-label">Requested by</span><input class="tr-input" id="ordBy" placeholder="Your name" autocomplete="off" spellcheck="false" dir="auto"></div>
         <div><span class="tr-label">Request No.</span><input class="tr-input" id="ordNo" inputmode="numeric" autocomplete="off"></div>
         <label class="order-urgent"><input type="checkbox" id="ordUrgent"> Urgent</label>
       </div>
-      <span class="tr-label">Out of stock or below Min</span>
+      <span class="tr-label" id="ordSugLabel">Out of stock or below Min</span>
       <div class="order-sug" id="ordSug"></div>
       <span class="tr-label">Add another part</span>
       <div class="tr-search2">
@@ -3163,9 +3167,25 @@
       '<div class="slip-cut">\u2702 cut here</div>';
   }
   // ---- Order parts: a purchase request to print and sign ----
-  var PR_NEXT_KEY = "uii-pr-next", orderDlg = document.getElementById("orderDlg"), orderPick = [];
+  var PR_NEXT_KEY = "uii-pr-next", orderDlg = document.getElementById("orderDlg"), orderPick = [], ordMode = "parts", ordPicks = { parts: [], equip: [] };
   function ordMin(r) { return /^\d+$/.test(String(r.min)) ? parseInt(r.min, 10) : null; }
-  function ordParts() { var out = []; MACHINES.forEach(function (m) { (data[m] || []).forEach(function (r) { if (hasContent(r)) out.push(r); }); }); return out; }
+  // spare parts of the open month, or Equipment (Tools, Supplies...): one request each
+  function ordParts() {
+    var out = [];
+    if (ordMode === "equip") sideLists.equip.forEach(function (r) { if (sideHasContent("equip", r)) out.push(r); });
+    else MACHINES.forEach(function (m) { (data[m] || []).forEach(function (r) { if (hasContent(r)) out.push(r); }); });
+    return out;
+  }
+  function ordSetMode(m) {
+    ordMode = m; orderPick = ordPicks[m];
+    document.getElementById("ordModeParts").setAttribute("aria-pressed", m === "parts" ? "true" : "false");
+    document.getElementById("ordModeEquip").setAttribute("aria-pressed", m === "equip" ? "true" : "false");
+    document.getElementById("ordSugLabel").textContent = m === "equip" ? "Out of stock" : "Out of stock or below Min";
+    document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = "";
+    renderOrder();
+  }
+  function ordKind(r) { return r.type ? "equip" : "part"; }
+  function ordWhere(r) { return r.type || r.machine; }
   // what needs ordering: nothing left, or under its minimum
   function ordSuggested() {
     return ordParts().filter(function (r) { var q = trStock(r), mn = ordMin(r); return /^\d+$/.test(String(r.quantity)) && (q === 0 || (mn !== null && q < mn)); });
@@ -3180,14 +3200,14 @@
   }
   function renderOrder() {
     var sug = ordSuggested(), box = document.getElementById("ordSug");
-    box.innerHTML = sug.length ? "" : '<div class="order-empty">Nothing is out of stock or below its Min in ' + monthLabel(month) + ".</div>";
+    box.innerHTML = sug.length ? "" : '<div class="order-empty">' + (ordMode === "equip" ? "No equipment is out of stock." : "Nothing is out of stock or below its Min in " + monthLabel(month) + ".") + "</div>";
     sug.forEach(function (r) {
       var l = document.createElement("label"), q = trStock(r), mn = ordMin(r);
       l.innerHTML = '<input type="checkbox"><span class="n"></span><span class="why"></span>';
       l.firstChild.checked = !!ordFind(r.id);
       var n = l.querySelector(".n"); n.textContent = r.name || "(no name)";
       var rr = document.createElement("span"); rr.className = "r"; rr.textContent = r.reference; n.appendChild(rr);
-      trBadges(n, "part", r);
+      trBadges(n, ordKind(r), r);
       var why = l.querySelector(".why");
       why.textContent = q === 0 ? "Out of stock" : "Stock " + q + " \u00B7 Min " + mn;
       if (q) why.classList.add("low");
@@ -3201,7 +3221,7 @@
       var b = document.createElement("button"); b.type = "button"; b.className = "tr-opt";
       b.innerHTML = '<span class="n"></span><span class="q"></span><span class="r"></span>';
       b.querySelector(".n").textContent = r.name || "(no name)"; b.querySelector(".r").textContent = r.reference;
-      trBadges(b.querySelector(".n"), "part", r);
+      trBadges(b.querySelector(".n"), ordKind(r), r);
       b.querySelector(".q").textContent = "In stock " + trStock(r) + " \u00B7 + Add";
       b.addEventListener("click", function () { ordToggle(r, true); document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = ""; renderOrder(); });
       list.appendChild(b);
@@ -3211,13 +3231,13 @@
     if (!rows.length) { sel.innerHTML = '<div class="order-empty">No parts yet. Tick a part above or add one.</div>'; document.getElementById("ordPrint").disabled = true; return; }
     document.getElementById("ordPrint").disabled = false;
     var t = document.createElement("table");
-    t.innerHTML = '<colgroup><col style="width:36px"><col style="width:100px"><col><col style="width:200px"><col style="width:90px"><col style="width:120px"><col style="width:40px"></colgroup>' + "<tr><th>#</th><th>Machine</th><th>Part name</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th></th></tr>";
+    t.innerHTML = '<colgroup><col style="width:36px"><col style="width:100px"><col><col style="width:200px"><col style="width:90px"><col style="width:120px"><col style="width:40px"></colgroup>' + "<tr><th>#</th><th>" + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th></th></tr>";
     rows.forEach(function (x, i) {
       var tr = document.createElement("tr");
       tr.innerHTML = "<td></td><td></td><td></td><td></td><td></td><td></td><td></td>";
       var c = tr.children;
       c[0].textContent = i + 1;
-      var mb = document.createElement("span"); mb.className = "tr-mach " + x.r.machine; mb.textContent = x.r.machine; c[1].appendChild(mb);
+      var mb = document.createElement("span"); mb.className = "tr-mach " + (x.r.type ? "EQUIP" : x.r.machine); mb.textContent = ordWhere(x.r); c[1].appendChild(mb);
       c[2].textContent = x.r.name || "\u2014"; c[3].textContent = x.r.reference || "\u2014"; c[4].textContent = trStock(x.r);
       var inp = document.createElement("input"); inp.className = "tr-input"; inp.inputMode = "numeric"; inp.value = x.qty;
       inp.addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); x.pick.qty = parseInt(this.value, 10) || 0; ordTotals(); });
@@ -3236,8 +3256,9 @@
   // picked parts in machine order
   function ordRows() {
     var out = [];
-    orderPick.forEach(function (pk) { var r = findRow(pk.id); if (r) out.push({ pick: pk, r: r, qty: pk.qty }); });
-    out.sort(function (a, b) { return MACHINES.indexOf(a.r.machine) - MACHINES.indexOf(b.r.machine); });
+    orderPick.forEach(function (pk) { var r = findRow(pk.id) || findSide("equip", pk.id); if (r) out.push({ pick: pk, r: r, qty: pk.qty }); });
+    var at = function (r) { return r.type ? MACHINES.length + SIDE.equip.tabs.indexOf(r.type) : MACHINES.indexOf(r.machine); };
+    out.sort(function (a, b) { return at(a.r) - at(b.r); });
     return out;
   }
   function ordTotals() {
@@ -3250,12 +3271,12 @@
   function prHtml(no, by, urgent, rows) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     var d = new Date(), pcs = 0;
-    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request</h1><div class="p-sub">Spare parts to order</div>' +
+    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request' + (ordMode === "equip" ? " \u00B7 Equipment" : "") + '</h1><div class="p-sub">' + (ordMode === "equip" ? "Equipment and supplies to order" : "Spare parts to order") + '</div>' +
       (urgent ? '<div class="p-urgent">URGENT</div>' : "") + '</div><div class="p-no">No. <b>' + prNo(no) + "</b><br>Date <b>" + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + "</b></div></div>";
-    h += '<table><colgroup><col style="width:7mm"><col style="width:18mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>Machine</th><th>Part name</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>';
+    h += '<table><colgroup><col style="width:7mm"><col style="width:18mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>' + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>";
     rows.forEach(function (x, i) {
       pcs += x.qty;
-      h += "<tr><td>" + (i + 1) + "</td><td><b>" + e(x.r.machine) + '</b></td><td class="l">' + e(x.r.name || "\u2014") + "</td><td>" + e(x.r.reference || "\u2014") + "</td><td>" + trStock(x.r) +
+      h += "<tr><td>" + (i + 1) + "</td><td><b>" + e(ordWhere(x.r)) + '</b></td><td class="l">' + e(x.r.name || "\u2014") + "</td><td>" + e(x.r.reference || "\u2014") + "</td><td>" + trStock(x.r) +
         '</td><td class="q">' + x.qty + "</td><td></td></tr>";
     });
     // empty lines down the page, to add parts by hand
@@ -3266,7 +3287,7 @@
   }
   document.getElementById("orderBtn").addEventListener("click", function () {
     if (sideView) leaveConsumables();
-    orderPick = [];
+    ordPicks = { parts: [], equip: [] };
     try {
       document.getElementById("ordBy").value = localStorage.getItem(TR_ME_KEY) || "";
       document.getElementById("ordNo").value = localStorage.getItem(PR_NEXT_KEY) || "1";
@@ -3274,9 +3295,11 @@
     document.getElementById("ordUrgent").checked = false;
     document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = "";
     orderDlg.hidden = false;
-    renderOrder();
+    ordSetMode("parts");
   });
   ["ordRef", "ordName"].forEach(function (id) { document.getElementById(id).addEventListener("input", renderOrder); });
+  document.getElementById("ordModeParts").addEventListener("click", function () { ordSetMode("parts"); });
+  document.getElementById("ordModeEquip").addEventListener("click", function () { ordSetMode("equip"); });
   document.getElementById("ordNo").addEventListener("input", function () { this.value = this.value.replace(/\D/g, ""); });
   document.getElementById("ordCancel").addEventListener("click", function () { orderDlg.hidden = true; });
   orderDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") orderDlg.hidden = true; });
