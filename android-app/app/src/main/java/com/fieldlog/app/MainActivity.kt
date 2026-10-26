@@ -223,6 +223,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshRecordingUi() {
+        RecorderBus.lastError?.let { msg ->
+            RecorderBus.lastError = null
+            AlertDialog.Builder(this).setTitle("Recording problem").setMessage(msg).setPositiveButton("OK", null).show()
+        }
         val rec = RecorderBus.recording
         if (rec != lastRec) {
             b.recordIcon.animate().alpha(0f).setDuration(110).withEndAction {
@@ -261,7 +265,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadList() {
         val files = RecordingService.recordingsDir(this)
-            .listFiles { f -> f.extension == "wav" && !f.name.contains("ORIGINAL") }
+            .listFiles { f -> f.extension == "wav" && !f.name.contains("ORIGINAL") && !f.name.contains("__RAW") }
             ?.sortedByDescending { it.lastModified() } ?: emptyList()
         adapter.submit(files)
     }

@@ -10,6 +10,7 @@ object RecorderBus {
     @Volatile var startElapsed = 0L      // SystemClock.elapsedRealtime at start
     @Volatile var pausedAccum = 0L       // accumulated ms while paused
     @Volatile var processing = false
+    @Volatile var lastError: String? = null
 
     private val main = Handler(Looper.getMainLooper())
     private val listeners = mutableSetOf<() -> Unit>()

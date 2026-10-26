@@ -1,5 +1,6 @@
 package com.fieldlog.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
@@ -8,6 +9,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -15,6 +18,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import java.io.File
 import java.io.RandomAccessFile
 import java.text.SimpleDateFormat
@@ -23,9 +27,9 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 /**
- * Foreground microphone service. Records raw PCM while the screen is off,
- * then applies the chosen enhancement level and saves a WAV on stop.
- * The notification is intentionally neutral (no "recording" wording).
+ * Foreground microphone service. The audio file is written LIVE to a WAV while
+ * recording (so it is saved even if enhancement fails or the app is killed),
+ * then optionally enhanced on stop. Capture failures are surfaced, not hidden.
  */
 class RecordingService : Service() {
 
@@ -33,7 +37,6 @@ class RecordingService : Service() {
         const val ACTION_START = "start"
         const val ACTION_STOP_SAVE = "stop_save"
         const val ACTION_CANCEL = "cancel"
-        const val ACTION_PAUSE = "pause"
         const val CHANNEL = "session"
         const val NOTIF_ID = 42
 
@@ -46,8 +49,12 @@ class RecordingService : Service() {
     }
 
     @Volatile private var running = false
+    @Volatile private var bytesWritten = 0L
     private var recorder: AudioRecord? = null
-    private var pcmFile: File? = null
+    private var captureThread: Thread? = null
+    private var liveWav: File? = null
+    private var stamp: String = ""
+    private var level: Enhancer.Level = Enhancer.Level.MEDIUM
     private lateinit var prefs: Prefs
 
     override fun onBind(i: Intent?): IBinder? = null
@@ -66,86 +73,120 @@ class RecordingService : Service() {
     private fun startRecording() {
         if (running) return
         createChannel()
-        startForeground(NOTIF_ID, buildNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                startForeground(NOTIF_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+            else startForeground(NOTIF_ID, buildNotification())
+        } catch (e: Exception) {
+            fail("Microphone permission is required. Open Settings → Apps → FieldLog → Permissions → Microphone → Allow.")
+            return
+        }
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (!hasMic) {
+            fail("Microphone permission not granted. Open Settings → Apps → FieldLog → Permissions → Microphone → Allow.")
+            stopForegroundCompat(); return
+        }
 
         val minBuf = AudioRecord.getMinBufferSize(
             WavIo.SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
-        ).coerceAtLeast(4096)
-        val rec = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            WavIo.SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf * 2
-        )
-        if (rec.state != AudioRecord.STATE_INITIALIZED) { stopSelf(); return }
+        ).coerceAtLeast(8192)
+        val rec = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                WavIo.SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minBuf * 4
+            )
+        } catch (e: Exception) { null }
+        if (rec == null || rec.state != AudioRecord.STATE_INITIALIZED) {
+            runCatching { rec?.release() }
+            fail("Microphone is busy or unavailable. Close other apps using the mic and try again.")
+            stopForegroundCompat(); return
+        }
         recorder = rec
-        pcmFile = File(cacheDir, "current.pcm")
+
+        stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        level = prefs.level
+        val dir = recordingsDir(this)
+        val wav = File(dir, "FieldLog_${stamp}__RAW.wav")
+        liveWav = wav
+        bytesWritten = 0L
         running = true
         RecorderBus.recording = true
         RecorderBus.paused = false
-        RecorderBus.pausedAccum = 0
         RecorderBus.startElapsed = SystemClock.elapsedRealtime()
         RecorderBus.notifyChanged()
 
-        thread(name = "rec-loop") {
-            val raf = RandomAccessFile(pcmFile, "rw"); raf.setLength(0)
+        captureThread = thread(name = "rec-loop") {
+            val raf = RandomAccessFile(wav, "rw")
+            raf.setLength(0)
+            raf.write(ByteArray(44))          // placeholder WAV header; filled in on stop
             val buf = ByteArray(minBuf)
-            rec.startRecording()
+            runCatching { rec.startRecording() }
+            var errors = 0
             while (running) {
                 val n = rec.read(buf, 0, buf.size)
-                if (n > 0) raf.write(buf, 0, n)
+                when {
+                    n > 0 -> { raf.write(buf, 0, n); bytesWritten += n; errors = 0 }
+                    n < 0 -> { if (++errors > 50) { running = false } }
+                }
             }
             runCatching { rec.stop() }
             runCatching { rec.release() }
+            WavIo.fixWavHeader(raf, bytesWritten)   // write RIFF/data sizes
             raf.close()
         }
-        // refresh the timer text on the notification every few seconds
         thread(name = "notif-timer") {
-            while (running) {
-                updateNotification()
-                Thread.sleep(2000)
-            }
+            while (running) { updateNotification(); Thread.sleep(2000) }
         }
     }
 
     private fun finishRecording(save: Boolean) {
-        if (!running && pcmFile == null) { stopForegroundCompat(); stopSelf(); return }
+        if (!running && liveWav == null) { stopForegroundCompat(); stopSelf(); return }
         running = false
         RecorderBus.recording = false
         RecorderBus.notifyChanged()
-        val pcm = pcmFile
+        val wav = liveWav
+        val st = stamp
+        val lvl = level
         thread(name = "finish") {
-            Thread.sleep(300) // let the capture loop flush and close the file
-            if (save && pcm != null && pcm.length() > 0) {
+            captureThread?.join(5000)         // wait for the live file to be finalized
+            val dir = recordingsDir(this)
+            if (!save) { wav?.delete() }
+            else if (wav == null || bytesWritten <= 0L) {
+                wav?.delete()
+                fail("No audio was captured. Check the Microphone permission for FieldLog.")
+            } else {
                 RecorderBus.processing = true; RecorderBus.notifyChanged()
-                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                val dir = recordingsDir(this)
-                val level = prefs.level
-
-                // 1) ALWAYS save the raw recording first (streamed, low memory) so it is
-                //    never lost, even if enhancement later fails or the app is killed.
-                val rawFile = File(dir, "FieldLog_${stamp}__RAW.wav")
-                val rawOk = runCatching { WavIo.pcmToWav(pcm, rawFile) }.isSuccess
-
-                // 2) Try to enhance into the main (cleaned) file.
+                // The raw recording is already saved as `wav`. Try to enhance into a cleaned file.
                 val enhanced = runCatching {
-                    val raw = WavIo.readPcm16(pcm)
+                    val raw = WavIo.readWavSamples(wav)
                     val ai = prefs.aiEnabled
-                    val cleaned = Enhancer.process(raw, level, ai)
-                    val tag = if (ai && Rnnoise.available) "${level.name}-AI" else level.name
-                    WavIo.writeWav(File(dir, "FieldLog_${stamp}__${tag}.wav"), cleaned)
-                    if (prefs.keepOriginal && rawOk) rawFile.renameTo(File(dir, "FieldLog_${stamp}__ORIGINAL.wav"))
-                    else rawFile.delete()
+                    val cleaned = Enhancer.process(raw, lvl, ai)
+                    val tag = if (ai && Rnnoise.available) "${lvl.name}-AI" else lvl.name
+                    WavIo.writeWav(File(dir, "FieldLog_${st}__${tag}.wav"), cleaned)
                 }.isSuccess
 
-                // 3) If enhancement failed but we saved raw, keep raw as the recording.
-                if (!enhanced && rawOk) rawFile.renameTo(File(dir, "FieldLog_${stamp}__${level.name}.wav"))
-
+                if (enhanced) {
+                    if (prefs.keepOriginal) wav.renameTo(File(dir, "FieldLog_${st}__ORIGINAL.wav"))
+                    else wav.delete()
+                } else {
+                    // Enhancement failed → keep the raw recording as the result.
+                    wav.renameTo(File(dir, "FieldLog_${st}__${lvl.name}.wav"))
+                }
                 RecorderBus.processing = false; RecorderBus.notifyChanged()
             }
-            pcm?.delete()
-            pcmFile = null
+            liveWav = null
             stopForegroundCompat()
             stopSelf()
         }
+    }
+
+    private fun fail(msg: String) {
+        RecorderBus.recording = false
+        RecorderBus.processing = false
+        RecorderBus.lastError = msg
+        RecorderBus.notifyChanged()
+        running = false
+        stopSelf()
     }
 
     private fun elapsedMs(): Long =
@@ -186,9 +227,7 @@ class RecordingService : Service() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val ch = NotificationChannel(CHANNEL, getString(R.string.channel_name), NotificationManager.IMPORTANCE_LOW).apply {
             description = getString(R.string.channel_desc)
-            setShowBadge(false)
-            setSound(null, null)
-            enableVibration(false)
+            setShowBadge(false); setSound(null, null); enableVibration(false)
         }
         nm.createNotificationChannel(ch)
     }
