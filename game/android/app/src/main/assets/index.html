@@ -89,7 +89,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <div class="grp"><span id="best">🏆 0</span><button id="pause">⏸</button><button id="mute">🔊</button></div>
 </div>
 <div id="lvbar" class="hidden"><i></i></div>
-<div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span></div>
+<div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span><span id="five"></span></div>
 <div id="msg"></div>
 <div id="flash"></div>
 
@@ -353,8 +353,10 @@ function makeRow(i) {
   if (row.cells[gen.safe] === FLOOR && !row.movers.length && Math.random() < 0.5) row.gems.push(gen.safe);
   return row;
 }
+// gems are worth 5 with the ×5 power-up, 2 with the double one
+const gemValue = () => ball.five > 0 ? 5 : ball.double > 0 ? 2 : 1;
 function pickPower(z) {
-  const opts = [['magnet', 35], ['double', z > 200 ? 20 : 0], ['shield', z > 300 ? 30 : 0], ['slow', z > 500 ? 15 : 0]];
+  const opts = [['magnet', 35], ['double', z > 200 ? 20 : 0], ['shield', z > 300 ? 30 : 0], ['slow', z > 500 ? 15 : 0], ['five', z > 800 ? 8 : 0]];
   let r = Math.random() * opts.reduce((a, o) => a + o[1], 0);
   for (const [t, w] of opts) { if ((r -= w) < 0) return t; }
   return 'magnet';
@@ -370,7 +372,7 @@ const CAM_BACK = 5.4, CAM_H = 3.1;
 function reset() {
   if (rows) for (const r of rows) dropRow(r);
   for (const g of pulled || []) scene.remove(g.mesh);
-  ball = { x: 0, tx: 0, vx: 0, y: 0, z: S.startZ, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0 };
+  ball = { x: 0, tx: 0, vx: 0, y: 0, z: S.startZ, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0, five: 0 };
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
@@ -392,7 +394,8 @@ function hud() {
   $('shield').textContent = ball.shield > 0 ? '🛡️ ' + Math.ceil(ball.shield) : '';
   $('magnet').textContent = ball.magnet > 0 ? '🧲 ' + Math.ceil(ball.magnet) : '';
   $('slow').textContent = ball.slow > 0 ? '🐢 ' + Math.ceil(ball.slow) : '';
-  $('double').textContent = ball.double > 0 ? '✖️2 ' + Math.ceil(ball.double) : '';
+  $('double').textContent = ball.double > 0 && !(ball.five > 0) ? '✖️2 ' + Math.ceil(ball.double) : '';
+  $('five').textContent = ball.five > 0 ? '✖️5 ' + Math.ceil(ball.five) : '';
   $('gems').textContent = '💎 ' + (S.bank + S.gems - S.banked);
   $('best').textContent = '🏆 ' + (S.mighty ? S.bestMighty : S.best);
   $('mute').textContent = muted ? '🔇' : '🔊';
@@ -843,7 +846,7 @@ function step(dt) {
           const gx = k - HALF + 0.5, gz = j * ROW + 1;
           if (b.magnet > 0) { pulled.push({ x: gx, y: 0.6, z: gz, mesh: takeGemMesh(r2, k) }); return false; }
           if (Math.abs(gx - b.x) < 0.65 && Math.abs(gz - b.z) < 0.7 && b.y < 1.2) {
-            S.gems += b.double > 0 ? 2 : 1; sfx.gem(); buzz(8);
+            S.gems += gemValue(); sfx.gem(); buzz(8);
             hideGemMesh(r2, k);
             burst(gx, 0.6, gz, [0x80ffdb, 0xffffff, 0x4cc9f0], 12, 2.5);
             return false;
@@ -853,10 +856,13 @@ function step(dt) {
         const pw = r2.power;
         if (pw && Math.abs(pw.k - HALF + 0.5 - b.x) < 0.7 && Math.abs(j * ROW + 1 - b.z) < 0.8 && b.y < 1.4) {
           r2.power = null; if (r2.powerMesh) r2.powerMesh.visible = false;
-          if (pw.type === 'magnet') { b.magnet = 10; say('Magnet! 🧲', '#ff5fa2'); }
-          else if (pw.type === 'slow') { b.slow = 6; say('Slow motion! 🐢', '#9fd8ff'); }
-          else if (pw.type === 'double') { b.double = 10; say('Double gems! ✖️2', '#ffd60a'); }
-          else { b.shield = 15; say('Shield! 🛡️', '#80ffdb'); }
+          // another of the same power adds its time to what is left, rather than starting over
+          const add = (k, t, msg, c) => { b[k] = Math.max(0, b[k]) + t; say(`${msg}\n${Math.ceil(b[k])} s`, c); };
+          if (pw.type === 'magnet') add('magnet', 10, 'Magnet! 🧲', '#ff5fa2');
+          else if (pw.type === 'slow') add('slow', 6, 'Slow motion! 🐢', '#9fd8ff');
+          else if (pw.type === 'double') add('double', 10, 'Double gems! ✖️2', '#ffd60a');
+          else if (pw.type === 'five') add('five', 10, 'Gems ×5! 💎', '#ff4fd8');
+          else add('shield', 15, 'Shield! 🛡️', '#80ffdb');
           sfx.power(); buzz([20, 30, 20]);
           burst(b.x, 0.6, b.z + 0.5, [0x80ffdb, 0xffffff, 0x4cc9f0], 20, 3);
         }
@@ -865,6 +871,7 @@ function step(dt) {
       if (b.magnet > 0) b.magnet = Math.max(0, b.magnet - dt);
       if (b.slow > 0) b.slow = Math.max(0, b.slow - dt);
       if (b.double > 0) b.double = Math.max(0, b.double - dt);
+      if (b.five > 0) b.five = Math.max(0, b.five - dt);
       // 5000 m down the track the game turns hard, and keeps getting harder up to 9000 m
       if (!curW() && b.z >= HARD_AT) {
         if (!S.hard) { say('HARD MODE 💀', '#ff3355'); sfx.level(); buzz([80, 60, 80]); }
@@ -885,7 +892,7 @@ function step(dt) {
         const k = Math.min(1, dt * 9);
         g.x += (b.x - g.x) * k; g.y += (b.y + R - g.y) * k; g.z += (b.z - g.z) * k;
         if (Math.hypot(g.x - b.x, g.z - b.z) > 0.35) return true;
-        S.gems += b.double > 0 ? 2 : 1; sfx.gem(); buzz(8);
+        S.gems += gemValue(); sfx.gem(); buzz(8);
         if (g.mesh) scene.remove(g.mesh);
         return false;
       });
@@ -1056,6 +1063,7 @@ function initWorld() {
   MAT.gem = new THREE.MeshStandardMaterial({ color: 0x80ffdb, emissive: 0x1f8a70, roughness: 0.15, metalness: 0.4, flatShading: true });
   GEO.hour = new THREE.ConeGeometry(0.17, 0.24, 12); GEO.hour.translate(0, -0.12, 0);   // tip at the centre
   MAT.slow = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, emissive: 0x2a6a9a, roughness: 0.2 });
+  MAT.five = new THREE.MeshStandardMaterial({ color: 0xff4fd8, emissive: 0x8a0a6a, roughness: 0.15, metalness: 0.5, flatShading: true });
   MAT.gold = new THREE.MeshStandardMaterial({ color: 0xffd60a, emissive: 0x8a6a00, roughness: 0.15, metalness: 0.5, flatShading: true });
   MAT.railHard = new THREE.MeshBasicMaterial({ color: 0xff3355, side: THREE.DoubleSide });
   MAT.archHardA = new THREE.MeshBasicMaterial({ color: 0xff3355 });
@@ -1356,6 +1364,9 @@ function buildRow(i) {
       g.add(top, new THREE.Mesh(GEO.hour, MAT.slow));
     } else if (row.power.type === 'double') {
       const gm = new THREE.Mesh(GEO.gem, MAT.gold); gm.scale.setScalar(1.6); g.add(gm);
+    } else if (row.power.type === 'five') {
+      const gm = new THREE.Mesh(GEO.gem, MAT.five); gm.scale.setScalar(2); g.add(gm);
+      for (const sx of [-1, 1]) { const m = new THREE.Mesh(GEO.gem, MAT.five); m.scale.setScalar(0.9); m.position.set(sx * 0.32, -0.08, 0); g.add(m); }
     } else {
       g.add(new THREE.Mesh(GEO.magnet, MAT.magnet));
       for (const s of [-1, 1]) { const t = new THREE.Mesh(GEO.tip, MAT.tip); t.position.set(s * 0.2, -0.05, 0); g.add(t); }
@@ -1540,7 +1551,7 @@ function enterRhythm() {
   const b = ball;
   S.world = 'rhythm';
   // power-ups do nothing among the tiles, so they end here rather than sit frozen on screen
-  Object.assign(b, { x: 0, y: 0, vy: 0, fall: false, air: true, hole: null, shield: 0, magnet: 0, slow: 0, double: 0 });
+  Object.assign(b, { x: 0, y: 0, vy: 0, fall: false, air: true, hole: null, shield: 0, magnet: 0, slow: 0, double: 0, five: 0 });
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
   const song = curSong(), w = curW();
   // without the song file, fall back to a steady 82 BPM for 55 s
@@ -1727,7 +1738,7 @@ function warmUp() {
   add(new THREE.Mesh(GEO.box, MAT.box)); add(new THREE.Mesh(GEO.box, MAT.mover));
   add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge)); add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge));
   add(new THREE.Mesh(GEO.pad, MAT.pad)); add(new THREE.Mesh(GEO.gem, MAT.gem)); add(new THREE.Mesh(GEO.shield, MAT.shield));
-  add(new THREE.Mesh(GEO.hour, MAT.slow)); add(new THREE.Mesh(GEO.gem, MAT.gold));
+  add(new THREE.Mesh(GEO.hour, MAT.slow)); add(new THREE.Mesh(GEO.gem, MAT.gold)); add(new THREE.Mesh(GEO.gem, MAT.five));
   add(new THREE.Mesh(GEO.arch, MAT.archHardA)); add(new THREE.Mesh(GEO.arch, MAT.archHardB));
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
   for (const [g, m] of [[GEO.beamH, MAT.beam], [GEO.beamHGlow, MAT.beamGlow], [GEO.beamH, MAT.beamOff], [GEO.post, MAT.post], [GEO.emitter, MAT.emitter], [GEO.gantry, MAT.post]]) add(new THREE.Mesh(g, m));
