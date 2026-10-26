@@ -39,6 +39,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 #msg.show{opacity:1;transform:scale(1)}
 #flash{position:fixed;inset:0;background:radial-gradient(circle,#fff 0%,#c8b6ff 40%,#3a0ca3 100%);opacity:0;pointer-events:none;transition:opacity .6s;z-index:3}
 #flash.on{opacity:1;transition:opacity .35s}
+#heat{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 60%,transparent 35%,rgba(255,110,30,.35) 65%,rgba(255,60,10,.75) 100%);z-index:2}
 #loading{background:radial-gradient(circle at 50% 60%,#3a0ca3 0%,#07051a 70%);z-index:5;transition:opacity .4s}
 #loading.fade{opacity:0}
 .bar{width:min(70vw,280px);height:12px;border-radius:8px;background:#ffffff22;overflow:hidden}
@@ -92,6 +93,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 <div id="powers" class="hidden"><span id="shield"></span><span id="magnet"></span><span id="slow"></span><span id="double"></span><span id="five"></span></div>
 <div id="msg"></div>
 <div id="flash"></div>
+<div id="heat"></div>
 
 <div id="loading" class="overlay">
   <div id="spin"></div>
@@ -199,6 +201,20 @@ const WORLDS = {
     icicles: true, cracks: true, jets: true, lasers: true, walls: true, sway: true, fade: true, chips: ['👑 Hardest track', '⚡ Everything at once'] } };
 const WORLD_ORDER = ['ice', 'lava', 'neon', 'space', 'golden'];
 function curW() { return S.wid ? WORLDS[S.wid] : null; }
+// the real Earth behind the Golden Kingdom, loaded the first time the Kingdom is played
+let earthLoading = null;
+function loadEarth() {
+  if (earthLoading) return earthLoading;
+  const q = quality === 'auto' ? (lowQ ? 'medium' : 'high') : quality;
+  earthLoading = (async () => {
+    try {
+      await loadScript('earth/earth_tex.js'); await loadScript('earth/region_grid.js');
+      if (q === 'high') await loadScript('earth/earth_day4k.js');
+      await loadScript('earth/earth.js'); await window.EARTH.init(THREE, renderer, q);
+    } catch (e) { earthLoading = null; }
+  })();
+  return earthLoading;
+}
 const loadJSON = (k, d) => { try { return JSON.parse(load(k)) || d; } catch (e) { return d; } };
 const CRACK = 4;   // lava floor that glows, then gives way just before the ball gets there
 const laserLit = l => l.type !== 'fence' || !l.blink || Math.sin(time * l.w + l.ph) > -0.2;
@@ -207,7 +223,7 @@ const jetLit = j => Math.sin(time * j.w + j.ph) > 0.15;
 const HARD_AT = 3000, HARD_SPEED = 6;   // hard mode starts 3000 m down the track (level 2); extra speed once fully hard (7000 m+)
 const TURBO_AT = 5000, TURBO_SPEED = 15;   // at 5000 m the speed jumps by 15 m/s over the next 300 m: around 60 m/s
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
-const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3));
+const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3)) - (S.wid === 'golden' ? z * 0.1 : 0);   // the Golden Kingdom runs downhill, toward the Earth
 const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
 
 let W, H, THREE;
@@ -284,6 +300,24 @@ function musicStop(fade) {
   if (!M.src) return;
   const src = M.src, now = AC.currentTime; M.src = null; M.on = false;
   if (fade) { M.gain.gain.setTargetAtTime(0, now, 0.08); src.stop(now + 0.5); } else src.stop();
+}
+// the Golden Kingdom's own music for the run down to Earth: it starts where the ball is on the way
+// down (its sections follow the descent), and stops for pauses, crashes and the finale
+const RM = { src: null, gain: null };
+function runMusicStop(fade) {
+  if (!RM.src) return;
+  const src = RM.src, now = AC.currentTime; RM.src = null;
+  if (fade) { RM.gain.gain.setTargetAtTime(0, now, 0.4); src.stop(now + 2); } else src.stop();
+}
+function runMusicStart() {
+  runMusicStop();
+  const a = ac(), song = window.SONGS && SONGS.golden_run;
+  if (!a || !song || !song.buf || window.__dtClock || S.wid !== 'golden' || S.world !== 'run' || S.phase !== 'play') return;
+  if (!RM.gain) { RM.gain = a.createGain(); RM.gain.connect(a.destination); }
+  RM.gain.gain.cancelScheduledValues(a.currentTime); RM.gain.gain.setValueAtTime(0, a.currentTime); RM.gain.gain.linearRampToValueAtTime(muted ? 0 : 0.75, a.currentTime + 1.5);
+  const w = WORLDS.golden, p = clamp(ball.z / (w.levels * w.len), 0, 1);
+  const src = a.createBufferSource(); src.buffer = song.buf; src.connect(RM.gain);
+  src.start(a.currentTime + 0.05, Math.min(song.buf.duration - 1, p * 128.7)); RM.src = src;
 }
 const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 
@@ -431,7 +465,7 @@ function start(mighty, fresh, wid) {
   for (const id of ['hud', 'powers', 'lvbar']) $(id).classList.remove('hidden');
   for (const id of ['shop', 'wdone']) $(id).classList.add('hidden');
   if (w) {
-    loadSong(S.wid);
+    loadSong(S.wid); if (S.wid === 'golden') { loadEarth(); S.eMsg = 0; loadSong('golden_run').then(runMusicStart); }
     if (S.level > w.levels) startDrop();   // resuming at the world's finale
     else say(`${w.icon} ${w.n}\nLevel ${S.level}/${w.levels}`, TH.msg);
   } else if (S.mighty) say('MIGHTY LEVEL 💀', '#ff3355');
@@ -440,7 +474,7 @@ function start(mighty, fresh, wid) {
   hud();
 }
 function goMenu() {
-  musicStop(); if (AC && AC.state === 'suspended') AC.resume();
+  musicStop(); runMusicStop(); if (AC && AC.state === 'suspended') AC.resume();
   S.mighty = false; S.wid = null; S.startZ = 0; applyTheme('classic'); reset(); S.phase = 'menu';
   $('msg').classList.remove('show'); S.msgT = 0;
   for (const id of ['over', 'hud', 'powers', 'lvbar', 'wdone', 'shop']) $(id).classList.add('hidden');
@@ -543,12 +577,12 @@ function revive() {
   $('over').classList.add('hidden');
   S.phase = 'play'; S.combo = 0;
   sfx.power(); buzz([20, 30, 20]); say(`Second chance! ❤️\n-${cost} 💎`, '#ff5fa2');
-  hud();
+  runMusicStart(); hud();
 }
 function end(fell) {
   if (S.phase !== 'play') return;
   S.phase = 'ending'; S.endT = fell ? 1.6 : 0.9; S.endFell = fell;
-  musicStop(true);
+  musicStop(true); runMusicStop(true);
 }
 function showOver(fell) {
   S.phase = 'over';
@@ -616,7 +650,7 @@ $('playMighty').onclick = () => start(true);
 $('again').onclick = () => start();
 $('home').onclick = goMenu;
 $('cont').onclick = revive;
-$('mute').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); if (M.gain) M.gain.gain.value = muted ? 0 : 0.7; hud(); };
+$('mute').onclick = () => { muted = !muted; save('rb_mute', muted ? '1' : '0'); if (M.gain) M.gain.gain.value = muted ? 0 : 0.7; if (RM.gain) RM.gain.gain.value = muted ? 0 : 0.75; hud(); };
 const QUALITY_NOTES = { low: 'Fastest. Lower resolution, no shadows. For older phones.', medium: 'Balanced. Sharp picture with soft shadows.',
   high: 'Sharpest picture and shadows. Needs a strong phone.', auto: 'Picks the best quality your phone runs smoothly.' };
 function settingsUI() {
@@ -632,7 +666,7 @@ $('setVibe').onclick = () => { vibeOff = !vibeOff; save('rb_vibe', vibeOff ? '0'
 for (const b of $('setQuality').children) b.onclick = () => { quality = b.dataset.q; save('rb_quality', quality); applyQuality(); settingsUI(); };
 function pause() {
   if (S.phase !== 'play') return;
-  S.phase = 'paused'; touch = null;
+  S.phase = 'paused'; touch = null; runMusicStop();
   if (AC && S.world === 'rhythm') AC.suspend();   // the song is the clock there, so stop it too
   $('paused').classList.remove('hidden');
 }
@@ -641,6 +675,7 @@ function resume() {
   $('paused').classList.add('hidden');
   S.phase = 'play'; ac();
   if (AC && AC.state === 'suspended') AC.resume();
+  runMusicStart();
 }
 $('pause').onclick = pause;
 $('resume').onclick = resume;
@@ -966,7 +1001,7 @@ let TH = THEMES.classic, RHYTHM_THEME = TH.tiles;
 
 // ---------- 3D ----------
 let FOG_N, FOG_H;
-let renderer, scene, camera, hemi, sun, ballMesh, ballGroup, ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite, ground, snow, skyArt;
+let heatGlow, renderer, scene, camera, hemi, sun, ballMesh, ballGroup, ballLight, shieldMesh, shieldWire, magnetRings, starGroup, sunSprite, ground, snow, skyArt;
 const GEO = {}, MAT = {};
 let partPool = [];
 function Wp(x, y, z, v) { return (v || new THREE.Vector3()).set(bend(z) + x, elev(z) + y, -z); }
@@ -1149,6 +1184,11 @@ function initWorld() {
     magnetRings.add(ring);
   }
   ballGroup = new THREE.Group(); ballGroup.add(ballMesh);
+  heatGlow = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    map: canvasTex(128, 128, (g, w) => { const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+      gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.25, 'rgba(255,140,40,.9)'); gr.addColorStop(0.6, 'rgba(255,60,20,.35)'); gr.addColorStop(1, 'rgba(255,40,10,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, w); }) }));
+  heatGlow.visible = false; scene.add(heatGlow);
   scene.add(ballGroup, ballLight, shieldMesh, shieldWire, magnetRings);
 
   const partMats = {};
@@ -1246,9 +1286,9 @@ function addDecor(grp, i, zc) {
     } else if (TH.decor === 'space') {
       if (r3 > 0.35) { const m = put(GEO.rock, MAT.asteroid, side * (5 + r1 * 9), -2 + r2 * 7, 0.4 + r3 * 1.4, 0.4 + r3 * 1.2, 0.4 + r3 * 1.3, r2 * 6); m.rotation.x = r1 * 6; }
     } else if (TH.decor === 'golden') {
+      if (i % 12) continue;   // a pillar every 24 m, so the Earth shows between them
       put(GEO.pillar, MAT.marble, side * 3.4, -0.6, 1, 4.2, 1, 0);
       const c = put(GEO.cap, MAT.goldCap, side * 3.4, 3.9, 1, 1.3, 1, 0); c.rotation.y = i;
-      if (r1 > 0.5) put(GEO.cloud, MAT.cloud, side * (7 + r2 * 12), -4 - r3 * 2, 3 + r1 * 3, 1 + r2, 2 + r3 * 2, 0);
     }
   }
 }
@@ -1498,7 +1538,42 @@ function render() {
   const fov = 62 + clamp((b.speed - 24) * 0.45, 0, 16);
   if (Math.abs(camera.fov - fov) > 0.1) { camera.fov += (fov - camera.fov) * 0.1; camera.updateProjectionMatrix(); }
   sun.intensity = 0.85 - 0.5 * S.dark;
-  renderer.render(scene, camera);
+  const earthOn = S.wid === 'golden' && window.EARTH && EARTH.ready();
+  starGroup.visible = !earthOn;
+  if (earthOn) {
+    // from orbit down to Beirut as the world goes by; the finale hangs in the sky above the city
+    const w = WORLDS.golden, p = S.world === 'run' ? clamp(b.z / (w.levels * w.len), 0, 1) : S.world === 'drop' ? 0.995 : 1;
+    scene.background = null; ground.visible = false; scene.fog.near = 1e4; scene.fog.far = 2e4;
+    renderer.autoClear = false; renderer.clear();
+    const es = EARTH.frame(renderer, camera, p, time);
+    renderer.clearDepth(); renderer.render(scene, camera); renderer.autoClear = true;
+    // re-entry: the ball glows and shakes, the edges of the screen burn orange, the air roars
+    heatGlow.visible = es.reentry > 0.01 && !b.dead; heatGlow.position.copy(ballGroup.position);
+    heatGlow.material.opacity = es.reentry * (0.75 + 0.25 * Math.sin(time * 37)); heatGlow.scale.setScalar(1.6 + es.reentry * 1.4);
+    $('heat').style.opacity = (es.reentry * 0.9).toFixed(3);
+    if (S.phase === 'play') S.shake = Math.max(S.shake, 0.07 * es.reentry);
+    rumble(S.phase === 'play' ? es.reentry : 0);
+    if (S.phase === 'play' && S.world === 'run') {
+      const m = es.alt < 3.2 ? 3 : es.alt < 7.5 ? 2 : es.alt < 130 ? 1 : 0;
+      if (m > (S.eMsg || 0)) { S.eMsg = m; say(['', 'Entering the atmosphere 🔥', 'Into the clouds ☁️', 'Welcome to Beirut 🇱🇧'][m], '#ffd166'); }
+    }
+  } else {
+    heatGlow.visible = false; $('heat').style.opacity = 0; rumble(0);
+    renderer.render(scene, camera);
+  }
+}
+// the roar of the air on re-entry: looping noise, loud as the heat
+let roar = null;
+function rumble(level) {
+  if (!roar && (level <= 0 || !AC)) return;
+  if (!roar) {
+    const n = AC.sampleRate * 2, buf = AC.createBuffer(1, n, AC.sampleRate), ch = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+    const src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
+    roar = AC.createGain(); roar.gain.value = 0; src.connect(f).connect(roar).connect(AC.destination); src.start();
+  }
+  roar.gain.setTargetAtTime(muted ? 0 : level * 0.3, AC.currentTime, 0.1);
 }
 
 // ---------- Rhythm World ----------
@@ -1512,7 +1587,7 @@ const flash = (on) => $('flash').classList.toggle('on', on);
 
 function startDrop() {
   const b = ball, i = Math.floor(b.z / ROW);
-  S.world = 'drop'; S.wt = 0; S.launched = 0;
+  S.world = 'drop'; S.wt = 0; S.launched = 0; runMusicStop(true);
   // a clear run-up, a ramp across all lanes, then the track simply ends
   const edge = i + Math.round(50 / ROW);
   for (let j = i - 2; j < edge + 80; j++) {
