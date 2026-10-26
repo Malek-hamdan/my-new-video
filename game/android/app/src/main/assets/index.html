@@ -171,7 +171,7 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 // The game runs in "track space": x across the 5 lanes, y up from the track, z distance travelled.
 // Rendering bends that space into hills and curves; the rules never see them.
 const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 80;
-const viewDist = () => clamp(VIEW + (ball.speed - 24) * 2.5, VIEW, 150);
+const viewDist = () => clamp(VIEW + (ball.speed - 24) * 2.5, VIEW, 210);
 const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;   // and CRACK (worlds)
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
@@ -380,6 +380,7 @@ function reset() {
   const w = curW();
   S.turbo = !w && S.startZ >= TURBO_AT ? 1 : 0;
   S.hard = w ? w.hard : S.mighty ? 1 : clamp01Hard(S.startZ);
+  S.nextFast = Math.ceil((S.startZ + 1) / 1000) * 1000;
   S.level = w ? 1 + Math.round(S.startZ / w.len) : S.mighty ? MIGHTY_LEVEL : 1 + Math.round(S.startZ / LEVEL_LEN); S.levelZ = S.startZ;
 }
 
@@ -404,10 +405,13 @@ function say(text, color) {
 // only the distance covered in this run counts, so starting from a saved level gives no free points
 function score() { return Math.floor(ball.z - S.startZ) + S.gems * 10 + S.rpts; }
 // track speed: a world speeds up its run (and stays at its own difficulty); the main track turns hard and turbo
+// and it never stops: past turbo (in a world, past its first level) every 1000 m adds more speed
+const RAMP_AT = 5300, RAMP = 0.008, RAMP_MAX = 100, W_RAMP = 0.006, W_RAMP_MAX = 60;
+const rampUp = z => { const w = curW(); return w ? clamp((z - w.len) * W_RAMP, 0, W_RAMP_MAX) : clamp((z - RAMP_AT) * RAMP, 0, RAMP_MAX); };
 function runSpeed(z) {
   const w = curW();
-  if (w) return Math.min(w.cap, speedAt(z) * w.mul + HARD_SPEED * w.hard);
-  return speedAt(z) + HARD_SPEED * S.hard + TURBO_SPEED * (z >= TURBO_AT ? 1 : 0);
+  if (w) return Math.min(w.cap, speedAt(z) * w.mul + HARD_SPEED * w.hard) + rampUp(z);
+  return speedAt(z) + HARD_SPEED * S.hard + TURBO_SPEED * (z >= TURBO_AT ? 1 : 0) + rampUp(z);
 }
 const clamp01Hard = z => z >= HARD_AT ? 0.35 + 0.65 * clamp((z - HARD_AT) / 4000, 0, 1) : 0;
 
@@ -720,7 +724,7 @@ function step(dt) {
     const b = ball;
     if (!b.dead && !b.fall) {
       b.slowF += ((b.slow > 0 ? 0.6 : 1) - b.slowF) * Math.min(1, dt * 4);
-      b.speed = (curW() ? runSpeed(b.z) : speedAt(b.z) + HARD_SPEED * S.hard + TURBO_SPEED * S.turbo) * b.slowF;
+      b.speed = (curW() ? runSpeed(b.z) : speedAt(b.z) + HARD_SPEED * S.hard + TURBO_SPEED * S.turbo + rampUp(b.z)) * b.slowF;
       b.prevZ = b.z;
       b.z += b.speed * dt;
       b.rot += b.speed * dt / R;
@@ -869,6 +873,12 @@ function step(dt) {
       if (!curW() && b.z >= TURBO_AT) {
         if (!S.turbo) { say('TURBO! 🔥🔥', '#ff9e00'); sfx.boost(); buzz([60, 40, 60, 40, 200]); }
         S.turbo = Math.max(S.turbo, clamp((b.z - TURBO_AT) / 300, 0.05, 1));
+      }
+      // every 1000 m of the never-ending speed-up says so (not on a level line, which has its own message)
+      if (rampUp(b.z) > 0 && b.z >= S.nextFast) {
+        const step = curW() ? curW().len : LEVEL_LEN;
+        if (S.nextFast % step) { say(`Faster! ⚡\n${Math.round(b.speed)} m/s`, '#ffd60a'); sfx.boost(); buzz([30, 30, 30]); }
+        S.nextFast += 1000;
       }
       // gems caught by the magnet fly into the ball
       pulled = pulled.filter(g => {
