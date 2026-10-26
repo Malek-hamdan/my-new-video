@@ -5,8 +5,8 @@
 // relief, trees and town blocks generated here, since no picture that sharp fits in a game.
 (() => {
   const RE = 6371;   // km
-  let THREE, ready = false, farS, nearS, farCam, nearCam, U = [], puffs, buildings, trees, whiteOut, sunGlow, stars, sky, skyU, atmU, cloudsU, region, local;
-  const st = { alt: 2e4, reentry: 0, cloud: 0 };
+  let THREE, ready = false, globe, cloudSphere, atmMesh, farS, nearS, farCam, nearCam, U = [], puffs, buildings, trees, whiteOut, sunGlow, stars, sky, skyU, atmU, cloudsU, region, local;
+  const st = { alt: 2e4, reentry: 0, cloud: 0, street: false };
   window.EARTH = { ready: () => ready, init, frame, state: st };
 
   function ll(lon, lat, r) {   // degrees to a point on the sphere, in the layout of three's sphere UVs
@@ -44,7 +44,7 @@
 
     // the globe
     const eu = uni({ day: { value: tex.day }, water: { value: tex.water }, night: { value: tex.lights }, alt: { value: 1e4 } });
-    farS.add(new THREE.Mesh(new THREE.SphereGeometry(RE, hi ? 256 : 160, hi ? 160 : 100), new THREE.ShaderMaterial({ uniforms: eu, vertexShader: VS,
+    farS.add(globe = new THREE.Mesh(new THREE.SphereGeometry(RE, hi ? 256 : 160, hi ? 160 : 100), new THREE.ShaderMaterial({ uniforms: eu, vertexShader: VS,
       fragmentShader: `uniform sampler2D day, water, night; uniform float alt; varying vec2 vUv; varying vec3 vW; ${LIB(oct)}
         void main(){
           vec3 n=normalize(vW), v=normalize(cameraPosition-vW); float d=dot(n,sun), k=smoothstep(-0.12,0.2,d);
@@ -57,14 +57,14 @@
           gl_FragColor=vec4(outc(haze(col,dist,vW)),1.0); }` })));
     // clouds over the globe
     cloudsU = uni({ map: { value: tex.clouds }, op: { value: 1 } });
-    farS.add(new THREE.Mesh(new THREE.SphereGeometry(RE + 7, hi ? 200 : 128, hi ? 120 : 80), new THREE.ShaderMaterial({ uniforms: cloudsU, transparent: true, depthWrite: false, vertexShader: VS,
+    farS.add(cloudSphere = new THREE.Mesh(new THREE.SphereGeometry(RE + 7, hi ? 200 : 128, hi ? 120 : 80), new THREE.ShaderMaterial({ uniforms: cloudsU, transparent: true, depthWrite: false, vertexShader: VS,
       fragmentShader: `uniform sampler2D map; uniform float op; varying vec2 vUv; varying vec3 vW; ${LIB(Math.min(oct, 6))}
         void main(){ vec3 n=normalize(vW); float d=dot(n,sun), dist=length(cameraPosition-vW);
           float a=smoothstep(0.03,0.55,texture2D(map,vUv).r)*(0.85+0.3*detail(vW, dist*0.0012));
           gl_FragColor=vec4(outc(haze(vec3(0.05+1.2*max(d,0.0)),dist,vW)), clamp(a,0.0,1.0)*op*(0.05+0.95*smoothstep(-0.25,0.1,d))); }` })));
     // the blue rim of air seen from space
     atmU = { sun: { value: SUN }, op: { value: 1 } };
-    farS.add(new THREE.Mesh(new THREE.SphereGeometry(RE * 1.022, 160, 100), new THREE.ShaderMaterial({ uniforms: atmU, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    farS.add(atmMesh = new THREE.Mesh(new THREE.SphereGeometry(RE * 1.022, 160, 100), new THREE.ShaderMaterial({ uniforms: atmU, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(position); vW=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(vW,1.0); }`,
       fragmentShader: `uniform vec3 sun; uniform float op; varying vec3 vN; varying vec3 vW;
         void main(){ vec3 v=normalize(cameraPosition-vW); float f=pow(1.0-abs(dot(vN,v)),2.4), lit=0.2+0.8*smoothstep(-0.3,0.4,dot(vN,sun));
@@ -198,7 +198,8 @@
 
   // the flight, by progress through the world (0 = the start, 1 = the end of the last level):
   // altitude (km), longitude and latitude of the point below
-  const KEY = [[0, 19000, 14, 20], [0.2, 9000, 22, 25], [0.42, 1800, 30, 30], [0.56, 160, 33.2, 32.8], [0.68, 24, 34.5, 33.6], [0.78, 6.5, 34.95, 33.8], [0.87, 2.4, 35.3, 33.86], [1, 0.6, 35.53, 33.9]];
+  // the last level (from 0.75) is on the ground, on Beirut's seafront, which the game builds itself
+  const KEY = [[0, 19000, 14, 20], [0.15, 9000, 22, 25], [0.32, 1800, 30, 30], [0.44, 160, 33.2, 32.8], [0.53, 24, 34.5, 33.6], [0.6, 6.5, 34.95, 33.8], [0.67, 2.4, 35.3, 33.86], [0.73, 0.3, 35.46, 33.89], [0.75, 0.004, 35.48, 33.9], [1, 0.004, 35.5, 33.905]];
   function flight(p) {
     let k = 0; while (k < KEY.length - 2 && p > KEY[k + 1][0]) k++;
     const [p0, a0, o0, l0] = KEY[k], [p1, a1, o1, l1] = KEY[k + 1], s = sm(p0, p1, p);
@@ -226,14 +227,16 @@
     for (const u of U) { u.hazeCol.value.setRGB(0.55, 0.72, 0.95); u.hazeK.value = hk; if (u.alt) u.alt.value = f.alt; if (u.time) u.time.value = time * 30; }
     atmU.op.value = sm(40, 300, f.alt); cloudsU.op.value = sm(5, 26, f.alt);
     nearS.fog.density = f.alt < 9 ? 0.018 * (1 - sm(1.2, 9, f.alt)) + 0.003 : 0;
-    region.visible = f.alt < 300; local.visible = f.alt < 60; buildings.visible = trees.visible = f.alt < 12;
+    const street = f.alt < 0.08; st.street = street;
+    globe.visible = cloudSphere.visible = atmMesh.visible = !street;
+    region.visible = f.alt < 300 && !street; local.visible = f.alt < 60 && !street; buildings.visible = trees.visible = f.alt < 12 && !street;
     const pu = puffs.material.userData.u; pu.op.value = 1 - sm(12, 25, f.alt);
     pu.camR.value.set(1, 0, 0).applyQuaternion(q); pu.camU.value.set(0, 1, 0).applyQuaternion(q);
     st.cloud = sm(3, 4, f.alt) * (1 - sm(6.5, 7.5, f.alt));
     st.reentry = sm(140, 85, f.alt) * (1 - sm(40, 22, f.alt));
     skyU.heat.value = st.reentry;
     whiteOut.material.opacity = st.cloud * 0.8; whiteOut.position.copy(pos).add(new THREE.Vector3(0, 0, -1).applyQuaternion(q).multiplyScalar(nearCam.near * 2)); whiteOut.quaternion.copy(q);
-    renderer.render(farS, farCam); renderer.clearDepth(); renderer.render(nearS, nearCam);
+    renderer.render(farS, farCam); if (!street) { renderer.clearDepth(); renderer.render(nearS, nearCam); }
     return st;
   }
 })();

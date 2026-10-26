@@ -223,8 +223,15 @@ const jetLit = j => Math.sin(time * j.w + j.ph) > 0.15;
 const HARD_AT = 3000, HARD_SPEED = 6;   // hard mode starts 3000 m down the track (level 2); extra speed once fully hard (7000 m+)
 const TURBO_AT = 5000, TURBO_SPEED = 15;   // at 5000 m the speed jumps by 15 m/s over the next 300 m: around 60 m/s
 const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
-const elev = z => ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3)) - (S.wid === 'golden' ? z * 0.1 : 0);   // the Golden Kingdom runs downhill, toward the Earth
-const bend = z => ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
+// The Golden Kingdom runs downhill toward the Earth, and its last level is on the ground: Beirut's
+// seafront road, straight and level, with the sea on the left and the city on the right
+const CITY_Z = 6000;
+const inCity = z => S.wid === 'golden' && z >= CITY_Z - 60;
+const flat = z => S.wid === 'golden' ? 1 - ramp(z, CITY_Z - 400, CITY_Z - 100) : 1;
+const elev = z => flat(z) * ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3)) - (S.wid === 'golden' ? Math.min(z, CITY_Z) * 0.1 : 0);
+const bend = z => flat(z) * ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
+const CITY_Y = -CITY_Z * 0.1;   // the road's height in the city
+let cars = [];   // oncoming traffic in the city
 
 let W, H, THREE;
 let lowQ = load('rb_lowq2') === '1';   // what Auto picked last time on this phone
@@ -332,7 +339,7 @@ function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power
 
 function makeRow(i) {
   const row = newRow();
-  if (gen.tunnelLeft > 0) { row.tunnel = true; gen.tunnelLeft--; }
+  if (gen.tunnelLeft > 0 && !inCity(i * ROW)) { row.tunnel = true; gen.tunnelLeft--; }
   else if (i * ROW > 350 && Math.random() < 0.012 + 0.02 * S.hard) gen.tunnelLeft = ri(25, 40);
   row.hard = S.hard > 0;
   if (i * ROW < S.startZ + (S.startZ ? 60 : 24)) return row;   // a calm stretch where each run starts (longer when resuming at speed)
@@ -353,6 +360,18 @@ function makeRow(i) {
   gen.gap = Math.max(3, Math.round(v * (0.8 - diff * 0.2 - 0.12 * h) / ROW) + ri(0, 1));
   const kind = Math.random();
   const others = () => [0, 1, 2, 3, 4].filter(c => c !== gen.safe).sort(() => Math.random() - 0.5);
+  if (inCity(z)) {
+    // Beirut: cars coming the other way, people crossing the road, roadworks barriers
+    const o = others();
+    if (kind < 0.45) {
+      for (let k = 0; k < ri(1, 3); k++) cars.push({ x: o[k] - HALF + 0.5, z: z + 1, v: -rand(10, 20), col: [0xf2f2f2, 0x1d1d22, 0xb0b4ba, 0xa31d1d, 0x1e4fa3, 0xe0c020, 0x2e6b3a][ri(0, 6)], mesh: null, gone: false });
+      gen.gap += 2;
+    } else if (kind < 0.7) {
+      for (let k = 0; k < ri(1, 3); k++) row.movers.push({ c: rand(-1.6, 1.6), amp: rand(1, 2), w: rand(0.6, 1.1), ph: rand(0, 6), gone: false, person: true });
+    } else for (let k = 0; k < ri(2, 3); k++) row.cells[o[k]] = BLOCK;
+    if (Math.random() < 0.5) row.gems.push(gen.safe);
+    return row;
+  }
   if (w && w.jets && Math.random() < 0.14) {
     // lava jets: columns of fire that burst up from a lane or two on and off
     row.jets = others().slice(0, ri(1, 2)).concat(Math.random() < 0.4 ? [gen.safe] : []).map(c => ({ c, w: rand(2.4, 3.4), ph: rand(0, 6) }));
@@ -407,6 +426,8 @@ function reset() {
   if (rows) for (const r of rows) dropRow(r);
   for (const g of pulled || []) scene.remove(g.mesh);
   ball = { x: 0, tx: 0, vx: 0, y: 0, z: S.startZ, vy: 0, speed: 9, rot: 0, air: false, fall: false, dead: false, shield: 0, magnet: 0, hole: null, cleared: false, def: 0, defV: 0, bounced: false, slow: 0, slowF: 1, double: 0, five: 0 };
+  for (const c of cars) if (c.mesh) scene.remove(c.mesh);
+  cars = []; if (typeof planeStop === 'function') planeStop(); S.planeDone = false;
   rows = []; gen = { safe: 2, gap: 2, lastPower: 0, queue: [], tunnelLeft: 0 };
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
@@ -843,6 +864,14 @@ function step(dt) {
         r.cells.forEach((v, k) => { if (v === CRACK) { r.cells[k] = HOLE; burst(k - HALF + 0.5, 0.1, j * ROW + 1, [0xff6a00, 0xffb000, 0x3a1008], 6, 2); } });
         r.dirty = true;
       }
+      // city traffic: oncoming cars, which only a jump clears
+      for (const c of cars) {
+        if (c.gone || b.dead || Math.abs(c.z - b.z) > 1.0 + R || Math.abs(c.x - b.x) > 0.42 + R * 0.7 || b.y > 0.8) continue;
+        if (b.shield > 0) { c.gone = true; b.shield = 0; S.shake = 0.2; burst(c.x, 0.5, c.z, [c.col, 0xffffff, 0x333333], 30, 4); sfx.crash(); say('Shield saved you! 🛡️', '#80ffdb'); continue; }
+        b.dead = true; S.shake = 0.5;
+        burst(b.x, b.y + R, b.z, [c.col, 0xffffff, 0xffd60a, 0x333333], 40, 4);
+        sfx.crash(); buzz([60, 40, 120]); say('Crash! 🚗', '#ffd60a'); end(false);
+      }
       // lava jets burst up in their lane on and off, high enough that only dodging gets past
       for (const j of [Math.floor((b.z - R) / ROW), Math.floor((b.z + R) / ROW)]) {
         const r = rowAt(j);
@@ -964,6 +993,8 @@ function step(dt) {
   }
   S.dark += ((S.world === 'run' && rowAt(Math.floor(ball.z / ROW)).tunnel ? 1 : 0) - S.dark) * Math.min(1, dt * 2);
   S.pulse = Math.max(0, S.pulse - dt * 4);
+  if (cars.length) cars = cars.filter(c => { if (S.phase === 'play' || S.phase === 'ending') c.z += c.v * dt;
+    if (c.z > ball.z - 30 && !c.gone) return true; if (c.mesh) scene.remove(c.mesh); return false; });
   S.shake = Math.max(0, S.shake - dt);
   // rubber: the squash springs back past round and wobbles out (positive = flattened, negative = stretched)
   ball.defV += (-300 * ball.def - 14 * ball.defV) * dt; ball.def += ball.defV * dt;
@@ -1195,7 +1226,97 @@ function initWorld() {
   for (let i = 0; i < 160; i++) partPool.push(new THREE.Mesh(GEO.part, MAT.boxEdge));
   partPool.forEach(m => { m.visible = false; scene.add(m); });
   MAT.partFor = c => partMats[c] || (partMats[c] = new THREE.MeshBasicMaterial({ color: c }));
+  initCity();
   applySkin();
+}
+
+// ---------- Beirut ----------
+// the seafront: pavements, a promenade with a railing and palms over the sea, apartment blocks with
+// windows and balconies, street lamps, people walking, oncoming cars, and the mountains far behind
+const lamb = c => new THREE.MeshLambertMaterial({ color: c }), cityMats = {};
+const cmat = c => cityMats[c] || (cityMats[c] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.4, metalness: 0.35 }));
+let seaMesh, mountains;
+function initCity() {
+  MAT.cityLine = new THREE.MeshBasicMaterial({ color: 0xf2f2f2, side: THREE.DoubleSide });
+  MAT.pave = new THREE.MeshLambertMaterial({ color: 0xc4c4c4, map: canvasTex(64, 64, (g, w) => { g.fillStyle = '#b9b3a8'; g.fillRect(0, 0, w, w); g.strokeStyle = '#9c968c'; g.lineWidth = 2;
+    for (let k = 0; k <= 4; k++) { g.beginPath(); g.moveTo(k * 16, 0); g.lineTo(k * 16, w); g.moveTo(0, k * 16); g.lineTo(w, k * 16); g.stroke(); } }) });
+  MAT.pave.map.wrapS = MAT.pave.map.wrapT = THREE.RepeatWrapping; MAT.pave.map.repeat.set(3, 1);
+  MAT.prom = lamb(0xb9b2a6); MAT.wall = lamb(0xa69c8c); MAT.metal = new THREE.MeshStandardMaterial({ color: 0xe8ecef, metalness: 0.6, roughness: 0.35 });
+  MAT.trunk = lamb(0x7a5a3a); MAT.frond = new THREE.MeshLambertMaterial({ color: 0x3f7a2a, side: THREE.DoubleSide });
+  MAT.lamp = new THREE.MeshBasicMaterial({ color: 0xfff1c8 }); MAT.pole = new THREE.MeshStandardMaterial({ color: 0x2c3036, metalness: 0.5, roughness: 0.5 });
+  MAT.barrier = new THREE.MeshLambertMaterial({ map: canvasTex(64, 64, (g, w) => { g.fillStyle = '#fff'; g.fillRect(0, 0, w, w); g.fillStyle = '#e8401c';
+    for (let k = -2; k < 4; k++) { g.beginPath(); g.moveTo(k * 24, 0); g.lineTo(k * 24 + 12, 0); g.lineTo(k * 24 + 12 + 32, w); g.lineTo(k * 24 + 32, w); g.fill(); } }) });
+  // one window bay (3 m): glass, a frame, and a balcony slab; tinted per building
+  const win = canvasTex(64, 64, (g, w) => { g.fillStyle = '#fff'; g.fillRect(0, 0, w, w);
+    g.fillStyle = '#5d6f80'; g.fillRect(14, 12, 36, 32); g.fillStyle = '#8ea4b8'; g.fillRect(16, 14, 15, 28); g.fillStyle = '#4a5a6a'; g.fillRect(33, 14, 15, 28);
+    g.fillStyle = '#d9d4cc'; g.fillRect(6, 46, 52, 6); g.fillStyle = '#9a948a'; g.fillRect(6, 52, 52, 2); });
+  win.wrapS = win.wrapT = THREE.RepeatWrapping;
+  MAT.flats = [0xf1e6d2, 0xe8d8bc, 0xf4f1ea, 0xd9d4cb, 0xf0d9c4, 0xe4cfae].map(c => new THREE.MeshLambertMaterial({ map: win, color: c }));
+  GEO.walkR = new THREE.BoxGeometry(6, 0.3, 2.02); GEO.walkL = new THREE.BoxGeometry(5, 0.3, 2.02); GEO.seawall = new THREE.BoxGeometry(0.4, 3, 2.02);
+  GEO.rpost = new THREE.BoxGeometry(0.06, 0.9, 0.06); GEO.rbar = new THREE.BoxGeometry(0.05, 0.05, 2.02);
+  GEO.trunk = new THREE.CylinderGeometry(0.1, 0.17, 4.6, 7); GEO.trunk.translate(0, 2.3, 0);
+  GEO.frond = new THREE.ConeGeometry(0.32, 2.7, 4); GEO.frond.scale(1, 1, 0.22); GEO.frond.translate(0, 1.35, 0);
+  GEO.pole = new THREE.CylinderGeometry(0.05, 0.07, 5.5, 8); GEO.pole.translate(0, 2.75, 0); GEO.arm = new THREE.BoxGeometry(1.3, 0.06, 0.06); GEO.lampHead = new THREE.BoxGeometry(0.45, 0.1, 0.22);
+  GEO.leg = new THREE.CylinderGeometry(0.055, 0.05, 0.46, 6); GEO.torso = new THREE.CylinderGeometry(0.13, 0.15, 0.44, 8); GEO.head = new THREE.SphereGeometry(0.105, 10, 8);
+  GEO.carBody = new THREE.BoxGeometry(0.88, 0.3, 2.05); GEO.carCab = new THREE.BoxGeometry(0.76, 0.27, 1.05); GEO.wheel = new THREE.CylinderGeometry(0.16, 0.16, 0.12, 10); GEO.wheel.rotateZ(Math.PI / 2);
+  GEO.headL = new THREE.BoxGeometry(0.2, 0.08, 0.04);
+  MAT.glass = new THREE.MeshStandardMaterial({ color: 0x1c2630, metalness: 0.7, roughness: 0.15 }); MAT.tyre = lamb(0x151515); MAT.headL = new THREE.MeshBasicMaterial({ color: 0xfffbe8 });
+  // the sea off the promenade, out to the horizon, and the mountains behind the city
+  seaMesh = new THREE.Mesh(new THREE.PlaneGeometry(3000, 6000), new THREE.MeshPhongMaterial({ color: 0x1b5a86, specular: 0x9fc0dd, shininess: 80 }));
+  seaMesh.rotation.x = -Math.PI / 2; seaMesh.visible = false; scene.add(seaMesh);
+  mountains = new THREE.Mesh(new THREE.CylinderGeometry(1800, 1800, 320, 64, 1, true, Math.PI / 3, Math.PI * 0.78), new THREE.MeshBasicMaterial({ side: THREE.BackSide, transparent: true, fog: false, depthWrite: false,
+    map: canvasTex(1024, 128, (g, w, h) => {
+      for (const [base, amp, col, f] of [[70, 40, 'rgba(120,150,170,0.75)', 0.011], [92, 30, 'rgba(96,126,110,0.9)', 0.019], [110, 16, 'rgba(80,104,84,1)', 0.04]]) {
+        g.fillStyle = col; g.beginPath(); g.moveTo(0, h);
+        for (let x = 0; x <= w; x += 4) g.lineTo(x, base - amp * (0.6 * Math.sin(x * f) + 0.4 * Math.sin(x * f * 2.7 + 1)) - amp * 0.4);
+        g.lineTo(w, h); g.fill(); }
+      g.fillStyle = 'rgba(245,248,252,0.85)';   // snow on the highest ridge
+      for (let x = 0; x <= w; x += 4) { const y = 70 - 40 * (0.6 * Math.sin(x * 0.011) + 0.4 * Math.sin(x * 0.011 * 2.7 + 1)) - 16; if (y < 42) g.fillRect(x, y, 4, 3); }
+    }) }));
+  mountains.visible = false; mountains.renderOrder = -1; scene.add(mountains);
+}
+function makePerson(seed) {
+  const r = k => { const x = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+  const g = new THREE.Group(), shirt = cmat([0xd23b3b, 0x2d6cc0, 0xf0f0f0, 0x2a2a2a, 0xe0a030, 0x3a8a5a, 0x8a4ab0][Math.floor(r(1) * 7)]);
+  const legs = cmat([0x2a3550, 0x3a3a3a, 0x6a5a48][Math.floor(r(2) * 3)]), skin = cmat([0xe8c2a0, 0xc99a74, 0x8d5f3e][Math.floor(r(3) * 3)]);
+  for (const x of [-0.07, 0.07]) { const l = new THREE.Mesh(GEO.leg, legs); l.position.set(x, 0.23, 0); g.add(l); }
+  const t = new THREE.Mesh(GEO.torso, shirt); t.position.y = 0.68; g.add(t);
+  const h = new THREE.Mesh(GEO.head, skin); h.position.y = 1.0; g.add(h);
+  g.scale.setScalar(0.95 + r(4) * 0.2); return g;
+}
+function makeCar(col) {
+  const g = new THREE.Group(), body = new THREE.Mesh(GEO.carBody, cmat(col)); body.position.y = 0.3; body.castShadow = true; g.add(body);
+  const cab = new THREE.Mesh(GEO.carCab, MAT.glass); cab.position.set(0, 0.58, -0.12); g.add(cab);
+  for (const [x, z] of [[-0.4, 0.66], [0.4, 0.66], [-0.4, -0.66], [0.4, -0.66]]) { const w = new THREE.Mesh(GEO.wheel, MAT.tyre); w.position.set(x, 0.16, z); g.add(w); }
+  for (const x of [-0.28, 0.28]) { const l = new THREE.Mesh(GEO.headL, MAT.headL); l.position.set(x, 0.33, 1.03); g.add(l); }
+  return g;
+}
+// the scenery of one 2 m row of the seafront; returns the people strolling on it
+function cityDecor(grp, i, zc) {
+  const h = k => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+  const put = (geo, mat, x, y) => { const m = new THREE.Mesh(geo, mat); Wp(x, y, zc, m.position); grp.add(m); return m; };
+  put(GEO.walkR, MAT.pave, 5.5, 0); put(GEO.walkL, MAT.prom, -5, 0); put(GEO.seawall, MAT.wall, -7.7, -1.35);
+  put(GEO.rpost, MAT.metal, -7.4, 0.6); put(GEO.rbar, MAT.metal, -7.4, 1.05); put(GEO.rbar, MAT.metal, -7.4, 0.6);
+  if (i % 6 === 0) {   // a palm on the promenade
+    const p = new THREE.Group(); Wp(-6.3, 0.15, zc, p.position); p.rotation.y = h(1) * 6;
+    const t = new THREE.Mesh(GEO.trunk, MAT.trunk); t.rotation.z = (h(2) - 0.5) * 0.15; p.add(t);
+    for (let k = 0; k < 8; k++) { const f = new THREE.Mesh(GEO.frond, MAT.frond); f.position.y = 4.55; f.rotation.set(0, k / 8 * Math.PI * 2, 1.15 + h(k + 3) * 0.35, 'YXZ'); p.add(f); }
+    grp.add(p);
+  }
+  if (i % 12 === 3) for (const [x, s] of [[8.2, -1], [-7.1, 1]]) {   // street lamps on both sides
+    put(GEO.pole, MAT.pole, x, 0.15); const a = put(GEO.arm, MAT.pole, x + s * 0.6, 5.55); a.rotation.y = 0; put(GEO.lampHead, MAT.lamp, x + s * 1.15, 5.5);
+  }
+  if (i % 7 === 0) {   // an apartment block, 12-13 m along the road
+    const d = 9 + h(5) * 9, wz = 11.5 + h(6) * 1.5, H = 9 + Math.pow(h(7), 1.4) * 42;
+    const g = new THREE.BoxGeometry(d, H, wz), uv = g.attributes.uv;
+    for (let f = 0; f < 6; f++) { const [a, b] = f < 2 ? [wz, H] : f < 4 ? [0, 0] : [d, H]; for (let k = 0; k < 4; k++) { const n = f * 4 + k; uv.setXY(n, uv.getX(n) * a / 3, uv.getY(n) * b / 3); } }
+    const m = new THREE.Mesh(g, MAT.flats[Math.floor(h(8) * MAT.flats.length)]); Wp(8.7 + d / 2, H / 2 + 0.15, zc + 5.5, m.position); m.castShadow = false; grp.add(m);
+  }
+  const walkers = [];
+  if (i % 3 === 0) for (const [x0, x1] of [[3.4, 7.6], [-6.8, -3.2]]) if (h(x0 > 0 ? 11 : 12) < 0.7) {
+    const m = makePerson(i * 3 + (x0 > 0 ? 1 : 2)); grp.add(m); walkers.push([m, x0 + (x1 - x0) * h(x0 > 0 ? 13 : 14), h(15) * 10, 0.7 + 0.6 * h(16)]);
+  }
+  return walkers;
 }
 
 // ---------- ball skins ----------
@@ -1346,7 +1467,8 @@ function buildRow(i) {
   const z0 = i * ROW, z1 = z0 + ROW, D = 0.6;
   const pos = [], col = [], rail = [];
   const red = row.hard && !curW();   // the main track turns red in hard mode; worlds keep their own colours
-  const cA = new THREE.Color(red ? 0x8a1a3a : TH.a), cB = new THREE.Color(red ? 0x661030 : TH.b), cS = new THREE.Color(red ? 0x3a0818 : TH.side);
+  const city = inCity(z0);   // Beirut's road: asphalt with white lines
+  const cA = new THREE.Color(city ? 0x47484d : red ? 0x8a1a3a : TH.a), cB = new THREE.Color(city ? 0x424348 : red ? 0x661030 : TH.b), cS = new THREE.Color(city ? 0x2a2a2e : red ? 0x3a0818 : TH.side);
   const tA = new THREE.Color(TH.ta), tB = new THREE.Color(TH.tb), cC = new THREE.Color(0xff5a00);
   const P = (x, y, z) => Wp(x, y, z);
   const quad = (a, b, c, d, color) => {
@@ -1375,16 +1497,21 @@ function buildRow(i) {
   }
   if (rail.length) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3));
-    grp.add(new THREE.Mesh(g, red ? MAT.railHard : MAT.rail));
+    grp.add(new THREE.Mesh(g, city ? MAT.cityLine : red ? MAT.railHard : MAT.rail));
+  }
+  if (city && i % 2 === 0) {   // dashed lane lines
+    const d = [];
+    for (const x of [-1.5, -0.5, 0.5, 1.5]) for (const p of [P(x - 0.04, 0.012, z0 + 0.2), P(x + 0.04, 0.012, z0 + 0.2), P(x + 0.04, 0.012, z0 + 1.6), P(x - 0.04, 0.012, z0 + 0.2), P(x + 0.04, 0.012, z0 + 1.6), P(x - 0.04, 0.012, z0 + 1.6)]) d.push(p.x, p.y, p.z);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(d, 3)); grp.add(new THREE.Mesh(g, MAT.cityLine));
   }
   const zc = z0 + 1;
   row.spin = []; row.gemMeshes = {}; row.moverMeshes = []; row.powerMesh = null; row.dropMeshes = row.drop ? [] : null; row.jetMeshes = [];
   for (let k = 0; k < COLS; k++) {
     const xc = k - HALF + 0.5;
     if (row.cells[k] === BLOCK) {
-      const ice = TH.decor === 'ice' || (row.drop && TH.decor === 'golden');
-      const m = new THREE.Mesh(ice ? GEO.icicle : GEO.box, ice ? MAT.icicle : MAT.box); m.castShadow = m.receiveShadow = true;
-      if (!ice) m.add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge));
+      const ice = !city && (TH.decor === 'ice' || (row.drop && TH.decor === 'golden'));
+      const m = new THREE.Mesh(ice ? GEO.icicle : GEO.box, ice ? MAT.icicle : city ? MAT.barrier : MAT.box); m.castShadow = m.receiveShadow = true;
+      if (!ice && !city) m.add(new THREE.LineSegments(GEO.boxEdges, MAT.boxEdge));
       Wp(xc, BLOCK_H / 2 - 0.04, zc, m.position); grp.add(m);
       if (row.dropMeshes) row.dropMeshes.push([m, xc]);
     } else if (row.cells[k] === PAD) {
@@ -1416,10 +1543,12 @@ function buildRow(i) {
   }
   for (const mv of row.movers) {
     if (mv.gone) continue;
-    const m = new THREE.Mesh(GEO.box, MAT.mover); m.castShadow = true;
-    m.add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge));
+    let m;
+    if (mv.person) m = makePerson(i * 7 + row.moverMeshes.length);   // someone crossing the road
+    else { m = new THREE.Mesh(GEO.box, MAT.mover); m.castShadow = true; m.add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge)); }
     grp.add(m); row.moverMeshes.push([mv, m]);
   }
+  row.walkers = city ? cityDecor(grp, i, zc) : null;
   if (row.laser && !row.laser.gone) {
     const l = row.laser, add = (geo, mat, x, y) => { const m = new THREE.Mesh(geo, mat); Wp(x, y, zc, m.position); grp.add(m); return m; };
     if (l.type === 'fence') {
@@ -1438,7 +1567,7 @@ function buildRow(i) {
     const c = new THREE.Mesh(GEO.jetCore, MAT.jetCore); c.position.copy(f.position); grp.add(c);
     row.jetMeshes.push([jt, f, c]);
   }
-  if (TH.decor && i % 3 === 0) addDecor(grp, i, zc);
+  if (TH.decor && i % 3 === 0 && !city) addDecor(grp, i, zc);
   if (row.tunnel) {
     const a = new THREE.Mesh(GEO.arch, row.hard ? (i % 2 ? MAT.archHardA : MAT.archHardB) : (i % 2 ? MAT.archA : MAT.archB));
     Wp(0, -0.6, zc, a.position); grp.add(a);
@@ -1470,7 +1599,15 @@ function render() {
   for (let i = first; i <= last; i++) {
     const r = rows[i];
     for (const m of r.spin) { m.rotation.y = time * 2.5 + i; }
-    for (const [mv, m] of r.moverMeshes) Wp(moverX(mv), BLOCK_H / 2 - 0.04, i * ROW + 1, m.position);
+    for (const [mv, m] of r.moverMeshes) {
+      Wp(moverX(mv), mv.person ? 0 : BLOCK_H / 2 - 0.04, i * ROW + 1, m.position);
+      if (mv.person) { m.rotation.y = Math.cos(time * mv.w + mv.ph) > 0 ? -Math.PI / 2 : Math.PI / 2; m.position.y += 0.03 * Math.abs(Math.sin(time * 9 + mv.ph)); }
+    }
+    // people strolling on the pavements, back and forth
+    if (r.walkers) for (const [m, x, ph, sp] of r.walkers) {
+      const u = (time * sp + ph) % 6, back = u >= 3;
+      Wp(x, 0.15 + 0.025 * Math.abs(Math.sin(time * 8 + ph)), i * ROW + 1 + (back ? 6 - u : u) - 1.5, m.position); m.rotation.y = back ? 0 : Math.PI;
+    }
     if (r.laserMesh) {
       const l = r.laser, [beam, glow, emitter] = r.laserMesh;
       if (l.type === 'fence') { const lit = laserLit(l); beam.material = lit ? MAT.beam : MAT.beamOff; glow.visible = lit; }
@@ -1495,6 +1632,10 @@ function render() {
       p.setXYZ(k, (base[k * 3] - 0.5) * 30 + Math.sin(time + k) * 0.3, 12 - ((base[k * 3 + 1] + fall) % 1 + 1) % 1 * 14, -(base[k * 3 + 2] * 40));
     }
     p.needsUpdate = true; snow.position.copy(camera.position); snow.position.y -= 3;
+  }
+  for (const c of cars) {
+    if (!c.mesh && c.z < b.z + viewDist()) { c.mesh = makeCar(c.col); scene.add(c.mesh); }
+    if (c.mesh) Wp(c.x, 0, c.z, c.mesh.position);
   }
   MAT.beamGlow.opacity = 0.3 + 0.1 * Math.sin(time * 40);   // a little flicker
   for (const g of pulled) if (g.mesh) Wp(g.x, g.y, g.z, g.mesh.position);
@@ -1554,13 +1695,93 @@ function render() {
     if (S.phase === 'play') S.shake = Math.max(S.shake, 0.07 * es.reentry);
     rumble(S.phase === 'play' ? es.reentry : 0);
     if (S.phase === 'play' && S.world === 'run') {
-      const m = es.alt < 3.2 ? 3 : es.alt < 7.5 ? 2 : es.alt < 130 ? 1 : 0;
-      if (m > (S.eMsg || 0)) { S.eMsg = m; say(['', 'Entering the atmosphere 🔥', 'Into the clouds ☁️', 'Welcome to Beirut 🇱🇧'][m], '#ffd166'); }
+      const m = es.street ? 4 : es.alt < 1.5 ? 3 : es.alt < 7.5 ? 2 : es.alt < 130 ? 1 : 0;
+      if (m > (S.eMsg || 0)) { S.eMsg = m; say(['', 'Entering the atmosphere 🔥', 'Into the clouds ☁️', 'Beirut below 🇱🇧', 'Welcome to Beirut! 🇱🇧'][m], '#ffd166'); }
+      // in the clouds a big double-decker airliner thunders over the track
+      if (!S.planeDone && es.alt < 7.4 && es.alt > 3) { S.planeDone = true; planeStart(); }
+    }
+    planeUpdate();
+    // on the ground: the sea off the promenade, the mountains behind the city, a light haze
+    const cityView = es.street || b.z > CITY_Z - 400;
+    seaMesh.visible = mountains.visible = cityView;
+    if (cityView) {
+      const cp = camera.position;
+      seaMesh.position.set(-1507.9, (S.world === 'run' ? CITY_Y : CITY_Y - 30) - 0.9, cp.z - 2000);
+      mountains.position.set(cp.x, CITY_Y + 128, cp.z);
+      if (es.street) { scene.fog.color.set(0xc9d9ec); scene.fog.near = 160; scene.fog.far = 1800; hemi.color.set(0xe6efff); hemi.groundColor.set(0x8a8478); }   // plain daylight in the city
     }
   } else {
     heatGlow.visible = false; $('heat').style.opacity = 0; rumble(0);
+    if (seaMesh) seaMesh.visible = mountains.visible = false;
     renderer.render(scene, camera);
   }
+}
+// ---------- the airliner in the clouds ----------
+// a big double-decker four-engine jet (no airline markings) flying the other way over the track, with
+// contrails and the roar of its engines rising and falling as it passes
+let planeModel = null, jet = null;
+function makePlane() {
+  const g = new THREE.Group(), white = new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.35, metalness: 0.1, emissive: 0x9aa0a8 }), grey = new THREE.MeshStandardMaterial({ color: 0xc8ced6, roughness: 0.4, metalness: 0.2, emissive: 0x70767e, side: THREE.DoubleSide });
+  const dark = new THREE.MeshBasicMaterial({ color: 0x1a2028 });
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(1.9, 1.9, 30, 24), white); fus.rotation.x = Math.PI / 2; fus.scale.set(1, 1, 1.22); g.add(fus);   // tall double-deck body
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(1.9, 24, 16), white); nose.scale.set(1, 1.22, 2.1); nose.position.z = 15; g.add(nose);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(1.9, 8, 24), white); tail.rotation.x = -Math.PI / 2; tail.scale.set(1, 1, 1.22); tail.position.set(0, 0.4, -19); g.add(tail);
+  for (const y of [0.75, -0.35]) for (const x of [-1.91, 1.91]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 24), dark); w.position.set(x * (y > 0 ? 0.92 : 1.02), y, 1); g.add(w); }   // two decks of windows
+  const wsx = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.9, 0.05), dark); wsx.position.set(0, 0.9, 16.8); wsx.rotation.x = -0.6; g.add(wsx);
+  const tri = (pts, mat) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); geo.computeVertexNormals(); return new THREE.Mesh(geo, mat); };
+  for (const sd of [-1, 1]) {   // swept wings, low on the body, and tailplanes
+    g.add(tri([[sd * 1.6, -0.9, 6], [sd * 20, -0.2, -6.5], [sd * 20, -0.2, -9], [sd * 1.6, -0.9, 6], [sd * 20, -0.2, -9], [sd * 1.6, -0.9, -6]], grey));
+    g.add(tri([[sd * 0.8, 0.9, -15], [sd * 8, 1.3, -20.5], [sd * 8, 1.3, -22], [sd * 0.8, 0.9, -15], [sd * 8, 1.3, -22], [sd * 0.8, 0.9, -20]], grey));
+    for (const ex of [6.5, 12]) {
+      const ez = 6 - (ex - 1.6) * 0.66 + 2.2, e = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.62, 3.6, 16), white); e.rotation.x = Math.PI / 2; e.position.set(sd * ex, -1.9, ez); g.add(e);
+      const inl = new THREE.Mesh(new THREE.CircleGeometry(0.62, 16), dark); inl.position.set(sd * ex, -1.9, ez + 1.81); g.add(inl);
+      const trail = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 140), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+        map: canvasTex(4, 128, (c, w, h) => { const gr = c.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.85, 'rgba(255,255,255,.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); }) }));
+      trail.rotation.x = -Math.PI / 2; trail.position.set(sd * ex, -1.9, ez - 72); g.add(trail);
+    }
+  }
+  g.add(tri([[0, 1.8, -13], [0, 11, -21.5], [0, 11, -24], [0, 1.8, -13], [0, 11, -24], [0, 1.8, -21]], grey));   // the fin
+  g.scale.setScalar(0.5);   // to the game's scale: about 35 m long next to the road's 1 m lanes
+  return g;
+}
+function planeStart() {
+  planeStop();
+  if (!planeModel) planeModel = makePlane();
+  S.plane = { z0: ball.z + 700, t0: time, last: null }; scene.add(planeModel);
+  jet = jetSound();
+}
+function planeStop() {
+  if (planeModel) scene.remove(planeModel);
+  if (jet) { jet.stop(); jet = null; }
+  S.plane = null;
+}
+function planeUpdate() {
+  const pl = S.plane; if (!pl) return;
+  const z = pl.z0 - (time - pl.t0) * 170;
+  if (z < ball.z - 250 || S.world !== 'run') return planeStop();
+  Wp(5, 22, z, planeModel.position); planeModel.rotation.set(-0.1, 0, 0.04 * Math.sin(time));
+  if (jet) {
+    const d = planeModel.position.distanceTo(camera.position), now = time, vr = pl.last ? (pl.last[0] - d) / Math.max(1e-3, now - pl.last[1]) : 0; pl.last = [d, now];
+    const k = 343 / (343 - clamp(vr * 0.35, -150, 150)), t = AC.currentTime;   // the pitch drops as it goes past
+    jet.osc.frequency.setTargetAtTime(2600 * k, t, 0.05); jet.bp.frequency.setTargetAtTime(2200 * k, t, 0.05); jet.lp.frequency.setTargetAtTime(420 * k, t, 0.05);
+    jet.g.gain.setTargetAtTime(muted ? 0 : Math.min(0.9, 2600 / (d * d + 1500)), t, 0.05);
+    if (jet.pan) jet.pan.pan.setTargetAtTime(clamp((planeModel.position.x - camera.position.x) / 25, -1, 1), t, 0.05);
+  }
+}
+function jetSound() {
+  if (!AC || window.__dtClock) return null;
+  const n = AC.sampleRate * 2, buf = AC.createBuffer(1, n, AC.sampleRate), ch = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) ch[i] = Math.random() * 2 - 1;
+  const src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
+  const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 2.5;
+  const bg = AC.createGain(); bg.gain.value = 0.35;
+  const osc = AC.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 2600; const og = AC.createGain(); og.gain.value = 0.04;
+  const g = AC.createGain(); g.gain.value = 0; const pan = AC.createStereoPanner ? AC.createStereoPanner() : null;
+  src.connect(lp).connect(g); src.connect(bp).connect(bg).connect(g); osc.connect(og).connect(g);
+  if (pan) g.connect(pan).connect(AC.destination); else g.connect(AC.destination);
+  src.start(); osc.start();
+  return { g, pan, osc, lp, bp, stop() { try { g.gain.setTargetAtTime(0, AC.currentTime, 0.1); src.stop(AC.currentTime + 0.5); osc.stop(AC.currentTime + 0.5); } catch (e) {} } };
 }
 // the roar of the air on re-entry: looping noise, loud as the heat
 let roar = null;
@@ -1588,6 +1809,8 @@ const flash = (on) => $('flash').classList.toggle('on', on);
 function startDrop() {
   const b = ball, i = Math.floor(b.z / ROW);
   S.world = 'drop'; S.wt = 0; S.launched = 0; runMusicStop(true);
+  for (const c of cars) if (c.mesh) scene.remove(c.mesh);
+  cars = [];
   // a clear run-up, a ramp across all lanes, then the track simply ends
   const edge = i + Math.round(50 / ROW);
   for (let j = i - 2; j < edge + 80; j++) {
