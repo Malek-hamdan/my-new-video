@@ -270,8 +270,9 @@
   .order-sel td input { width: 72px; padding: 6px 8px; text-align: center; font-weight: 700; }
   .order-sel .x { background: transparent; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; }
   .order-sel .tot { text-align: right; padding: 10px 8px; font-weight: 700; }
-  .prq { width: 190mm; min-height: 277mm; display: flex; flex-direction: column; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+  .prq { width: 190mm; min-height: 236mm; display: flex; flex-direction: column; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
   .prq td { height: 9mm; box-sizing: border-box; }
+  .prq .p-sign { break-inside: avoid; page-break-inside: avoid; }
   .prq tr.blank td { color: #bbb; }
   .prq .p-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #1F3864; padding-bottom: 3mm; margin-bottom: 4mm; }
   .prq h1 { margin: 0; font-size: 22px; color: #1F3864; }
@@ -371,7 +372,7 @@
   .area-sw button:hover { color: var(--text); }
   @media (max-width: 560px) { .area-sw button { font-size: 16px; padding: 12px; } .area-sw button small { display: none; } }
   body.area-equip .months-wrap, body.area-equip #blankBtn, body.area-equip #trMachLabel, body.area-equip #trMachines, .order-mode { display: none !important; }
-  body.area-equip h1 { background: linear-gradient(180deg, #e8fff9, #7fe3cf) !important; -webkit-background-clip: text !important; background-clip: text !important; color: transparent !important; }
+  body.area-equip header h1 { background: linear-gradient(180deg, #e8fff9, #7fe3cf) !important; -webkit-background-clip: text !important; background-clip: text !important; color: transparent !important; }
   body.area-equip .tabs .tab[aria-selected="true"] { background: rgba(47,191,166,0.18) !important; border-color: rgba(47,191,166,0.6) !important; }
   body.area-equip:not(.tx-view) .btn-transfer, body.area-equip:not(.tx-view) .btn-receive { display: inline-flex !important; }
   th.col-eunit { width: 9%; }
@@ -3323,14 +3324,17 @@
     var d = new Date(), pcs = 0;
     var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request' + (ordMode === "equip" ? " \u00B7 Equipment" : "") + '</h1><div class="p-sub">' + (ordMode === "equip" ? "Equipment and supplies to order" : "Spare parts to order") + '</div>' +
       (urgent ? '<div class="p-urgent">URGENT</div>' : "") + '</div><div class="p-no">No. <b>' + prNo(no) + "</b><br>Date <b>" + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + "</b></div></div>";
-    h += '<table><colgroup><col style="width:7mm"><col style="width:18mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>' + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>";
+    h += '<table><colgroup><col style="width:7mm"><col style="width:23mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>' + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>";
     rows.forEach(function (x, i) {
       pcs += x.qty;
       h += "<tr><td>" + (i + 1) + "</td><td><b>" + e(ordWhere(x.r)) + '</b></td><td class="l">' + e(x.r.name || "\u2014") + "</td><td>" + e(x.r.reference || "\u2014") + "</td><td>" + trStock(x.r) +
         '</td><td class="q">' + x.qty + "</td><td></td></tr>";
     });
     // empty lines down the page, to add parts by hand
-    for (var b = rows.length; b < 20; b++) h += '<tr class="blank"><td>' + (b + 1) + "</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
+    // a long name or reference takes two or three lines: leave out that many empty ones
+    var used = 0;
+    rows.forEach(function (x) { used += Math.max(1, Math.ceil(String(x.r.name || "").length / 26), Math.ceil(String(x.r.reference || "").length / 18), Math.ceil(String(ordWhere(x.r) || "").length / 11)); });
+    for (var b = rows.length, room = 16 - used; room > 0; b++, room--) h += '<tr class="blank"><td>' + (b + 1) + "</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
     h += '<tr class="tot"><td colspan="5" style="text-align:right">Total \u00B7 ' + rows.length + ordWord(rows.length) + "</td><td>" + pcs + "</td><td></td></tr></table>";
     h += '<div class="p-sign"><div>Requested by<div class="nm">' + e(by) + '</div><div class="sg">Signature</div></div><div>Approved by<div class="nm"></div><div class="sg">Signature</div></div><div>Ordered by<div class="nm"></div><div class="sg">Signature</div></div></div></div>';
     return h;
