@@ -361,6 +361,22 @@
   .tr-mach.BLM { background: #1F4E8C; } .tr-mach.BCW3 { background: #0E7C66; } .tr-mach.Bonal { background: #B35418; } .tr-mach.Sollas { background: #6B3FA0; }
   .tr-picked .tr-mach { font-size: 13px; padding: 3px 11px; }
   .tr-mach.EQUIP { background: #0F766E; }
+  /* Two areas: Spare Parts and Equipment */
+  .area-sw { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
+  .area-sw button { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 18px; border-radius: 16px; border: 2px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); font-family: inherit; font-size: 19px; font-weight: 800; text-align: left; cursor: pointer; }
+  .area-sw button .ic { font-size: 24px; }
+  .area-sw button small { display: block; font-size: 12px; font-weight: 600; opacity: 0.85; }
+  .area-sw button.parts[aria-pressed="true"] { border-color: #5b9dff; background: rgba(91,157,255,0.14); color: #e6eeff; }
+  .area-sw button.equip[aria-pressed="true"] { border-color: #2fbfa6; background: rgba(47,191,166,0.14); color: #dcfff7; }
+  .area-sw button:hover { color: var(--text); }
+  @media (max-width: 560px) { .area-sw button { font-size: 16px; padding: 12px; } .area-sw button small { display: none; } }
+  body.area-equip .months-wrap, body.area-equip #blankBtn, body.area-equip #trMachLabel, body.area-equip #trMachines, .order-mode { display: none !important; }
+  body.area-equip h1 { background: linear-gradient(180deg, #e8fff9, #7fe3cf) !important; -webkit-background-clip: text !important; background-clip: text !important; color: transparent !important; }
+  body.area-equip .tabs .tab[aria-selected="true"] { background: rgba(47,191,166,0.18) !important; border-color: rgba(47,191,166,0.6) !important; }
+  body.area-equip:not(.tx-view) .btn-transfer, body.area-equip:not(.tx-view) .btn-receive { display: inline-flex !important; }
+  th.col-eunit { width: 9%; }
+  /* Equipment has nothing to do with the lines */
+  body.area-equip .tr-line-box, body.area-equip.tx-view th.col-line, body.area-equip.tx-view td[data-label="Line"] { display: none !important; }
   .tr-mach.Other { background: #5B6475; }
   .tr-src { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-right: 8px; vertical-align: 1px; }
   .tr-src.used { background: rgba(240,170,80,0.2); color: #ffd59a; border: 1px solid rgba(240,170,80,0.55); }
@@ -386,12 +402,20 @@
   th.col-uref, th.col-eref { width: 18%; }
   th.col-uqty, th.col-eqty { width: 9%; }
   th.col-ucond, th.col-econd { width: 14%; }
-  th.col-eloc { width: 16%; }
+  th.col-eloc { width: 14%; }
   .side-sel { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: rgba(255,255,255,0.03); color: var(--text); font: inherit; font-size: 14px; }
   .side-sel[data-state="ok"] { border-color: rgba(127,214,164,0.5); color: #c6f1d8; }
   .side-sel[data-state="warn"] { border-color: rgba(255,196,87,0.6); color: #ffe3a8; }
   .side-sel[data-state="bad"] { border-color: rgba(255,107,107,0.6); color: #ffb4b4; }
+  .ar-tip { position: fixed; z-index: 9000; background: rgba(18,22,32,0.72); -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4); color: rgba(255,255,255,0.95); font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 24px rgba(0,0,0,0.35); pointer-events: none; white-space: nowrap; animation: arTipIn 0.14s ease-out; }
+  .ar-tip::before { content: ""; position: absolute; top: -5px; left: 50%; width: 8px; height: 8px; margin-left: -4px; background: inherit; border-left: 1px solid rgba(255,255,255,0.14); border-top: 1px solid rgba(255,255,255,0.14); transform: rotate(45deg); }
+  .ar-tip[hidden] { display: none; }
+  @keyframes arTipIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+  body.area-equip .tabs { gap: 3px; }
+  body.area-equip .tabs .tab { padding-left: 8px; padding-right: 8px; gap: 6px; }
   .side-sel[data-state="new"] { border-color: rgba(91,157,255,0.6); color: #cfe0ff; }
+  .side-sel[data-state="away"] { border-color: rgba(178,140,255,0.65); color: #ddd0ff; }
+  .side-sel[data-state="lost"] { border-color: rgba(160,168,184,0.7); border-style: dashed; color: #b9c0cc; }
   .side-sel option { background: #141925; color: var(--text); }
   body.side-view .btn-arrival, body.side-view .tx-filter, body.side-view #lockBar, body.side-view #copyBanner { display: none !important; }
   th.col-cname { width: 50%; }
@@ -511,7 +535,7 @@
   .arch-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
   .arch-row select { font-size: 14px; padding: 7px 10px; }
   .arch-row .muted-p { margin: 0; }
-  .arch-actions .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .arch-actions .btn:disabled, #ordPrint:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn.btn-danger { border-color: rgba(255,120,120,0.55); color: #ffb4b4; }
   .ysum { width: 190mm; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
   .ysum h1 { margin: 0; font-size: 22px; color: #1F3864; }
@@ -1011,6 +1035,11 @@
     </div>
   </header>
 
+  <div class="area-sw" id="areaSw" role="group" aria-label="Area">
+    <button type="button" class="parts" id="areaParts" aria-pressed="true"><span class="ic">&#128295;</span><span>Spare Parts<small>Machine parts &middot; months &middot; Transaction &middot; Summary</small></span></button>
+    <button type="button" class="equip" id="areaEquip" aria-pressed="false"><span class="ic">&#129520;</span><span>Equipment<small>Tools &middot; supplies &middot; oils &middot; cleaning &middot; its own Transaction</small></span></button>
+  </div>
+
   <div class="copy-banner reminder" id="reminder" hidden>
     <div>
       <strong id="reminderTitle"></strong>
@@ -1177,7 +1206,7 @@
   <div class="confirm" id="trDlg" hidden role="dialog" aria-modal="true" aria-labelledby="trTitle">
     <div class="confirm-card tr-card" id="trCard">
       <div class="tr-title" id="trTitle"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path id="trIcon" d="M5 12h14M13 6l6 6-6 6"/></svg><span id="trTitleText">Transfer parts out</span></div>
-      <span class="tr-label">Machine</span>
+      <span class="tr-label" id="trMachLabel">Machine</span>
       <div class="tr-chips" id="trMachines"></div>
       <div id="trPartBox">
         <div class="tr-search2" id="trSearchRow">
@@ -1208,7 +1237,7 @@
   <div class="confirm" id="orderDlg" hidden role="dialog" aria-modal="true" aria-labelledby="orderTitle">
     <div class="confirm-card order-card">
       <div class="tr-title" id="orderTitle">Order parts</div>
-      <p class="blank-help">Pick the parts to order and how many, then print a purchase request for approval.</p>
+      <p class="blank-help" id="ordHelp">Pick the parts to order and how many, then print a purchase request for approval.</p>
       <div class="order-mode"><button type="button" id="ordModeParts" aria-pressed="true">Spare parts</button><button type="button" id="ordModeEquip" aria-pressed="false">Equipment</button></div>
       <div class="order-top">
         <div><span class="tr-label">Requested by</span><input class="tr-input" id="ordBy" placeholder="Your name" autocomplete="off" spellcheck="false" dir="auto"></div>
@@ -1217,7 +1246,7 @@
       </div>
       <span class="tr-label" id="ordSugLabel">Out of stock or below Min</span>
       <div class="order-sug" id="ordSug"></div>
-      <span class="tr-label">Add another part</span>
+      <span class="tr-label" id="ordAddLabel">Add another part</span>
       <div class="tr-search2">
         <div><input class="tr-input" id="ordRef" placeholder="Type the reference" autocomplete="off" spellcheck="false" dir="auto"></div>
         <div><input class="tr-input" id="ordName" placeholder="Type the part name" autocomplete="off" spellcheck="false" dir="auto"></div>
@@ -1345,6 +1374,7 @@
   var CONS_KEY = "uii-consumables-v1", VIEW_KEY = "uii-spare-parts-view", CONS_TAB_KEY = "uii-consumables-tab", SIDE_TAB_KEY = "uii-side-tab-";
   var sideLists = { cons: [], used: [], equip: [] };
   var sideView = "";
+  var AREA_KEY = "uii-area", area = "parts", eqTx = false;
   var sideActive = { cons: "BLM", used: "BLM", equip: "Tools" };
   var sideTimers = {};
   function openSheet() {
@@ -1785,6 +1815,7 @@
     sep.setAttribute("aria-hidden", "true");
     monthsEl.appendChild(sep);
     SIDE_KEYS.forEach(function (key) {
+      if (key === "equip") return;
       var cb = document.createElement("button");
       cb.type = "button";
       cb.className = "month " + key;
@@ -1874,7 +1905,7 @@
   }
 
   function tabCount(m) {
-    return m === TX ? txList.length : m === SUM ? "" : data[m].length;
+    return m === TX ? partsTx().length : m === SUM ? "" : data[m].length;
   }
 
   // The nearest earlier month that has parts, for filling an empty month
@@ -2141,23 +2172,25 @@
       b.setAttribute("aria-pressed", f === txFilter ? "true" : "false");
       b.innerHTML = '<span></span><span class="count"></span>';
       b.firstChild.textContent = f;
-      b.lastChild.textContent = f === "All" ? txList.length : txList.filter(function (t) { return txMatches(t, f); }).length;
+      b.lastChild.textContent = f === "All" ? partsTx().length : partsTx().filter(function (t) { return txMatches(t, f); }).length;
       b.addEventListener("click", function () {
         txFilter = f;
         try { localStorage.setItem(TXF_KEY, f); } catch (e) {}
-        renderTransactions();
+        renderRows();
       });
       txFilterEl.appendChild(b);
     });
   }
 
-  function renderTransactions() {
-    document.getElementById("thead").innerHTML = TX_HEAD;
-    titleEl.textContent = txFilter === "All" ? TX : txFilter + " " + TX;
-    renderTxFilter();
+  function partsTx() { return txList.filter(function (t) { return t.source !== "equip"; }); }
+  function renderTransactions(scope) {
+    var eq = scope === "equip";
+    document.getElementById("thead").innerHTML = eq ? TX_HEAD.replace('class="col-mach">Machine<', 'class="col-mach">Section<') : TX_HEAD;
+    titleEl.textContent = eq ? "Equipment " + TX : txFilter === "All" ? TX : txFilter + " " + TX;
+    if (!eq) renderTxFilter();
     rowsEl.innerHTML = "";
-    var inSum = 0, outSum = 0;
-    var shown = txFilter === "All" ? txList : txList.filter(function (t) { return txMatches(t, txFilter); });
+    var inSum = 0, outSum = 0, base = eq ? equipTxAll() : partsTx();
+    var shown = eq || txFilter === "All" ? base : base.filter(function (t) { return txMatches(t, txFilter); });
     shown.forEach(function (t, i) {
       // show the part's current name and reference while it still exists
       var part = findRow(t.partId);
@@ -2186,7 +2219,7 @@
         t.date = din.value;
         sortTx(txList);
         saveDoc("transactions", t.id, txBody(t));
-        renderTransactions();
+        renderRows();
       });
       dtd.appendChild(din);
       tr.appendChild(dtd);
@@ -2453,7 +2486,7 @@
   }
   function fixTx(id) {
     if (ro()) return;
-    var t = txList.find(function (x) { return x.id === id; });
+    var t = findTxAny(id);
     if (!t) return;
     var part = fixPart(t);
     txFixPending = t;
@@ -2492,13 +2525,13 @@
       if (x === t) x.change = t.change > 0 ? q : -q;
       saveDoc("transactions", x.id, txBody(x));
     });
-    renderTransactions();
+    renderRows();
     setStatus("Quantity fixed: " + (t.change > 0 ? "+" : "\u2212") + q + (part ? " \u00B7 stock now " + part.quantity : ""), "saved");
   });
   var txDelDlg = document.getElementById("txDelDlg"), txDelPending = null;
   function deleteTx(id) {
     if (ro()) return;
-    var t = txList.find(function (x) { return x.id === id; });
+    var t = findTxAny(id);
     if (!t) return;
     var part = t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId), now = part && /^\d+$/.test(String(part.quantity)) ? parseInt(part.quantity, 10) : null;
     var what = (t.change > 0 ? "In +" : "Out \u2212") + Math.abs(t.change) + " \u00B7 " + (part && part.name ? part.name : t.name || t.reference) + " \u00B7 " + t.machine + (t.source ? " (" + SIDE[t.source].label + ")" : "") + (t.line ? " \u00B7 Line " + t.line : "") + ".";
@@ -2528,7 +2561,7 @@
     var list = allTx[t.month] || [], idx = list.findIndex(function (x) { return x.id === t.id; });
     if (idx !== -1) list.splice(idx, 1);
     deleteDoc("transactions", t.id);
-    renderTransactions();
+    renderRows();
     setStatus("Transaction deleted, stock not changed", "saved");
   });
   txDelDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { txDelDlg.hidden = true; txDelPending = null; } });
@@ -2537,7 +2570,7 @@
     if (!t) return;
     var res = reverseTx(t);
     if (res && res !== "gone") { setStatus(res, "error"); return; }
-    renderTransactions();
+    renderRows();
     setStatus("Transaction deleted and stock fixed", "saved");
   });
 
@@ -2865,6 +2898,17 @@
     document.querySelector("#addTop span").textContent = addLabel;
     document.getElementById("addBottomLabel").textContent = addLabel;
     document.getElementById("addTop").title = sideView ? addLabel + " to " + sideTab() + "." : "Add a part you already have in stock. Its starting quantity is not recorded as a transaction.";
+    if (sideView === "equip" && eqTx) {
+      document.body.removeAttribute("data-side");
+      document.body.classList.remove("locked", "sum-view");
+      document.body.classList.add("tx-view");
+      document.getElementById("summary").hidden = true;
+      lockBar.hidden = true;
+      renderTransactions("equip");
+      var tc = document.getElementById("tab-EquipTx"); if (tc) tc.lastChild.textContent = equipTxAll().length;
+      document.getElementById("panelMeta").textContent = "Every equipment move · " + equipTxAll().length + (equipTxAll().length === 1 ? " entry" : " entries");
+      return;
+    }
     if (sideView) { renderSide(focusId); return; }
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
     updateLockBar();
@@ -2989,7 +3033,8 @@
     trState = { machine: "All", part: null, line: "", mode: mode === "in" ? "in" : "out" };
     var inn = trState.mode === "in";
     document.getElementById("trCard").classList.toggle("in", inn);
-    document.getElementById("trTitleText").textContent = inn ? "Receive parts in" : "Transfer parts out";
+    if (area === "equip") trState.machine = "Equip";
+    document.getElementById("trTitleText").textContent = area === "equip" ? (inn ? "Receive equipment in" : "Transfer equipment out") : inn ? "Receive parts in" : "Transfer parts out";
     document.getElementById("trIcon").setAttribute("d", inn ? "M19 12H5M11 6l-6 6 6 6" : "M5 12h14M13 6l6 6-6 6");
     document.getElementById("trSave").textContent = inn ? "Save receipt" : "Save transfer";
     try {
@@ -3038,11 +3083,12 @@
     } else {
       row.hidden = false;
       // spare parts of the open month, then Used parts
-      var all = trState.machine === "All", other = trState.machine === "Other", pool = [];
+      var all = trState.machine === "All", pool = [];
       MACHINES.forEach(function (m) { if (all || trState.machine === m) (data[m] || []).forEach(function (r) { if (hasContent(r)) pool.push({ kind: "part", r: r }); }); });
       sideLists.used.forEach(function (r) { if (((all && r.machine !== "Other") || trState.machine === r.machine) && sideHasContent("used", r)) pool.push({ kind: "used", r: r }); });
       // Other: things that belong to no machine (Used parts \u00B7 Other, and all Equipment)
-      if (other) sideLists.equip.forEach(function (r) { if (sideHasContent("equip", r)) pool.push({ kind: "equip", r: r }); });
+      // Equipment area: only equipment; Spare Parts never lists it
+      if (trState.machine === "Equip") { pool = []; sideLists.equip.forEach(function (r) { if (sideHasContent("equip", r)) pool.push({ kind: "equip", r: r }); }); }
       // Reference and Part name are searched separately; fill one or both
       var qr = norm(search.value.trim()), qn = norm(nameIn.value.trim()), hits = pool.filter(function (h) {
         return (!qr || norm(h.r.reference).indexOf(qr) !== -1) && (!qn || norm(h.r.name).indexOf(qn) !== -1);
@@ -3153,11 +3199,11 @@
     var d = new Date(t.ts || Date.now());
     var part = t.source ? findSide(t.source, t.partId) : partIn(t.month, t.partId);
     var name = part && part.name ? part.name : t.name, ref = part && part.reference ? part.reference : t.reference;
-    return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 Spare Part Issue Slip</div><div class="s-sub">Store room</div></div>' +
+    return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 ' + (t.source === "equip" ? "Equipment" : "Spare Part") + ' Issue Slip</div><div class="s-sub">Store room</div></div>' +
       '<div class="s-no"><span class="s-k">Date</span> <b>' + e(txDate(t)) + '</b><br><span class="s-k">Time</span> <b>' + e(t.time || pad(d.getHours()) + ":" + pad(d.getMinutes())) + "</b></div></div>" +
       '<div class="s-grid">' +
       '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-val">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + "</div></div>" +
-      '<div class="s-cell s-linebox">' + (t.line ? "LINE " + e(t.line) : "\u2014") + "</div>" +
+      '<div class="s-cell s-linebox">' + (t.source === "equip" ? e(String(t.machine).toUpperCase()) : t.line ? "LINE " + e(t.line) : "\u2014") + "</div>" +
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-val">' + e(ref || "\u2014") + "</div></div>" +
       '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-val big">' + Math.abs(t.change) + "</div></div></div>" +
       '<div class="s-sign">' +
@@ -3176,8 +3222,12 @@
     else MACHINES.forEach(function (m) { (data[m] || []).forEach(function (r) { if (hasContent(r)) out.push(r); }); });
     return out;
   }
+  // "parts" for machine parts, "items" for equipment
+  function ordWord(n) { return ordMode === "equip" ? (n === 1 ? " item" : " items") : (n === 1 ? " part" : " parts"); }
   function ordSetMode(m) {
     ordMode = m; orderPick = ordPicks[m];
+    document.getElementById("ordHelp").textContent = m === "equip" ? "Pick the items to order and how many, then print a purchase request for approval." : "Pick the parts to order and how many, then print a purchase request for approval.";
+    document.getElementById("ordAddLabel").textContent = m === "equip" ? "Add another item" : "Add another part";
     document.getElementById("ordModeParts").setAttribute("aria-pressed", m === "parts" ? "true" : "false");
     document.getElementById("ordModeEquip").setAttribute("aria-pressed", m === "equip" ? "true" : "false");
     document.getElementById("ordSugLabel").textContent = m === "equip" ? "Out of stock" : "Out of stock or below Min";
@@ -3228,7 +3278,7 @@
     });
     // what goes on the request
     var sel = document.getElementById("ordSel"), rows = ordRows();
-    if (!rows.length) { sel.innerHTML = '<div class="order-empty">No parts yet. Tick a part above or add one.</div>'; document.getElementById("ordPrint").disabled = true; return; }
+    if (!rows.length) { sel.innerHTML = '<div class="order-empty">' + (ordMode === "equip" ? "No items yet. Tick an item above or add one." : "No parts yet. Tick a part above or add one.") + "</div>"; document.getElementById("ordPrint").disabled = true; return; }
     document.getElementById("ordPrint").disabled = false;
     var t = document.createElement("table");
     t.innerHTML = '<colgroup><col style="width:36px"><col style="width:100px"><col><col style="width:200px"><col style="width:90px"><col style="width:120px"><col style="width:40px"></colgroup>' + "<tr><th>#</th><th>" + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th></th></tr>";
@@ -3264,7 +3314,7 @@
   function ordTotals() {
     var n = 0, rows = ordRows();
     rows.forEach(function (x) { n += x.qty; });
-    var el = document.getElementById("ordTot"); if (el) el.textContent = rows.length + (rows.length === 1 ? " part" : " parts") + " \u00B7 " + n + " pcs";
+    var el = document.getElementById("ordTot"); if (el) el.textContent = rows.length + ordWord(rows.length) + " \u00B7 " + n + " pcs";
     document.getElementById("ordPrint").disabled = !rows.length || rows.some(function (x) { return x.qty < 1; });
   }
   function prNo(n) { return String(n); }
@@ -3281,12 +3331,12 @@
     });
     // empty lines down the page, to add parts by hand
     for (var b = rows.length; b < 20; b++) h += '<tr class="blank"><td>' + (b + 1) + "</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>";
-    h += '<tr class="tot"><td colspan="5" style="text-align:right">Total \u00B7 ' + rows.length + (rows.length === 1 ? " part" : " parts") + "</td><td>" + pcs + "</td><td></td></tr></table>";
+    h += '<tr class="tot"><td colspan="5" style="text-align:right">Total \u00B7 ' + rows.length + ordWord(rows.length) + "</td><td>" + pcs + "</td><td></td></tr></table>";
     h += '<div class="p-sign"><div>Requested by<div class="nm">' + e(by) + '</div><div class="sg">Signature</div></div><div>Approved by<div class="nm"></div><div class="sg">Signature</div></div><div>Ordered by<div class="nm"></div><div class="sg">Signature</div></div></div></div>';
     return h;
   }
   document.getElementById("orderBtn").addEventListener("click", function () {
-    if (sideView) leaveConsumables();
+    if (sideView && area !== "equip") { leaveConsumables(); renderMonths(); renderTabs(); renderRows(); }
     ordPicks = { parts: [], equip: [] };
     try {
       document.getElementById("ordBy").value = localStorage.getItem(TR_ME_KEY) || "";
@@ -3295,7 +3345,8 @@
     document.getElementById("ordUrgent").checked = false;
     document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = "";
     orderDlg.hidden = false;
-    ordSetMode("parts");
+    document.getElementById("orderTitle").textContent = area === "equip" ? "Order equipment" : "Order parts";
+    ordSetMode(area === "equip" ? "equip" : "parts");
   });
   ["ordRef", "ordName"].forEach(function (id) { document.getElementById(id).addEventListener("input", renderOrder); });
   document.getElementById("ordModeParts").addEventListener("click", function () { ordSetMode("parts"); });
@@ -3473,15 +3524,16 @@
         { k: "quantity", label: "Quantity", w: 11, num: true, cls: "col-uqty" },
         { k: "condition", label: "Condition", w: 16, options: ["Good", "Needs repair"], cls: "col-ucond" },
         { k: "notes", label: "Notes", w: 36 }] },
-    equip: { label: "Equipment", store: "equipment", lsKey: "uii-equipment-v1", tabField: "type", tabs: ["Tools", "Measuring", "Machines", "Safety", "Supplies"], theme: "EQUIP",
+    equip: { label: "Equipment", store: "equipment", lsKey: "uii-equipment-v1", tabField: "type", tabs: ["Tools", "Measuring", "Machines", "Safety", "Supplies", "Oils & Fluids", "Cleaning", "Hygiene", "General"], theme: "EQUIP",
       blurb: "Tools and equipment that are not spare parts", one: "item", many: "items", file: "UII-Equipment.xlsx", title: "Tools, measuring devices and other equipment",
       icon: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
       fields: [{ k: "name", label: "Name", w: 38, cls: "col-ename" }, { k: "reference", label: "Serial / Reference", w: 22, cls: "col-eref" },
         { k: "quantity", label: "Quantity", w: 11, num: true, cls: "col-eqty" },
+        { k: "unit", label: "Unit", w: 10, options: ["pcs", "box", "pack", "bag", "sachet", "roll", "carton", "gallon", "litre", "kg"], cls: "col-eunit" },
         { k: "location", label: "Location", w: 20, cls: "col-eloc" },
-        { k: "condition", label: "Condition", w: 16, options: ["New", "Working", "Needs repair", "Broken"], cls: "col-econd" }] }
+        { k: "condition", label: "Condition", w: 16, options: ["New", "Working", "Needs repair", "Broken", "At repair", "Missing"], cls: "col-econd" }] }
   };
-  var CONDITION_CLASS = { "New": "new", "Needs repair": "warn", "Broken": "bad" };
+  var CONDITION_CLASS = { "New": "new", "Needs repair": "warn", "Broken": "bad", "At repair": "away", "Missing": "lost" };
   function sideFieldKeys(key) { return SIDE[key].fields.map(function (f) { return f.k; }); }
   function cleanSide(key, r) {
     var c = SIDE[key];
@@ -3556,6 +3608,7 @@
     renderSearch();
   }
   function switchSide(tab) {
+    eqTx = false;
     sideActive[sideView] = tab;
     try { localStorage.setItem(SIDE_TAB_KEY + sideView, tab); } catch (e) {}
     renderTabs();
@@ -3574,9 +3627,20 @@
       b.innerHTML = '<span></span><span class="count"></span>';
       b.firstChild.textContent = m;
       b.lastChild.textContent = sideOf(sideView, m).length;
+      if (AR[m]) b.setAttribute("data-ar", AR[m]);
+      if (sideView === "equip" && eqTx) { b.setAttribute("aria-selected", "false"); b.tabIndex = -1; }
       b.addEventListener("click", function () { switchSide(m); });
       tabsEl.appendChild(b);
     });
+    if (sideView !== "equip") return;
+    var sep = document.createElement("span"); sep.className = "tab-sep"; sep.setAttribute("aria-hidden", "true"); tabsEl.appendChild(sep);
+    var tb = document.createElement("button");
+    tb.type = "button"; tb.className = "tab tx"; tb.id = "tab-EquipTx"; tb.setAttribute("role", "tab");
+    tb.setAttribute("aria-selected", eqTx ? "true" : "false");
+    tb.innerHTML = "<span>Transaction</span><span class=\"count\"></span>";
+    tb.lastChild.textContent = equipTxAll().length;
+    tb.addEventListener("click", function () { eqTx = true; renderTabs(); renderRows(); });
+    tabsEl.appendChild(tb);
   }
   function sideDupIds() {
     var seen = {}, dup = {};
@@ -3613,6 +3677,27 @@
     emptyEl.hidden = n !== 0;
   }
   function updateConsCounts() { updateSideCounts(); }
+  var AR = { pcs: "\u062D\u0628\u0629", box: "\u0639\u0644\u0628\u0629", pack: "\u0628\u0627\u0643\u064A\u062A \u0623\u0648 \u0631\u0628\u0637\u0629", bag: "\u0643\u064A\u0633 \u0643\u0628\u064A\u0631", sachet: "\u0643\u064A\u0633 \u0635\u063A\u064A\u0631",
+    roll: "\u0631\u0648\u0644 \u0623\u0648 \u0644\u0641\u0629", carton: "\u0643\u0631\u062A\u0648\u0646\u0629", gallon: "\u063A\u0627\u0644\u0648\u0646", litre: "\u0644\u064A\u062A\u0631", kg: "\u0643\u064A\u0644\u0648",
+    "New": "\u062C\u062F\u064A\u062F", "Working": "\u0634\u063A\u0651\u0627\u0644", "Needs repair": "\u0628\u062F\u0648 \u062A\u0635\u0644\u064A\u062D", "Broken": "\u062E\u0631\u0628\u0627\u0646", "At repair": "\u0639\u0646\u062F \u0627\u0644\u062A\u0635\u0644\u064A\u062D", "Missing": "\u0636\u0627\u064A\u0639", "Good": "\u0645\u0646\u064A\u062D",
+    "Tools": "\u0639\u062F\u0651\u0629", "Measuring": "\u0623\u062F\u0648\u0627\u062A \u0642\u064A\u0627\u0633", "Machines": "\u0645\u0643\u0646\u0627\u062A \u0635\u063A\u064A\u0631\u0629", "Safety": "\u0633\u0644\u0627\u0645\u0629", "Supplies": "\u0644\u0648\u0627\u0632\u0645 \u0627\u0644\u0648\u0631\u0634\u0629",
+    "Oils & Fluids": "\u0632\u064A\u0648\u062A \u0648\u0633\u0648\u0627\u0626\u0644", "Cleaning": "\u062A\u0646\u0638\u064A\u0641", "Hygiene": "\u0646\u0638\u0627\u0641\u0629 \u0634\u062E\u0635\u064A\u0629", "General": "\u0639\u0627\u0645", "Other": "\u063A\u064A\u0631 \u0645\u0643\u0646\u0629" };
+  // hover anything with data-ar: its Arabic shows at once, under it
+  (function () {
+    var tip = document.createElement("div");
+    tip.className = "ar-tip"; tip.dir = "rtl"; tip.hidden = true;
+    document.body.appendChild(tip);
+    document.addEventListener("mouseover", function (e) {
+      var el = e.target.closest ? e.target.closest("[data-ar]") : null, t = el && el.getAttribute("data-ar");
+      if (!t) { tip.hidden = true; return; }
+      var r = el.getBoundingClientRect();
+      tip.textContent = t; tip.hidden = false;
+      tip.style.left = Math.max(6, Math.min(window.innerWidth - tip.offsetWidth - 6, r.left + r.width / 2 - tip.offsetWidth / 2)) + "px";
+      tip.style.top = (r.bottom + 6) + "px";
+    });
+    document.addEventListener("scroll", function () { tip.hidden = true; }, true);
+    document.addEventListener("mousedown", function () { tip.hidden = true; });
+  })();
   function makeSideCell(key, row, f) {
     var td = document.createElement("td");
     td.setAttribute("data-label", f.label);
@@ -3627,11 +3712,13 @@
       });
       input.value = row[f.k];
       input.disabled = readOnly;
+      input.setAttribute("data-ar", AR[row[f.k]] || "");
       var paint = function () { input.setAttribute("data-state", CONDITION_CLASS[input.value] || (input.value ? "ok" : "")); };
       paint();
       input.addEventListener("change", function () {
         var cur = findSide(key, row.id) || row;
         cur[f.k] = input.value;
+        input.setAttribute("data-ar", AR[input.value] || "");
         paint();
         writeSide(key, cur);
       });
@@ -3876,7 +3963,7 @@
     allParts[month] = next;
     renderMonths();
 
-    if (active === TX) { data = next; renderTransactions(); return; }
+    if (active === TX || (sideView === "equip" && eqTx)) { data = next; if (sideView) { if (eqTx) renderRows(); } else renderTransactions(); return; }
     if (active === SUM) { data = next; renderSummary(); updateCounts(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
     var after = next[active].map(function (r) { return r.id; }).join(",");
@@ -3915,7 +4002,8 @@
     if (!allTx[month]) allTx[month] = [];
     txList = allTx[month];
     renderMonths();
-    if (active === TX) renderTransactions(); else if (active === SUM) { renderSummary(); updateCounts(); } else updateCounts();
+    if (sideView) { if (sideView === "equip" && eqTx) renderRows(); else updateCounts(); }
+    else if (active === TX) renderTransactions(); else if (active === SUM) { renderSummary(); updateCounts(); } else updateCounts();
   }
 
   // ---- Excel export: builds a real .xlsx (zip of XML parts) for the open month ----
@@ -4988,6 +5076,42 @@
     }).catch(function () { setStatus("That file isn't a UII backup or month export.", "error"); });
   });
 
+  // ---- Two areas: Spare Parts (months, machines) and Equipment (its own lists and Transaction) ----
+  function setArea(a, quiet) {
+    if (!quiet) flushWrites();
+    area = a === "equip" ? "equip" : "parts";
+    try { localStorage.setItem(AREA_KEY, area); } catch (e) {}
+    document.body.classList.toggle("area-equip", area === "equip");
+    document.getElementById("areaParts").setAttribute("aria-pressed", area === "parts" ? "true" : "false");
+    document.getElementById("areaEquip").setAttribute("aria-pressed", area === "equip" ? "true" : "false");
+    document.querySelector(".subtitle").textContent = area === "equip" ? "Equipment Register" : "Machine Spare Parts Register";
+    document.querySelector("#orderBtn span").textContent = area === "equip" ? "Order equipment" : "Order parts";
+    eqTx = false;
+    if (area === "equip") {
+      sideView = "equip";
+      try { localStorage.setItem(VIEW_KEY, "equip"); } catch (e) {}
+    } else if (sideView === "equip") {
+      sideView = "";
+      try { localStorage.setItem(VIEW_KEY, ""); } catch (e) {}
+    }
+    if (quiet) return;
+    updateSearchPlaceholder();
+    renderMonths(); renderTabs(); renderRows(); renderSearch();
+  }
+  document.getElementById("areaParts").addEventListener("click", function () { if (area !== "parts") setArea("parts"); });
+  document.getElementById("areaEquip").addEventListener("click", function () { if (area !== "equip") setArea("equip"); });
+  // every equipment move, from every month, newest first
+  function equipTxAll() {
+    var out = [];
+    Object.keys(allTx).forEach(function (k) { (allTx[k] || []).forEach(function (t) { if (t.source === "equip") out.push(t); }); });
+    return sortTx(out) || out;
+  }
+  function findTxAny(id) {
+    var ks = Object.keys(allTx);
+    for (var i = 0; i < ks.length; i++) { var l = allTx[ks[i]] || []; for (var j = 0; j < l.length; j++) if (l[j].id === id) return l[j]; }
+    return null;
+  }
+
   // ---- Boot ----
   try {
     var savedTab = localStorage.getItem(TAB_KEY);
@@ -5001,6 +5125,8 @@
       if (SIDE[k].tabs.indexOf(t) !== -1) sideActive[k] = t;
     });
   } catch (e) {}
+  try { if (localStorage.getItem(AREA_KEY) === "equip") area = "equip"; } catch (e) {}
+  setArea(area, true);
   updateSearchPlaceholder();
   openSheet();
 
