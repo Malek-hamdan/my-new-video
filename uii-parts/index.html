@@ -3487,10 +3487,28 @@
   function printHtml(html) {
     var area = document.getElementById("printArea");
     area.innerHTML = html;
+    fitOnePage(area);
     document.body.classList.add("printing");
     var done = function () { document.body.classList.remove("printing"); window.removeEventListener("afterprint", done); };
     window.addEventListener("afterprint", done);
     setTimeout(function () { window.print(); setTimeout(done, 500); }, 60);
+  }
+  // A request or year summary is one sheet: shrink it rather than leave the signatures alone on page 2
+  function fitOnePage(area) {
+    var el = area.querySelector(".prq, .ysum");
+    if (!el) return;
+    area.style.cssText = "display:block;position:absolute;left:-9999px;top:0;visibility:hidden";
+    var probe = document.createElement("div");
+    probe.style.height = "277mm";
+    area.appendChild(probe);
+    var page = probe.offsetHeight, h = el.offsetHeight;
+    area.removeChild(probe);
+    area.style.cssText = "";
+    if (h <= page) return;
+    // scale inside a sheet of fixed height, so the printer has nothing to split
+    el.style.transform = "scale(" + Math.max(0.6, (page - 8) / h).toFixed(3) + ")";
+    el.style.transformOrigin = "top left";
+    el.parentNode.style.cssText = "height:296mm;overflow:hidden";
   }
   function printSlip(t) {
     var area = document.getElementById("printArea");
