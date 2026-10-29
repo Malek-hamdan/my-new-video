@@ -1472,13 +1472,16 @@
 
   // ---- Status line ----
   var statusEl = document.getElementById("status");
-  var statusTimer = null;
-  function setStatus(msg, kind) {
+  var statusTimer = null, statusHold = 0;
+  // holdMs keeps an important message up, so a routine "Saved" right after it cannot hide it
+  function setStatus(msg, kind, holdMs) {
+    if (!holdMs && kind !== "error" && Date.now() < statusHold) return;
+    statusHold = holdMs ? Date.now() + holdMs : 0;
     statusEl.textContent = msg;
     statusEl.className = "status " + (kind || "");
     clearTimeout(statusTimer);
     if (kind === "saved") {
-      statusTimer = setTimeout(function () { statusEl.textContent = ""; statusEl.className = "status"; }, 1600);
+      statusTimer = setTimeout(function () { statusEl.textContent = ""; statusEl.className = "status"; }, holdMs || 1600);
     }
   }
 
@@ -4858,7 +4861,7 @@
       openSheet();
       if (!db) saveLocal();
       renderMonths(); renderTabs(); renderRows(); renderArch(); renderBackupDlg();
-      setStatus(y + " removed from the site: " + c.parts + " parts, " + c.tx + " transactions. They are in UII-Archive-" + y + ".xlsx.", "saved");
+      setStatus(y + " removed from the site: " + c.parts + " parts, " + c.tx + " transactions. They are in UII-Archive-" + y + ".xlsx.", "saved", 8000);
     });
   }
   // One page for the file: what each machine used and received in the year
