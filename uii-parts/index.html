@@ -4861,7 +4861,11 @@
       openSheet();
       if (!db) saveLocal();
       renderMonths(); renderTabs(); renderRows(); renderArch(); renderBackupDlg();
-      setStatus(y + " removed from the site: " + c.parts + " parts, " + c.tx + " transactions. They are in UII-Archive-" + y + ".xlsx.", "saved", 8000);
+      var done = y + " removed from the site: " + c.parts + " parts, " + c.tx + " transactions. They are in UII-Archive-" + y + ".xlsx.";
+      setStatus(done, "saved", 8000);
+      // the Backups window covers the status line, so say it there too
+      var info = document.getElementById("archInfo");
+      info.innerHTML = '<b style="color:#7fd6a4">\u2713 ' + done + "</b><br>" + info.textContent;
     });
   }
   // One page for the file: what each machine used and received in the year
