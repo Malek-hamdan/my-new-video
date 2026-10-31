@@ -1,0 +1,556 @@
+<title>Sawalef</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone-width column; list, chat, contact and settings views swap in place */
+:root{
+  --bg:#0B1418; --bar:#0F1B20; --surface:#15232A; --line:#22343C; --line-soft:#1C2C33;
+  --fg:#EAF3F5; --fg-2:#CFDDE2; --muted:#93AAB2;
+  --accent:#3FB6D9; --accent-ink:#0B1418; --accent-soft:#123A47; --accent-text:#8FDDF3;
+  --out:#134456; --in:#1A2A31; --quote-out:#0F3646; --quote-in:#13222A; --reply-name:#F2C14E;
+  --danger-bg:#3A1D24; --danger:#FFB4BE; --doodle:#1D3139;
+  --font:'Inter','IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#app{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;position:relative;overflow:hidden;background:var(--bg)}
+.view{flex:1;display:flex;flex-direction:column;min-height:0}
+.pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.icon-btn{width:44px;height:44px;border:0;background:transparent;display:inline-flex;align-items:center;justify-content:center;border-radius:22px;color:var(--fg);flex-shrink:0}
+.icon-btn:hover{background:var(--surface)}
+svg{flex-shrink:0}
+
+/* list */
+.top{display:flex;align-items:center;justify-content:space-between;padding-block:18px 10px}
+.top h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search{display:flex;align-items:center;gap:10px;height:46px;border-radius:23px;background:var(--surface);padding:0 16px;color:var(--muted)}
+.search input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:15px;color:var(--fg)}
+.chips{display:flex;gap:8px;padding-block:12px 4px;overflow-x:auto}
+.chip{height:34px;padding:0 14px;border-radius:17px;border:1px solid var(--line);background:transparent;color:var(--fg-2);font-size:14px;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:transparent;color:var(--accent-text);font-weight:600}
+.rows{flex:1;overflow-y:auto;padding-bottom:96px}
+.row{display:flex;align-items:center;gap:14px;width:100%;padding-block:11px;border:0;background:transparent;text-align:start}
+.row:hover{background:var(--bar)}
+.row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.row-line{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row-name{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-time{font-size:12px;color:var(--muted);flex-shrink:0;font-variant-numeric:tabular-nums}
+.row-time.live{color:var(--accent-text)}
+.row-prev{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;min-width:0}
+.row-prev span{overflow:hidden;text-overflow:ellipsis}
+.badge{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.avatar{border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:600;color:#0B1418;overflow:hidden;background-size:cover;background-position:center}
+.fab{position:absolute;inset-inline-end:max(16px,env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:18px;border:0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.empty{padding:48px 16px;text-align:center;color:var(--muted);line-height:1.5}
+
+/* chat */
+.chat-head{display:flex;align-items:center;gap:8px;padding-block:10px;padding-inline:4px 8px;background:var(--bar);border-bottom:1px solid var(--line-soft)}
+.who{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:start;padding:4px 0}
+.who-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.who-name{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who-status{font-size:12px;color:var(--accent-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wall{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding-block:12px;background-color:var(--bg)}
+.wall.doodle{background-image:var(--doodle-img);background-size:120px 120px}
+.day{align-self:center;font-size:12px;color:var(--muted);background:var(--surface);padding:4px 12px;border-radius:10px;margin-bottom:6px;border:0}
+.msg{display:flex}
+.msg.me{justify-content:flex-end}
+.bubble{max-width:80%;padding:6px 9px 5px;background:var(--in);border-radius:14px;border-start-start-radius:4px;display:flex;flex-direction:column;gap:4px;border:0;text-align:start;color:var(--fg)}
+.msg.me .bubble{background:var(--out);border-start-start-radius:14px;border-start-end-radius:4px}
+.msg.picked .bubble{outline:2px solid var(--accent);outline-offset:2px}
+.quote{border-radius:8px;background:var(--quote-in);padding:6px 10px;display:flex;gap:8px;min-width:0}
+.msg.me .quote{background:var(--quote-out)}
+.quote i{width:3px;border-radius:2px;background:var(--reply-name);flex-shrink:0}
+.quote div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.quote b{font-size:13px;color:var(--reply-name);font-weight:600}
+.quote span{font-size:13px;color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.body{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.txt{font-size:15px;line-height:1.35;white-space:pre-wrap;word-break:break-word;flex:1 1 auto;min-width:0}
+.meta{font-size:11px;color:#A9CBD6;display:inline-flex;align-items:center;gap:3px;margin-inline-start:auto;font-variant-numeric:tabular-nums}
+.voice{display:flex;align-items:center;gap:10px;width:250px;max-width:100%;padding-top:4px}
+.voice-av{position:relative}
+.voice-mic{position:absolute;inset-inline-start:-4px;bottom:-2px;width:20px;height:20px;border-radius:10px;background:var(--out);display:flex;align-items:center;justify-content:center}
+.msg:not(.me) .voice-mic{background:var(--in)}
+.wave{flex:1;position:relative;display:flex;align-items:center;gap:2px;height:30px;min-width:0;overflow:hidden}
+.wave i{width:2.5px;border-radius:2px;background:#6E97A4;flex-shrink:0}
+.wave b{position:absolute;inset-inline-start:0;top:50%;margin-top:-6px;width:12px;height:12px;border-radius:6px;background:var(--accent-text)}
+.dur{font-size:12px;color:#A9CBD6;padding-inline-start:96px}
+.composer{padding-block:8px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;background:var(--bg)}
+.replybar{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:12px;padding:6px 6px 6px 10px}
+.replybar .quote{flex:1;background:transparent;padding:0}
+.compose-row{display:flex;align-items:flex-end;gap:8px}
+.field{flex:1;min-width:0;display:flex;align-items:flex-end;gap:6px;min-height:48px;border-radius:24px;background:var(--surface);padding:6px 6px 6px 14px}
+.field textarea{flex:1;min-width:0;border:0;background:transparent;outline:none;resize:none;font-size:15px;line-height:1.35;padding:7px 0;max-height:120px;color:var(--fg)}
+.as{height:36px;padding:0 12px;border:0;border-radius:18px;background:var(--accent-soft);color:var(--accent-text);font-size:12px;font-weight:600;white-space:nowrap}
+.send{width:48px;height:48px;border-radius:24px;border:0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* forms & sheets */
+.form{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:18px;padding-block:8px 24px}
+.lbl{display:flex;flex-direction:column;gap:8px}
+.lbl>span{font-size:13px;color:var(--muted)}
+.inp{height:48px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--fg);font-size:15px;padding:0 14px;width:100%;min-width:0}
+textarea.inp{height:auto;padding:10px 14px;resize:vertical;line-height:1.4}
+select.inp{padding:0 10px}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--bg);border-radius:12px;padding:4px;border:1px solid var(--line)}
+.seg button{height:40px;border:0;border-radius:9px;background:transparent;color:var(--fg-2);font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.btn{height:48px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--fg-2);font-size:14px;padding:0 12px}
+.btn.primary{border:0;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:16px}
+.btn.danger{border:0;background:var(--danger-bg);color:var(--danger);font-weight:600}
+.h2{margin:0;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-text)}
+.check{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px}
+.check input{width:22px;height:22px;accent-color:var(--accent)}
+.photo-pick{display:flex;flex-direction:column;align-items:center;gap:10px}
+.photo-pick label{cursor:pointer}
+.swatches{display:flex;gap:12px;flex-wrap:wrap}
+.sw{width:44px;height:44px;border-radius:22px;border:3px solid transparent}
+.sw[aria-pressed="true"]{border-color:var(--fg)}
+.footer{padding-block:12px calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:10px}
+.footer .btn{flex:1}
+.scrim{position:absolute;inset:0;background:rgba(3,8,10,.55);display:flex;flex-direction:column;justify-content:flex-end;z-index:20}
+.sheet{background:var(--surface);border-radius:22px 22px 0 0;padding-block:10px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;max-height:88%;overflow-y:auto}
+.sheet .grab{align-self:center;width:40px;height:4px;border-radius:2px;background:var(--line)}
+.sheet h2{margin:0;font-size:18px;font-weight:600}
+.sheet .inp{background:var(--bg)}
+.sheet .seg{background:var(--bg)}
+.menu{display:flex;flex-direction:column}
+.menu button{height:52px;border:0;background:transparent;text-align:start;font-size:16px;display:flex;align-items:center;gap:14px;color:var(--fg);border-radius:12px;padding:0 8px}
+.menu button:hover{background:var(--bg)}
+.menu .del{color:var(--danger)}
+.toast{position:absolute;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;white-space:nowrap}
+.note{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+@media (prefers-reduced-motion:no-preference){.scrim .sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+</style>
+
+<div id="app"></div>
+
+<script>
+(() => {
+const KEY = 'sawalef_v1';
+const COLORS = ['#3FB6D9','#FF8A5C','#9B7BFF','#F2C14E'];
+const AV = ['#F2C14E','#4FC3F7','#9B7BFF','#FF8A5C','#7ED6A5','#F48FB1','#B0C4FF'];
+
+const T = {
+  en:{search:'Search chats',all:'All',unread:'Unread',pinned:'Pinned',newContact:'New contact',editContact:'Edit contact',
+    name:'Name',number:'Number (any, made up)',status:'Status line',online:'online',typing:'typing…',lastSeen:'last seen today at',hidden:'Hidden',
+    pin:'Pin to top of chat list',unreadCount:'Unread count shown in the list',dayLabel:'Date label at top of chat',choosePhoto:'Choose photo',removePhoto:'Remove photo',
+    save:'Save',saveStart:'Save and open chat',delete:'Delete',deleteChat:'Delete this chat',message:'Message',asMe:'as Me',as:'as',me:'Me',you:'You',
+    editMsg:'Edit message',sentBy:'Sent by',type:'Type',text:'Text',voice:'Voice',duration:'Length (m:ss)',time:'Time',tick:'Ticks',read:'Read',delivered:'Delivered',sent:'Sent',
+    replyTo:'Replying to',noReply:'No reply',up:'Move up',down:'Move down',insert:'Insert above',reply:'Reply',edit:'Edit',
+    settings:'Settings',app:'App',appName:'App name',accent:'Accent colour',look:'Chat look',wallpaper:'Wallpaper',doodles:'Doodles',plain:'Plain',
+    language:'Language',data:'Data',backup:'Copy backup',restore:'Restore from backup',restoreHint:'Paste a backup here, then tap Restore.',
+    wipe:'Delete all chats',wipeConfirm:'Tap again to delete everything',voiceMsg:'Voice message',photo:'Photo',
+    noChats:'No chats yet. Tap + to add a contact and start writing a conversation.',copied:'Backup copied',restored:'Backup restored',badBackup:'That backup could not be read',
+    today:'Today',example:'(example)',storageOff:'This browser is not saving data, so changes are lost when the page closes.'},
+  ar:{search:'ابحث بالمحادثات',all:'الكل',unread:'غير مقروءة',pinned:'مثبّتة',newContact:'جهة اتصال جديدة',editContact:'تعديل جهة الاتصال',
+    name:'الاسم',number:'الرقم (أي رقم)',status:'السطر تحت الاسم',online:'متصل',typing:'عم يكتب…',lastSeen:'آخر ظهور اليوم',hidden:'مخفي',
+    pin:'تثبيت فوق بالقائمة',unreadCount:'عدد الرسائل غير المقروءة',dayLabel:'التاريخ فوق المحادثة',choosePhoto:'اختر صورة',removePhoto:'احذف الصورة',
+    save:'حفظ',saveStart:'حفظ وفتح المحادثة',delete:'حذف',deleteChat:'احذف هالمحادثة',message:'رسالة',asMe:'أنا',as:'من',me:'أنا',you:'أنت',
+    editMsg:'تعديل الرسالة',sentBy:'المرسل',type:'النوع',text:'النص',voice:'صوت',duration:'المدة (د:ث)',time:'الوقت',tick:'الصحّين',read:'مقروءة',delivered:'وصلت',sent:'انبعتت',
+    replyTo:'ردّ على',noReply:'بدون ردّ',up:'لفوق',down:'لتحت',insert:'زيد فوقها',reply:'ردّ',edit:'تعديل',
+    settings:'الإعدادات',app:'التطبيق',appName:'اسم التطبيق',accent:'اللون',look:'شكل المحادثة',wallpaper:'الخلفية',doodles:'رسومات',plain:'سادة',
+    language:'اللغة',data:'البيانات',backup:'انسخ نسخة احتياطية',restore:'استرجع النسخة',restoreHint:'الصق النسخة الاحتياطية هون واكبس استرجع.',
+    wipe:'احذف كل المحادثات',wipeConfirm:'اكبس كمان مرة لتحذف كل شي',voiceMsg:'رسالة صوتية',photo:'صورة',
+    noChats:'ما في محادثات. اكبس + لتضيف جهة اتصال وتبلّش تكتب.',copied:'انسخت النسخة الاحتياطية',restored:'رجعت النسخة',badBackup:'ما قدرت اقرا النسخة',
+    today:'اليوم',example:'(مثال)',storageOff:'هالمتصفح ما عم يحفظ، التعديلات بتروح لما تسكّر الصفحة.'}
+};
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); };
+
+function seed() {
+  const a = uid(), b = uid(), c = uid();
+  return {
+    settings:{appName:'Sawalef',accent:COLORS[0],wallpaper:'doodle',lang:'en'},
+    contacts:[
+      {id:uid(),name:'Sami (example)',number:'+961 00 000 000',photo:'',status:'typing',pinned:true,unread:0,day:'Today',updated:Date.now(),
+       messages:[
+        {id:a,from:'me',type:'text',text:'Hey, are you coming tonight?',time:'13:18',status:'read',replyTo:null},
+        {id:b,from:'them',type:'text',text:'Not sure yet',time:'13:18',status:'read',replyTo:null},
+        {id:uid(),from:'me',type:'text',text:'Come on, everyone will be there',time:'13:19',status:'read',replyTo:b},
+        {id:c,from:'them',type:'text',text:'Ok ok, I will try',time:'13:20',status:'read',replyTo:null},
+        {id:uid(),from:'me',type:'voice',text:'',dur:'0:20',time:'13:27',status:'read',replyTo:null},
+        {id:uid(),from:'them',type:'text',text:'Tap any message to edit it. Write as the other person with the button next to the text box.',time:'13:33',status:'read',replyTo:null}
+       ]}
+    ]
+  };
+}
+
+let storageOk = true;
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw); } catch (e) { storageOk = false; }
+  return seed();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); storageOk = true; } catch (e) { storageOk = false; } }
+
+let S = load();
+const ui = {view:'list', filter:'all', q:'', chatId:null, as:'me', replyTo:null, sheet:null, form:null, wipeArmed:false};
+const t = k => (T[S.settings.lang] || T.en)[k] || T.en[k] || k;
+const app = document.getElementById('app');
+const chat = () => S.contacts.find(c => c.id === ui.chatId);
+
+/* ---------- icons ---------- */
+const I = {
+  back:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  gear:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>',
+  search:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  plus:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  pin:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6l-1 6 4 4H6l4-4z"/><path d="M12 13v8"/></svg>',
+  send:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-3-7z"/></svg>',
+  mic:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  micS:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8FDDF3" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  play:'<svg width="26" height="26" viewBox="0 0 24 24" fill="#CFDDE2" aria-hidden="true"><path d="M7 4.5c0-.8.9-1.3 1.6-.9l11 7.1c.6.4.6 1.3 0 1.7l-11 7.1c-.7.4-1.6-.1-1.6-.9z"/></svg>',
+  x:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  pen:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+  replyI:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 7L4 12l6 5"/><path d="M4 12h10a6 6 0 0 1 6 6"/></svg>',
+  trash:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  camera:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>'
+};
+function ticks(st) {
+  if (st === 'sent') return '<svg width="12" height="11" viewBox="0 0 12 11" fill="none" stroke="#A9CBD6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Sent"><path d="M1 6l3 3 6-7"/></svg>';
+  const c = st === 'read' ? 'var(--accent-text)' : '#A9CBD6';
+  return `<svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="${st === 'read' ? 'Read' : 'Delivered'}"><path d="M1 6l3 3 6-7"/><path d="M6 9l1 0 6-7"/></svg>`;
+}
+function avatar(c, size) {
+  const col = AV[[...(c.name || '?')].reduce((a, ch) => a + ch.charCodeAt(0), 0) % AV.length];
+  const ini = ((c.name || '').match(/[\p{L}\p{N}]+/gu) || ['?']).slice(0, 2).map(w => [...w][0]).join('').toUpperCase();
+  const st = `width:${size}px;height:${size}px;font-size:${Math.round(size * .36)}px;background-color:${col};` + (c.photo ? `background-image:url(${c.photo});` : '');
+  return `<span class="avatar" style="${st}" aria-hidden="true">${c.photo ? '' : esc(ini)}</span>`;
+}
+const statusText = c => ({online:t('online'),typing:t('typing'),lastseen:t('lastSeen') + ' ' + (c.lastSeen || now()),hidden:''})[c.status] ?? '';
+const preview = m => !m ? '' : m.type === 'voice' ? t('voiceMsg') + ' ' + (m.dur || '0:00') : m.text;
+
+/* ---------- theme ---------- */
+function applyTheme() {
+  const r = document.documentElement;
+  r.style.setProperty('--accent', S.settings.accent);
+  r.lang = S.settings.lang; r.dir = S.settings.lang === 'ar' ? 'rtl' : 'ltr';
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><g fill='none' stroke='#1D3139' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M10 22l22-10-7 22-4-8z'/><path d='M72 10l3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z'/><path d='M14 70h16v8a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z'/><path d='M30 73h3a3 3 0 0 1 0 6h-3'/><path d='M80 62v18M80 62l10-3v14'/><circle cx='77' cy='80' r='3'/><circle cx='87' cy='73' r='3'/><path d='M52 104a9 9 0 1 0 9-12 7 7 0 0 1-9 12z'/><circle cx='104' cy='40' r='5'/><path d='M100 98h12M106 92v12'/><path d='M42 44c4-4 8 4 12 0s8 4 12 0'/></g></svg>`;
+  r.style.setProperty('--doodle-img', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+}
+
+/* ---------- views ---------- */
+function vList() {
+  const q = ui.q.trim().toLowerCase();
+  let list = S.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || c.messages.some(m => (m.text || '').toLowerCase().includes(q)));
+  if (ui.filter === 'unread') list = list.filter(c => c.unread > 0);
+  if (ui.filter === 'pinned') list = list.filter(c => c.pinned);
+  list.sort((a, b) => (b.pinned - a.pinned) || (b.updated - a.updated));
+  const nUnread = S.contacts.filter(c => c.unread > 0).length;
+  const rows = list.map(c => {
+    const m = c.messages[c.messages.length - 1];
+    return `<button class="row pad" data-act="open" data-id="${c.id}">
+      ${avatar(c, 52)}
+      <span class="row-main">
+        <span class="row-line"><span class="row-name">${esc(c.name)}</span><span class="row-time ${c.unread ? 'live' : ''}">${esc(m ? m.time : '')}</span></span>
+        <span class="row-line"><span class="row-prev">${m && m.from === 'me' ? ticks(m.status) : ''}<span>${esc(preview(m))}</span></span>
+        ${c.unread ? `<span class="badge">${c.unread}</span>` : c.pinned ? `<span style="color:var(--muted)">${I.pin}</span>` : ''}</span>
+      </span></button>`;
+  }).join('');
+  return `<div class="view">
+    <div class="top pad"><h1>${esc(S.settings.appName)}</h1><button class="icon-btn" data-act="settings" aria-label="${t('settings')}">${I.gear}</button></div>
+    <div class="pad"><label class="search">${I.search}<input id="q" type="search" placeholder="${t('search')}" aria-label="${t('search')}" value="${esc(ui.q)}"></label></div>
+    <div class="chips pad">
+      <button class="chip" data-act="filter" data-f="all" aria-pressed="${ui.filter === 'all'}">${t('all')}</button>
+      <button class="chip" data-act="filter" data-f="unread" aria-pressed="${ui.filter === 'unread'}">${t('unread')}${nUnread ? ' ' + nUnread : ''}</button>
+      <button class="chip" data-act="filter" data-f="pinned" aria-pressed="${ui.filter === 'pinned'}">${t('pinned')}</button>
+    </div>
+    ${storageOk ? '' : `<p class="note pad" style="padding-block:6px">${t('storageOff')}</p>`}
+    <div class="rows">${rows || `<p class="empty">${t('noChats')}</p>`}</div>
+    <button class="fab" data-act="newContact" aria-label="${t('newContact')}">${I.plus}</button>
+  </div>`;
+}
+
+function bubble(c, m) {
+  const r = m.replyTo && c.messages.find(x => x.id === m.replyTo);
+  const quote = r ? `<span class="quote"><i></i><div><b>${esc(r.from === 'me' ? t('you') : c.name)}</b><span>${esc(preview(r))}</span></div></span>` : '';
+  const meta = `<span class="meta">${esc(m.time)}${m.from === 'me' ? ticks(m.status) : ''}</span>`;
+  let inner;
+  if (m.type === 'voice') {
+    const who = m.from === 'me' ? {name:t('me'), photo:S.settings.myPhoto || ''} : c;
+    let seedN = [...m.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+    const bars = Array.from({length:34}, () => { seedN = (seedN * 9301 + 49297) % 233280; return 5 + Math.round(seedN / 233280 * 19); });
+    inner = `<span class="voice"><span class="voice-av">${avatar(who, 50)}<span class="voice-mic">${I.micS}</span></span>
+      <span style="color:var(--fg-2)">${I.play}</span><span class="wave"><b></b>${bars.map(h => `<i style="height:${h}px"></i>`).join('')}</span></span>
+      <span class="body"><span class="dur">${esc(m.dur || '0:00')}</span>${meta}</span>`;
+  } else {
+    inner = `<span class="body"><span class="txt">${esc(m.text)}</span>${meta}</span>`;
+  }
+  return `<div class="msg ${m.from === 'me' ? 'me' : ''} ${ui.sheet && ui.sheet.id === m.id ? 'picked' : ''}"><button class="bubble" data-act="msg" data-id="${m.id}">${quote}${inner}</button></div>`;
+}
+
+function vChat() {
+  const c = chat();
+  if (!c) { ui.view = 'list'; return vList(); }
+  const st = statusText(c);
+  const rep = ui.replyTo && c.messages.find(x => x.id === ui.replyTo);
+  return `<div class="view">
+    <div class="chat-head">
+      <button class="icon-btn" data-act="back" aria-label="Back">${I.back}</button>
+      <button class="who" data-act="editContact">${avatar(c, 40)}<span class="who-text"><span class="who-name">${esc(c.name)}</span>${st ? `<span class="who-status">${esc(st)}</span>` : ''}</span></button>
+    </div>
+    <div class="wall pad ${S.settings.wallpaper === 'doodle' ? 'doodle' : ''}" id="wall">
+      ${c.day ? `<span class="day">${esc(c.day)}</span>` : ''}
+      ${c.messages.map(m => bubble(c, m)).join('')}
+    </div>
+    <div class="composer pad">
+      ${rep ? `<div class="replybar"><span class="quote"><i></i><div><b>${esc(rep.from === 'me' ? t('you') : c.name)}</b><span>${esc(preview(rep))}</span></div></span><button class="icon-btn" data-act="cancelReply" aria-label="Cancel reply">${I.x}</button></div>` : ''}
+      <div class="compose-row">
+        <div class="field"><textarea id="draft" rows="1" placeholder="${t('message')}" aria-label="${t('message')}"></textarea>
+          <button class="as" data-act="toggleAs" aria-label="${t('sentBy')}">${ui.as === 'me' ? t('asMe') : t('as') + ' ' + esc(c.name.split(' ')[0])}</button></div>
+        <button class="send" data-act="send" id="sendBtn" aria-label="Send">${I.mic}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function vContact() {
+  const f = ui.form;
+  const opt = (v, l) => `<option value="${v}" ${f.status === v ? 'selected' : ''}>${esc(l)}</option>`;
+  return `<div class="view">
+    <div class="chat-head" style="background:transparent;border:0">
+      <button class="icon-btn" data-act="back" aria-label="Back">${I.back}</button>
+      <h1 style="margin:0;font-size:20px;font-weight:600">${f.id ? t('editContact') : t('newContact')}</h1>
+    </div>
+    <form class="form pad" id="contactForm">
+      <div class="photo-pick">
+        ${f.photo ? avatar(f, 104) : `<span class="avatar" style="width:104px;height:104px;background:var(--surface);border:2px dashed var(--line);color:var(--muted)">${I.camera}</span>`}
+        <div style="display:flex;gap:8px">
+          <label class="as" style="display:inline-flex;align-items:center">${t('choosePhoto')}<input id="cPhoto" type="file" accept="image/*" hidden></label>
+          ${f.photo ? `<button type="button" class="as" data-act="rmPhoto">${t('removePhoto')}</button>` : ''}
+        </div>
+      </div>
+      <label class="lbl"><span>${t('name')}</span><input class="inp" id="cName" required value="${esc(f.name)}" autocomplete="off"></label>
+      <label class="lbl"><span>${t('number')}</span><input class="inp" id="cNum" inputmode="tel" value="${esc(f.number)}" placeholder="+961 00 000 000" autocomplete="off"></label>
+      <div class="two">
+        <label class="lbl"><span>${t('status')}</span><select class="inp" id="cStatus">${opt('online', t('online'))}${opt('typing', t('typing'))}${opt('lastseen', t('lastSeen') + '…')}${opt('hidden', t('hidden'))}</select></label>
+        <label class="lbl"><span>${t('time')}</span><input class="inp" id="cSeen" value="${esc(f.lastSeen || now())}" placeholder="13:33"></label>
+      </div>
+      <div class="two">
+        <label class="lbl"><span>${t('dayLabel')}</span><input class="inp" id="cDay" value="${esc(f.day)}"></label>
+        <label class="lbl"><span>${t('unreadCount')}</span><input class="inp" id="cUnread" type="number" min="0" max="999" value="${f.unread || 0}"></label>
+      </div>
+      <label class="check"><span>${t('pin')}</span><input type="checkbox" id="cPin" ${f.pinned ? 'checked' : ''}></label>
+      ${f.id ? `<button type="button" class="btn danger" data-act="delChat">${ui.wipeArmed ? t('wipeConfirm') : t('deleteChat')}</button>` : ''}
+    </form>
+    <div class="footer pad"><button class="btn primary" data-act="saveContact">${f.id ? t('save') : t('saveStart')}</button></div>
+  </div>`;
+}
+
+function vSettings() {
+  const s = S.settings;
+  return `<div class="view">
+    <div class="chat-head" style="background:transparent;border:0">
+      <button class="icon-btn" data-act="back" aria-label="Back">${I.back}</button>
+      <h1 style="margin:0;font-size:20px;font-weight:600">${t('settings')}</h1>
+    </div>
+    <div class="form pad">
+      <h2 class="h2">${t('app')}</h2>
+      <label class="lbl"><span>${t('appName')}</span><input class="inp" id="sName" value="${esc(s.appName)}" maxlength="30"></label>
+      <div class="lbl"><span>${t('accent')}</span><div class="swatches">${COLORS.map(c => `<button class="sw" style="background:${c}" data-act="accent" data-c="${c}" aria-pressed="${s.accent === c}" aria-label="${c}"></button>`).join('')}</div></div>
+      <div class="lbl"><span>${t('me')}: ${t('photo')}</span><div style="display:flex;align-items:center;gap:12px">${avatar({name:t('me'),photo:s.myPhoto || ''}, 48)}<label class="as" style="display:inline-flex;align-items:center">${t('choosePhoto')}<input id="sMyPhoto" type="file" accept="image/*" hidden></label></div></div>
+      <h2 class="h2">${t('look')}</h2>
+      <div class="lbl"><span>${t('wallpaper')}</span><div class="seg"><button data-act="wall" data-w="doodle" aria-pressed="${s.wallpaper === 'doodle'}">${t('doodles')}</button><button data-act="wall" data-w="plain" aria-pressed="${s.wallpaper === 'plain'}">${t('plain')}</button></div></div>
+      <div class="lbl"><span>${t('language')}</span><div class="seg"><button data-act="lang" data-l="en" aria-pressed="${s.lang === 'en'}">English</button><button data-act="lang" data-l="ar" aria-pressed="${s.lang === 'ar'}">العربية</button></div></div>
+      <h2 class="h2">${t('data')}</h2>
+      <button class="btn" data-act="backup">${t('backup')}</button>
+      <label class="lbl"><span>${t('restoreHint')}</span><textarea class="inp" id="sRestore" rows="3"></textarea></label>
+      <button class="btn" data-act="restore">${t('restore')}</button>
+      <button class="btn danger" data-act="wipe">${ui.wipeArmed ? t('wipeConfirm') : t('wipe')}</button>
+    </div>
+  </div>`;
+}
+
+function vSheet() {
+  const c = chat(), sh = ui.sheet; if (!c || !sh) return '';
+  const m = c.messages.find(x => x.id === sh.id); if (!m) return '';
+  if (sh.mode === 'menu') {
+    return `<div class="scrim" data-act="closeSheet"><div class="sheet pad" role="dialog" aria-label="Message">
+      <span class="grab"></span>
+      <div class="menu">
+        <button data-act="startEdit">${I.pen}${t('edit')}</button>
+        <button data-act="replyMsg">${I.replyI}${t('reply')}</button>
+        <button data-act="insertAbove">${I.plus}${t('insert')}</button>
+        <button class="del" data-act="delMsg">${I.trash}${t('delete')}</button>
+      </div></div></div>`;
+  }
+  const d = sh.draft;
+  const before = c.messages.slice(0, c.messages.findIndex(x => x.id === m.id));
+  return `<div class="scrim" data-act="closeSheet"><div class="sheet pad" role="dialog" aria-label="${t('editMsg')}">
+    <span class="grab"></span>
+    <h2>${t('editMsg')}</h2>
+    <div class="lbl"><span>${t('sentBy')}</span><div class="seg"><button data-act="dFrom" data-v="me" aria-pressed="${d.from === 'me'}">${t('me')}</button><button data-act="dFrom" data-v="them" aria-pressed="${d.from === 'them'}">${esc(c.name)}</button></div></div>
+    <div class="lbl"><span>${t('type')}</span><div class="seg"><button data-act="dType" data-v="text" aria-pressed="${d.type === 'text'}">${t('text')}</button><button data-act="dType" data-v="voice" aria-pressed="${d.type === 'voice'}">${t('voice')}</button></div></div>
+    ${d.type === 'voice'
+      ? `<label class="lbl"><span>${t('duration')}</span><input class="inp" id="dDur" value="${esc(d.dur || '0:20')}" placeholder="0:20"></label>`
+      : `<label class="lbl"><span>${t('text')}</span><textarea class="inp" id="dText" rows="3">${esc(d.text)}</textarea></label>`}
+    <div class="two">
+      <label class="lbl"><span>${t('time')}</span><input class="inp" id="dTime" value="${esc(d.time)}" placeholder="13:19"></label>
+      <label class="lbl"><span>${t('tick')}</span><select class="inp" id="dStatus" ${d.from === 'me' ? '' : 'disabled'}>
+        ${['read','delivered','sent'].map(v => `<option value="${v}" ${d.status === v ? 'selected' : ''}>${t(v)}</option>`).join('')}</select></label>
+    </div>
+    <label class="lbl"><span>${t('replyTo')}</span><select class="inp" id="dReply"><option value="">${t('noReply')}</option>
+      ${before.map(x => `<option value="${x.id}" ${d.replyTo === x.id ? 'selected' : ''}>${esc((x.from === 'me' ? t('you') : c.name) + ': ' + preview(x).slice(0, 40))}</option>`).join('')}</select></label>
+    <div class="three">
+      <button class="btn" data-act="mvUp">${t('up')}</button>
+      <button class="btn" data-act="mvDown">${t('down')}</button>
+      <button class="btn" data-act="insertAbove">${t('insert')}</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn danger" style="flex:1" data-act="delMsg">${t('delete')}</button>
+      <button class="btn primary" style="flex:2" data-act="saveMsg">${t('save')}</button>
+    </div>
+  </div></div>`;
+}
+
+let toastTimer;
+function toast(msg) {
+  let el = document.querySelector('.toast');
+  if (!el) { el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); app.appendChild(el); }
+  el.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), 2200);
+}
+
+function render(keepScroll) {
+  applyTheme();
+  const wall = document.getElementById('wall'); const top = wall ? wall.scrollTop : 0;
+  const v = ui.view === 'chat' ? vChat() : ui.view === 'contact' ? vContact() : ui.view === 'settings' ? vSettings() : vList();
+  app.innerHTML = v + (ui.view === 'chat' ? vSheet() : '');
+  const w = document.getElementById('wall');
+  if (w) w.scrollTop = keepScroll ? top : w.scrollHeight;
+  syncSend();
+}
+function syncSend() {
+  const d = document.getElementById('draft'), b = document.getElementById('sendBtn');
+  if (d && b) b.innerHTML = d.value.trim() ? I.send : I.mic;
+}
+
+/* ---------- actions ---------- */
+function readDraft() {
+  const d = ui.sheet.draft, g = id => document.getElementById(id);
+  if (g('dText')) d.text = g('dText').value;
+  if (g('dDur')) d.dur = g('dDur').value;
+  if (g('dTime')) d.time = g('dTime').value;
+  if (g('dStatus')) d.status = g('dStatus').value;
+  if (g('dReply')) d.replyTo = g('dReply').value || null;
+}
+function touch(c) { c.updated = Date.now(); save(); }
+function readContactForm() {
+  const f = ui.form, g = id => document.getElementById(id);
+  f.name = g('cName').value.trim(); f.number = g('cNum').value.trim(); f.status = g('cStatus').value;
+  f.lastSeen = g('cSeen').value.trim(); f.day = g('cDay').value; f.unread = Math.max(0, parseInt(g('cUnread').value, 10) || 0); f.pinned = g('cPin').checked;
+}
+function resizeImage(file, cb) {
+  const fr = new FileReader();
+  fr.onload = () => { const img = new Image(); img.onload = () => {
+    const s = 192, cv = document.createElement('canvas'); cv.width = cv.height = s;
+    const k = Math.max(s / img.width, s / img.height), w = img.width * k, h = img.height * k;
+    cv.getContext('2d').drawImage(img, (s - w) / 2, (s - h) / 2, w, h); cb(cv.toDataURL('image/jpeg', .82));
+  }; img.src = fr.result; };
+  fr.readAsDataURL(file);
+}
+
+const A = {
+  open(el) { ui.chatId = el.dataset.id; ui.view = 'chat'; ui.replyTo = null; ui.sheet = null; const c = chat(); c.unread = 0; save(); render(); },
+  back() { if (ui.view === 'contact' && ui.form && ui.form.id) { ui.view = 'chat'; } else { ui.view = 'list'; } ui.sheet = null; ui.wipeArmed = false; render(); },
+  settings() { ui.view = 'settings'; ui.wipeArmed = false; render(); },
+  filter(el) { ui.filter = el.dataset.f; render(); },
+  newContact() { ui.form = {id:null,name:'',number:'',photo:'',status:'online',lastSeen:now(),day:t('today'),unread:0,pinned:false}; ui.view = 'contact'; ui.wipeArmed = false; render(); },
+  editContact() { const c = chat(); ui.form = {...c, messages:undefined}; ui.view = 'contact'; ui.wipeArmed = false; render(); },
+  rmPhoto() { readContactForm(); ui.form.photo = ''; render(); },
+  saveContact() {
+    readContactForm(); const f = ui.form;
+    if (!f.name) { document.getElementById('cName').focus(); return; }
+    if (f.id) { Object.assign(chat(), {name:f.name,number:f.number,photo:f.photo,status:f.status,lastSeen:f.lastSeen,day:f.day,unread:f.unread,pinned:f.pinned}); save(); ui.view = 'chat'; }
+    else { const c = {id:uid(),name:f.name,number:f.number,photo:f.photo,status:f.status,lastSeen:f.lastSeen,day:f.day,unread:f.unread,pinned:f.pinned,updated:Date.now(),messages:[]}; S.contacts.push(c); save(); ui.chatId = c.id; ui.view = 'chat'; }
+    render();
+  },
+  delChat() {
+    if (!ui.wipeArmed) { readContactForm(); ui.wipeArmed = true; render(); return; }
+    S.contacts = S.contacts.filter(c => c.id !== ui.form.id); save(); ui.wipeArmed = false; ui.view = 'list'; render();
+  },
+  toggleAs() { ui.as = ui.as === 'me' ? 'them' : 'me'; const d = document.getElementById('draft'); const v = d ? d.value : ''; render(true); const n = document.getElementById('draft'); if (n) { n.value = v; syncSend(); } },
+  send() {
+    const c = chat(), d = document.getElementById('draft'), text = d.value.trim();
+    const m = {id:uid(),from:ui.as,type:text ? 'text' : 'voice',text,dur:text ? undefined : '0:15',time:now(),status:'read',replyTo:ui.replyTo};
+    c.messages.push(m); ui.replyTo = null; touch(c); render();
+    const n = document.getElementById('draft'); if (n) n.focus();
+  },
+  cancelReply() { ui.replyTo = null; render(true); },
+  msg(el) { ui.sheet = {id:el.dataset.id, mode:'menu'}; render(true); },
+  closeSheet(el, e) { if (e.target !== el) return; ui.sheet = null; render(true); },
+  startEdit() { const m = chat().messages.find(x => x.id === ui.sheet.id); ui.sheet = {id:m.id, mode:'edit', draft:{...m}}; render(true); },
+  replyMsg() { ui.replyTo = ui.sheet.id; ui.sheet = null; render(true); const n = document.getElementById('draft'); if (n) n.focus(); },
+  dFrom(el) { readDraft(); ui.sheet.draft.from = el.dataset.v; render(true); },
+  dType(el) { readDraft(); ui.sheet.draft.type = el.dataset.v; render(true); },
+  saveMsg() {
+    readDraft(); const c = chat(), i = c.messages.findIndex(x => x.id === ui.sheet.id), d = ui.sheet.draft;
+    c.messages[i] = {id:d.id,from:d.from,type:d.type,text:d.type === 'text' ? d.text : '',dur:d.type === 'voice' ? (d.dur || '0:20') : undefined,time:d.time,status:d.status,replyTo:d.replyTo};
+    ui.sheet = null; touch(c); render(true);
+  },
+  delMsg() {
+    const c = chat(), id = ui.sheet.id;
+    c.messages = c.messages.filter(x => x.id !== id); c.messages.forEach(x => { if (x.replyTo === id) x.replyTo = null; });
+    ui.sheet = null; touch(c); render(true);
+  },
+  mvUp() { move(-1); }, mvDown() { move(1); },
+  insertAbove() {
+    const c = chat(), i = c.messages.findIndex(x => x.id === ui.sheet.id), ref = c.messages[i];
+    const m = {id:uid(),from:ref.from === 'me' ? 'them' : 'me',type:'text',text:'',time:ref.time,status:'read',replyTo:null};
+    c.messages.splice(i, 0, m); touch(c); ui.sheet = {id:m.id, mode:'edit', draft:{...m}}; render(true);
+    const ta = document.getElementById('dText'); if (ta) ta.focus();
+  },
+  accent(el) { S.settings.accent = el.dataset.c; save(); render(); },
+  wall(el) { S.settings.wallpaper = el.dataset.w; save(); render(); },
+  lang(el) { S.settings.lang = el.dataset.l; save(); render(); },
+  backup() {
+    const txt = JSON.stringify(S);
+    const ta = document.getElementById('sRestore');
+    const fallback = () => { ta.value = txt; ta.focus(); ta.select(); };
+    try { navigator.clipboard.writeText(txt).then(() => toast(t('copied')), fallback); } catch (e) { fallback(); }
+  },
+  restore() {
+    try { const d = JSON.parse(document.getElementById('sRestore').value); if (!d.settings || !Array.isArray(d.contacts)) throw 0; S = d; save(); toast(t('restored')); render(); }
+    catch (e) { toast(t('badBackup')); }
+  },
+  wipe() { if (!ui.wipeArmed) { ui.wipeArmed = true; render(); return; } S.contacts = []; ui.wipeArmed = false; save(); ui.view = 'list'; render(); }
+};
+function move(dir) {
+  readDraft(); const c = chat(), i = c.messages.findIndex(x => x.id === ui.sheet.id), j = i + dir;
+  if (j < 0 || j >= c.messages.length) return;
+  [c.messages[i], c.messages[j]] = [c.messages[j], c.messages[i]]; touch(c); render(true);
+}
+
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || !app.contains(el)) return;
+  const f = A[el.dataset.act]; if (!f) return;
+  if (el.dataset.act !== 'closeSheet') e.stopPropagation();
+  if (el.tagName === 'BUTTON' || el.tagName === 'A') e.preventDefault();
+  f(el, e);
+});
+app.addEventListener('input', e => {
+  if (e.target.id === 'q') { ui.q = e.target.value; const pos = e.target.selectionStart; render(); const q = document.getElementById('q'); q.focus(); q.setSelectionRange(pos, pos); }
+  if (e.target.id === 'draft') { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'; syncSend(); }
+  if (e.target.id === 'sName') { S.settings.appName = e.target.value || 'Sawalef'; save(); }
+});
+app.addEventListener('change', e => {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  if (e.target.id === 'cPhoto') { readContactForm(); resizeImage(file, url => { ui.form.photo = url; render(); }); }
+  if (e.target.id === 'sMyPhoto') { resizeImage(file, url => { S.settings.myPhoto = url; save(); render(); }); }
+});
+app.addEventListener('keydown', e => {
+  if (e.target.id === 'draft' && e.key === 'Enter' && !e.shiftKey && e.target.value.trim()) { e.preventDefault(); A.send(); }
+  if (e.key === 'Escape' && ui.sheet) { ui.sheet = null; render(true); }
+});
+app.addEventListener('submit', e => e.preventDefault());
+
+render();
+})();
+</script>
