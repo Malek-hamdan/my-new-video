@@ -550,6 +550,12 @@ app.addEventListener('keydown', e => {
   if (e.key === 'Escape' && ui.sheet) { ui.sheet = null; render(true); }
 });
 app.addEventListener('submit', e => e.preventDefault());
+// Android back button: close an open sheet or go back one screen; false means leave the app.
+window.sawalefBack = () => {
+  if (ui.sheet) { ui.sheet = null; render(true); return true; }
+  if (ui.view !== 'list') { A.back(); return true; }
+  return false;
+};
 
 render();
 })();

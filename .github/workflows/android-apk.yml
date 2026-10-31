@@ -1,0 +1,62 @@
+name: Build Android APK
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - 'android/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Copy the web app into the APK assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          {
+            echo '<!doctype html><html><head><meta charset="utf-8">'
+            echo '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+            echo '<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>'
+            echo '</head><body>'
+            cat app/index.html
+            echo '</body></html>'
+          } > android/app/src/main/assets/index.html
+
+      - name: Build debug APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Sawalef.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sawalef-apk
+          path: Sawalef.apk
+
+      - name: Publish as a GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="sawalef-build-${{ github.run_number }}"
+          gh release create "$TAG" Sawalef.apk \
+            --target "${{ github.sha }}" \
+            --title "Sawalef APK (build ${{ github.run_number }})" \
+            --notes "Debug APK built from ${{ github.ref_name }} @ ${{ github.sha }}. Download Sawalef.apk below and open it on your Android phone." \
+            --prerelease
