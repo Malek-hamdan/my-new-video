@@ -367,6 +367,18 @@
   .tr-mach.BLM { background: #1F4E8C; } .tr-mach.BCW3 { background: #0E7C66; } .tr-mach.Bonal { background: #B35418; } .tr-mach.Sollas { background: #6B3FA0; }
   .tr-picked .tr-mach { font-size: 13px; padding: 3px 11px; }
   .tr-mach.EQUIP { background: #0F766E; }
+  /* Imported or Local parts: two lists inside the same months */
+  .origin-sw { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 12px; }
+  .origin-sw button { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 14px; border-radius: 12px; border: 2px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .origin-sw button small { margin-left: 8px; font-size: 12px; font-weight: 600; opacity: 0.85; }
+  .origin-sw button .ic { font-size: 18px; }
+  .origin-sw button:hover { color: var(--text); }
+  .origin-sw button.imp[aria-pressed="true"] { border-color: #5b9dff; background: rgba(91,157,255,0.14); color: #e6eeff; }
+  .origin-sw button.loc[aria-pressed="true"] { border-color: #e0a030; background: rgba(224,160,48,0.15); color: #fff3dc; }
+  body.area-equip .origin-sw, body.side-view .origin-sw { display: none; }
+  body.origin-loc:not(.side-view):not(.area-equip) .tabs .tab[aria-selected="true"] { background: rgba(224,160,48,0.16); border-color: rgba(224,160,48,0.6); }
+  .chip.chip-local { background: rgba(224,160,48,0.16); border-color: rgba(224,160,48,0.6); color: #ffe3a8; }
+  @media (max-width: 560px) { .origin-sw button { font-size: 14px; padding: 9px; } .origin-sw button small { display: none; } }
   /* Two areas: Spare Parts and Equipment */
   .area-sw { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
   .area-sw button { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 18px; border-radius: 16px; border: 2px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); font-family: inherit; font-size: 19px; font-weight: 800; text-align: left; cursor: pointer; }
@@ -1079,6 +1091,10 @@
     <button class="btn" id="lockBtn" type="button"></button>
   </div>
 
+  <div class="origin-sw" id="originSw" role="group" aria-label="Where the parts come from">
+    <button type="button" class="imp" id="originImp" aria-pressed="true"><span class="ic" aria-hidden="true">&#9992;&#65039;</span><span>Imported parts<small>from abroad</small></span></button>
+    <button type="button" class="loc" id="originLoc" aria-pressed="false"><span class="ic" aria-hidden="true">&#128205;</span><span>Local parts<small>bought in the country</small></span></button>
+  </div>
   <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
 
   <section class="panel" role="tabpanel" id="panel" aria-labelledby="">
@@ -1383,10 +1399,16 @@
   var AREA_KEY = "uii-area", area = "parts", eqTx = false;
   var sideActive = { cons: "BLM", used: "BLM", equip: "Tools" };
   var sideTimers = {};
+  // Local parts (bought in the country) have their own lists inside the same months.
+  // They are saved with the other parts, marked local; sheet = the open month, both kinds.
+  var ORIGIN_KEY = "uii-origin", origin = "imp", sheet = emptyData();
+  function inOrigin(r) { return !!r.local === (origin === "loc"); }
   function openSheet() {
     if (!allParts[month]) allParts[month] = emptyData();
     if (!allTx[month]) allTx[month] = [];
-    data = allParts[month];
+    sheet = allParts[month];
+    data = {};
+    MACHINES.forEach(function (m) { data[m] = sheet[m].filter(inOrigin); });
     txList = allTx[month];
   }
   var active = MACHINES[0];
@@ -1425,6 +1447,7 @@
       date: String(r.date || ""),
       baseline: !!r.baseline,
       arrival: !!r.arrival,
+      local: !!r.local,
       created: Number(r.created) || 0
     };
   }
@@ -1451,15 +1474,16 @@
       time: /^\d{2}:\d{2}$/.test(t.time) ? t.time : "",
       me: String(t.me || ""),
       by: String(t.by || ""),
-      to: String(t.to || "")
+      to: String(t.to || ""),
+      local: !!t.local
     };
   }
 
   function rowBody(r) {
-    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created };
+    return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, local: !!r.local, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "" };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "", local: !!t.local };
   }
   function ymd(ts) {
     var d = new Date(ts);
@@ -1525,7 +1549,7 @@
     allParts = {}; allTx = {};
     (rows || []).forEach(function (r) {
       if (MACHINES.indexOf(r.machine) === -1) return;
-      var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, created: r.created }, r.machine);
+      var row = clean({ id: r.id || uid(), month: r.month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, local: r.local, created: r.created }, r.machine);
       if (!allParts[row.month]) allParts[row.month] = emptyData();
       allParts[row.month][row.machine].push(row);
     });
@@ -1674,7 +1698,7 @@
 
   function findRow(id) {
     for (var i = 0; i < MACHINES.length; i++) {
-      var list = data[MACHINES[i]];
+      var list = (sheet || data)[MACHINES[i]];
       for (var j = 0; j < list.length; j++) if (list[j].id === id) return list[j];
     }
     return null;
@@ -1735,7 +1759,7 @@
     }
     var tx = cleanTx({
       partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: after - before, after: after, line: after < before ? line : "", date: row.date, ts: Date.now()
+      change: after - before, after: after, line: after < before ? line : "", date: row.date, ts: Date.now(), local: row.local
     }, uid());
     var sel = document.getElementById("f-" + row.id + "-line");
     if (sel) { sel.value = ""; sel.classList.add("no-line"); sel.classList.remove("need"); }
@@ -1927,7 +1951,7 @@
   }
   function hasContent(r) { return (r.name + r.reference + r.quantity + r.price).trim() !== ""; }
   function monthIsEmpty() {
-    return !MACHINES.some(function (m) { return data[m].length; }) && !txList.length;
+    return !MACHINES.some(function (m) { return sheet[m].length; }) && !txList.length;
   }
   var copyBanner = document.getElementById("copyBanner");
   function updateCopyBanner() {
@@ -1950,11 +1974,12 @@
       allParts[src][m].filter(hasContent).forEach(function (r) {
         // the copied quantity is this month's starting stock, so it is already "logged"
         var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency,
-          loggedQty: r.quantity, date: "", baseline: false, arrival: false, created: t++ }, m);
-        data[m].push(row);
+          loggedQty: r.quantity, date: "", baseline: false, arrival: false, local: r.local, created: t++ }, m);
+        sheet[m].push(row);
         writeRow(row);
       });
     });
+    openSheet();
     renderTabs();
     renderRows();
     setStatus("Copied from " + monthLabel(src), "saved");
@@ -2013,7 +2038,7 @@
     var machinesHit = {}, newest = {};
     hits.forEach(function (r) {
       machinesHit[r.machine] = 1;
-      var k = r.machine + "|" + norm(r.reference || r.name);
+      var k = (r.local ? "L|" : "") + r.machine + "|" + norm(r.reference || r.name);
       if (!newest[k] || r.month > newest[k]) newest[k] = r.month;
     });
     var head = document.createElement("div");
@@ -2025,13 +2050,13 @@
     hits.slice(0, 60).forEach(function (r) {
       var b = document.createElement("button");
       b.type = "button";
-      var isNow = newest[r.machine + "|" + norm(r.reference || r.name)] === r.month;
+      var isNow = newest[(r.local ? "L|" : "") + r.machine + "|" + norm(r.reference || r.name)] === r.month;
       b.className = "result" + (isNow ? "" : " old");
       var first = document.createElement("div");
       var nm = document.createElement("div"); nm.className = "r-name"; nm.dir = "auto";
       nm.appendChild(highlight(r.name || "(no name)", raw));
       var tags = document.createElement("div"); tags.className = "r-tags";
-      [[r.machine, "chip"], [monthLabel(r.month), "chip chip-month"], isNow ? ["Stock now", "chip chip-now"] : ["End of " + monthLabel(r.month).split(" ")[0], "chip chip-old"]].concat(r.arrival ? [["New arrival", "chip chip-in"]] : []).forEach(function (t) {
+      [[r.machine, "chip"]].concat(r.local ? [["Local", "chip chip-local"]] : []).concat([[monthLabel(r.month), "chip chip-month"], isNow ? ["Stock now", "chip chip-now"] : ["End of " + monthLabel(r.month).split(" ")[0], "chip chip-old"]]).concat(r.arrival ? [["New arrival", "chip chip-in"]] : []).forEach(function (t) {
         var c = document.createElement("span"); c.className = t[1]; c.textContent = t[0]; tags.appendChild(c);
       });
       first.appendChild(nm); first.appendChild(tags);
@@ -2054,6 +2079,7 @@
     });
   }
   function openPart(r) {
+    if (!inOrigin(r)) setOrigin(r.local ? "loc" : "imp");
     if (r.month !== month) selectMonth(r.month);
     if (active !== r.machine) switchTo(r.machine);
     var tr = rowsEl.querySelector('tr[data-id="' + r.id + '"]');
@@ -2191,11 +2217,11 @@
     });
   }
 
-  function partsTx() { return txList.filter(function (t) { return t.source !== "equip"; }); }
+  function partsTx() { return txList.filter(function (t) { return t.source !== "equip" && (t.source ? origin === "imp" : !!t.local === (origin === "loc")); }); }
   function renderTransactions(scope) {
     var eq = scope === "equip";
     document.getElementById("thead").innerHTML = eq ? TX_HEAD.replace('class="col-mach">Machine<', 'class="col-mach">Section<') : TX_HEAD;
-    titleEl.textContent = eq ? "Equipment " + TX : txFilter === "All" ? TX : txFilter + " " + TX;
+    titleEl.textContent = eq ? "Equipment " + TX : (txFilter === "All" ? TX : txFilter + " " + TX) + originLabel();
     if (!eq) renderTxFilter();
     rowsEl.innerHTML = "";
     var inSum = 0, outSum = 0, base = eq ? equipTxAll() : partsTx();
@@ -2321,12 +2347,14 @@
     return parts.join(" + ") || "—";
   }
   // upTo ("YYYY-MM-DD"): only count transactions dated up to that day
-  function monthStats(k, upTo) {
+  // org "imp" or "loc": only that kind of parts; left out: all of them
+  function monthStats(k, upTo, org) {
     var st = { all: { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0 } };
     MACHINES.forEach(function (m) { st[m] = { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0, used: {} }; });
     (allTx[k] || []).forEach(function (t) {
       if (upTo && txDate(t) > upTo) return;
       if (t.source) return;
+      if (org && !!t.local !== (org === "loc")) return;
       var s = st[t.machine];
       if (!s) return;
       var part = partIn(k, t.partId), p = part ? unitPrice(part) : null, cur = part ? part.currency : "";
@@ -2349,17 +2377,17 @@
 
   function renderSummary() {
     var box = document.getElementById("summary");
-    titleEl.textContent = SUM;
+    titleEl.textContent = SUM + originLabel();
     var idx = MONTHS.indexOf(month);
     var prevKey = idx > 0 ? MONTHS[idx - 1] : null;
-    var cur = monthStats(month);
-    var prevFull = prevKey ? monthStats(prevKey) : null;
+    var cur = monthStats(month, null, origin);
+    var prevFull = prevKey ? monthStats(prevKey, null, origin) : null;
     var hasPrev = prevFull && prevFull.all.n > 0;
     // The month running now is compared with the same days of the month before
     var partial = month === CURRENT_MONTH, today = new Date().getDate();
     var daysIn = new Date(parseInt(month.slice(0, 4), 10), parseInt(month.slice(5), 10), 0).getDate();
     if (partial && today >= daysIn) partial = false;
-    var prev = hasPrev && partial ? monthStats(prevKey, prevKey + "-" + pad(today)) : prevFull;
+    var prev = hasPrev && partial ? monthStats(prevKey, prevKey + "-" + pad(today), origin) : prevFull;
     var prevName = prevKey ? monthLabel(prevKey).split(" ")[0] : "";
     var prevSpan = partial ? prevName + " 1\u2013" + today : prevName;
     var prevLong = partial ? prevName + " 1\u2013" + today : prevKey ? monthLabel(prevKey) : "";
@@ -2929,7 +2957,7 @@
     document.getElementById("thead").innerHTML = MACHINE_HEAD;
     emptyEl.querySelector("strong").textContent = "No parts yet";
     emptyEl.querySelector("span").textContent = "Use “Add part” for stock you already have, or “New arrival” for parts that just came in.";
-    titleEl.textContent = active;
+    titleEl.textContent = active + originLabel();
     rowsEl.innerHTML = "";
     data[active].forEach(function (row, i) {
       var tr = document.createElement("tr");
@@ -2993,7 +3021,8 @@
   function addRow(received) {
     if (sideView) { addSide(); return; }
     if (ro() || active === TX) return;
-    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency() }, active);
+    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency(), local: origin === "loc" }, active);
+    sheet[active].push(row);
     data[active].push(row);
     writeRow(row);
     renderRows(row.id);
@@ -3007,6 +3036,8 @@
     clearTimeout(editTimers[id]);
     delete editTimers[id];
     list.splice(idx, 1);
+    var si = sheet[active].indexOf(row);
+    if (si !== -1) sheet[active].splice(si, 1);
     deleteDoc("parts", row.id);
     // the part's transactions go with it
     var gone = [];
@@ -3043,7 +3074,7 @@
     var inn = trState.mode === "in";
     document.getElementById("trCard").classList.toggle("in", inn);
     if (area === "equip") trState.machine = "Equip";
-    document.getElementById("trTitleText").textContent = area === "equip" ? (inn ? "Receive equipment in" : "Transfer equipment out") : inn ? "Receive parts in" : "Transfer parts out";
+    document.getElementById("trTitleText").textContent = (area === "equip" ? (inn ? "Receive equipment in" : "Transfer equipment out") : inn ? "Receive parts in" : "Transfer parts out") + (area !== "equip" && origin === "loc" ? " \u00B7 Local" : "");
     document.getElementById("trIcon").setAttribute("d", inn ? "M19 12H5M11 6l-6 6 6 6" : "M5 12h14M13 6l6 6-6 6");
     document.getElementById("trSave").textContent = inn ? "Save receipt" : "Save transfer";
     try {
@@ -3157,7 +3188,7 @@
     var before = trStock(row), after = inn ? before + qty : before - qty, date = document.getElementById("trDate").value;
     row.quantity = String(after); row.loggedQty = row.quantity; row.baseline = false;
     var tx = cleanTx({ partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now() }, uid());
+      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local }, uid());
     if (!inn) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     writeRow(row); saveDoc("transactions", tx.id, txBody(tx));
@@ -3217,7 +3248,7 @@
     return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 ' + (t.source === "equip" ? "Equipment" : "Spare Part") + ' Issue Slip</div><div class="s-sub">Store room</div></div>' +
       '<div class="s-no"><span class="s-k">Date</span> <b>' + e(txDate(t)) + '</b><br><span class="s-k">Time</span> <b>' + e(t.time || pad(d.getHours()) + ":" + pad(d.getMinutes())) + "</b></div></div>" +
       '<div class="s-grid">' +
-      '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-val">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + "</div></div>" +
+      '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-val">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + (t.local ? '<span class="s-used">LOCAL</span>' : "") + "</div></div>" +
       '<div class="s-cell s-linebox">' + (t.source === "equip" ? e(String(t.machine).toUpperCase()) : t.line ? "LINE " + e(t.line) : "\u2014") + "</div>" +
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-val">' + e(ref || "\u2014") + "</div></div>" +
       '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-val big">' + Math.abs(t.change) + "</div></div></div>" +
@@ -3337,7 +3368,8 @@
   function prHtml(no, by, urgent, rows) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     var d = new Date(), pcs = 0;
-    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request' + (ordMode === "equip" ? " \u00B7 Equipment" : "") + '</h1><div class="p-sub">' + (ordMode === "equip" ? "Equipment and supplies to order" : "Spare parts to order") + '</div>' +
+    var loc = ordMode !== "equip" && origin === "loc";
+    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request' + (ordMode === "equip" ? " \u00B7 Equipment" : loc ? " \u00B7 Local parts" : "") + '</h1><div class="p-sub">' + (ordMode === "equip" ? "Equipment and supplies to order" : loc ? "Local spare parts to buy in the country" : "Spare parts to order") + '</div>' +
       (urgent ? '<div class="p-urgent">URGENT</div>' : "") + '</div><div class="p-no">No. <b>' + prNo(no) + "</b><br>Date <b>" + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + "</b></div></div>";
     h += '<table><colgroup><col style="width:7mm"><col style="width:23mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>' + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>";
     rows.forEach(function (x, i) {
@@ -3364,7 +3396,7 @@
     document.getElementById("ordUrgent").checked = false;
     document.getElementById("ordRef").value = ""; document.getElementById("ordName").value = "";
     orderDlg.hidden = false;
-    document.getElementById("orderTitle").textContent = area === "equip" ? "Order equipment" : "Order parts";
+    document.getElementById("orderTitle").textContent = area === "equip" ? "Order equipment" : origin === "loc" ? "Order local parts" : "Order parts";
     ordSetMode(area === "equip" ? "equip" : "parts");
   });
   ["ordRef", "ordName"].forEach(function (id) { document.getElementById(id).addEventListener("input", renderOrder); });
@@ -3984,7 +4016,7 @@
     snap.docs.forEach(function (d) {
       var v = d.data() || {};
       if (MACHINES.indexOf(v.machine) === -1) return;
-      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, min: v.min, price: v.price, currency: v.currency, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, created: v.created }, v.machine);
+      var row = clean({ id: d.id, month: v.month, name: v.name, reference: v.reference, quantity: v.quantity, min: v.min, price: v.price, currency: v.currency, loggedQty: v.loggedQty, date: v.date, baseline: v.baseline, arrival: v.arrival, local: v.local, created: v.created }, v.machine);
       // keep local text for rows with an edit still waiting to be sent
       var local = editTimers[d.id] && findRow(d.id);
       if (local) row = local;
@@ -3995,15 +4027,13 @@
       MACHINES.forEach(function (m) { nextAll[k][m].sort(function (a, b) { return a.created - b.created || (a.id < b.id ? -1 : 1); }); });
     });
     allParts = nextAll;
-    var next = allParts[month] || emptyData();
-    allParts[month] = next;
     renderMonths();
 
-    if (active === TX || (sideView === "equip" && eqTx)) { data = next; if (sideView) { if (eqTx) renderRows(); } else renderTransactions(); return; }
-    if (active === SUM) { data = next; renderSummary(); updateCounts(); return; }
+    if (active === TX || (sideView === "equip" && eqTx)) { openSheet(); if (sideView) { if (eqTx) renderRows(); } else renderTransactions(); return; }
+    if (active === SUM) { openSheet(); renderSummary(); updateCounts(); return; }
     var before = data[active].map(function (r) { return r.id; }).join(",");
-    var after = next[active].map(function (r) { return r.id; }).join(",");
-    data = next;
+    openSheet();
+    var after = data[active].map(function (r) { return r.id; }).join(",");
 
     if (before !== after) {
       var focused = document.activeElement;
@@ -4189,8 +4219,8 @@
     var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
     function z(name, i) { return name + (i % 2 ? "Z" : ""); }
 
-    function partsSheet(m) {
-      var list = data[m].filter(hasContent);
+    function partsSheet(m, loc) {
+      var list = sheet[m].filter(function (r) { return hasContent(r) && !!r.local === loc; });
       var rows = list.map(function (r, i) {
         // a part at 0 shows as a light red row
         var zr = String(r.quantity).trim() === "0", zz = function (n) { return zr ? n + "Zero" : z(n, i); };
@@ -4210,8 +4240,8 @@
       var value = curs.length === 1 ? { v: bag[curs[0]], s: "totM_" + m } : { v: curs.map(function (c) { return money(bag[c], c); }).join(" + "), s: "totN_" + m };
       var totals = list.length ? [[{ v: "Total \u00B7 " + list.length + (list.length === 1 ? " part" : " parts"), s: "totL_" + m }, { v: "", s: "totN_" + m },
         { v: pcs + " pcs", s: "totN_" + m }, { v: "", s: "totN_" + m }, { v: curs.length === 1 ? curs[0] : "", s: "totN_" + m }, value]] : [];
-      return { name: m, xml: sheetXml({
-        title: "UII — " + m, subtitle: "Spare parts stock · " + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
+      return { name: m + (loc ? " Local" : ""), xml: sheetXml({
+        title: "UII — " + m + (loc ? " · Local parts" : ""), subtitle: (loc ? "Local parts stock · " : "Spare parts stock · ") + label + " · " + list.length + (list.length === 1 ? " part" : " parts") + " · " + stamp,
         theme: m, rows: rows, totals: totals,
         columns: [{ name: "Name", width: 44 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 12 }, { name: "Unit price", width: 14 }, { name: "Currency", width: 11 }, { name: "Total price", width: 16 }]
       }) };
@@ -4223,7 +4253,7 @@
         var cells = [{ v: txDate(t), s: z("center", i) }];
         if (withMachine) cells.push({ v: t.machine, s: z("center", i) });
         return cells.concat([
-          { v: (part && part.name ? part.name : t.name) + (t.source ? " (" + SIDE[t.source].label + ")" : ""), s: z("text", i) },
+          { v: (part && part.name ? part.name : t.name) + (t.source ? " (" + SIDE[t.source].label + ")" : "") + (t.local ? " (Local)" : ""), s: z("text", i) },
           { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" },
           { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
@@ -4256,13 +4286,17 @@
     // Each machine gets its parts sheet followed by its own transaction sheet
     var sheets = [];
     MACHINES.forEach(function (m) {
-      sheets.push(partsSheet(m));
-      sheets.push(txSheet(m + " " + TX, "UII — " + m + " " + TX, txList.filter(function (t) { return t.machine === m; }), false, m));
+      sheets.push(partsSheet(m, false));
+      sheets.push(txSheet(m + " " + TX, "UII — " + m + " " + TX, txList.filter(function (t) { return t.machine === m && !t.local; }), false, m));
     });
+    // local parts: their own sheets, only when there are some
+    MACHINES.forEach(function (m) { if (sheet[m].some(function (r) { return r.local && hasContent(r); })) sheets.push(partsSheet(m, true)); });
+    var localTx = txList.filter(function (t) { return t.local; });
+    if (localTx.length) sheets.push(txSheet("Local " + TX + "s", "UII — Local parts " + TX + "s", localTx, true, "ALL"));
     sheets.push(txSheet("All " + TX + "s", "UII — All " + TX + "s", txList, true, "ALL"));
     // hidden copy of this month so the file can be restored into the site
     var mp = [], mt = [];
-    MACHINES.forEach(function (m) { data[m].forEach(function (r) { var b = rowBody(r); b.id = r.id; mp.push(b); }); });
+    MACHINES.forEach(function (m) { sheet[m].forEach(function (r) { var b = rowBody(r); b.id = r.id; mp.push(b); }); });
     txList.forEach(function (t) { var b = txBody(t); b.id = t.id; mt.push(b); });
     sheets.push(dataSheet(MONTH_MARK, { app: "UII parts", kind: "month", month: month, savedAt: Date.now(), parts: mp, transactions: mt }));
 
@@ -4305,7 +4339,7 @@
       MACHINES.forEach(function (m) {
         allParts[k][m].filter(hasContent).forEach(function (r) {
           var i = pr.length, t = totalOf(r);
-          pr.push([{ v: monthLabel(k), s: z("center", i) }, { v: m, s: z("center", i) }, { v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
+          pr.push([{ v: monthLabel(k), s: z("center", i) }, { v: m, s: z("center", i) }, { v: r.local ? "Local" : "Imported", s: z("center", i) }, { v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
             { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) }, { v: numOrText(r.min), s: z("center", i) },
             { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) }, { v: t === null ? "" : t, s: z("moneyBold", i) },
             { v: r.date, s: z("center", i) }, { v: r.arrival ? "New arrival" : "Add part", s: r.arrival ? "typeIn" : z("center", i) }]);
@@ -4315,7 +4349,7 @@
     sheets.push({ name: "All parts", xml: sheetXml({
       title: "UII \u2014 All parts", subtitle: stamp + " \u00B7 " + pr.length + (pr.length === 1 ? " part" : " parts") + " in every month and machine",
       rows: pr,
-      columns: [{ name: "Month", width: 16 }, { name: "Machine", width: 11 }, { name: "Name", width: 36 }, { name: "Reference", width: 20 }, { name: "Quantity", width: 11 },
+      columns: [{ name: "Month", width: 16 }, { name: "Machine", width: 11 }, { name: "Origin", width: 11 }, { name: "Name", width: 36 }, { name: "Reference", width: 20 }, { name: "Quantity", width: 11 },
         { name: "Min", width: 8 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Total price", width: 14 }, { name: "Date", width: 13 }, { name: "Added as", width: 13 }]
     }) });
 
@@ -4325,7 +4359,7 @@
       (allTx[k] || []).slice().reverse().forEach(function (t) {
         var i = tr.length, part = partIn(k, t.partId), isIn = t.change > 0, val = txValue(t, part);
         tr.push([{ v: txDate(t), s: z("center", i) }, { v: monthLabel(k), s: z("center", i) }, { v: t.machine, s: z("center", i) },
-          { v: (part && part.name ? part.name : t.name) + (t.source ? " (" + SIDE[t.source].label + ")" : ""), s: z("text", i) }, { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
+          { v: (part && part.name ? part.name : t.name) + (t.source ? " (" + SIDE[t.source].label + ")" : "") + (t.local ? " (Local)" : ""), s: z("text", i) }, { v: part && part.reference ? part.reference : t.reference, s: z("center", i) },
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" }, { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
           { v: t.line ? "Line " + t.line : "", s: z("center", i) }, { v: part ? priceVal(part.price) : "", s: z("money", i) }, { v: part ? part.currency : "", s: z("center", i) },
           { v: val === null ? "" : val, s: z("moneyBold", i) }, { v: t.after, s: z("center", i) }]);
@@ -5010,13 +5044,13 @@
     var keepP = all.parts.filter(function (r) { return r.month !== target || mode === "add"; });
     var keepT = all.transactions.filter(function (t) { return t.month !== target || mode === "add"; });
     var have = {};
-    if (mode === "add") all.parts.forEach(function (r) { if (r.month === target) have[r.machine + "|" + (norm(r.reference) || "n:" + norm(r.name))] = 1; });
+    if (mode === "add") all.parts.forEach(function (r) { if (r.month === target) have[(r.local ? "L|" : "") + r.machine + "|" + (norm(r.reference) || "n:" + norm(r.name))] = 1; });
     var ids = {}, stamp = Date.now(), skipped = 0, sameMonth = target === snap.month && mode !== "add";
     var parts = [];
     snap.parts.forEach(function (r, i) {
       // empty rows are not worth copying
       if (!(String(r.name || "") + (r.reference || "") + (r.quantity || "") + (r.price || "")).trim()) return;
-      var key = r.machine + "|" + (norm(r.reference) || "n:" + norm(r.name));
+      var key = (r.local ? "L|" : "") + r.machine + "|" + (norm(r.reference) || "n:" + norm(r.name));
       if (mode === "add" && have[key]) { skipped++; return; }
       var c = Object.assign({}, r);
       // fresh ids unless putting a month back in its own place, so the source month keeps its parts
@@ -5139,6 +5173,20 @@
     renderMonths(); renderTabs(); renderRows(); renderSearch();
   }
   document.getElementById("areaParts").addEventListener("click", function () { if (area !== "parts") setArea("parts"); });
+  function originLabel() { return origin === "loc" ? " \u00B7 Local parts" : ""; }
+  function setOrigin(o, quiet) {
+    origin = o === "loc" ? "loc" : "imp";
+    try { localStorage.setItem(ORIGIN_KEY, origin); } catch (e) {}
+    document.body.classList.toggle("origin-loc", origin === "loc");
+    document.getElementById("originImp").setAttribute("aria-pressed", origin === "imp" ? "true" : "false");
+    document.getElementById("originLoc").setAttribute("aria-pressed", origin === "loc" ? "true" : "false");
+    if (quiet) return;
+    flushWrites();
+    openSheet();
+    renderTabs(); renderRows(); renderSearch();
+  }
+  document.getElementById("originImp").addEventListener("click", function () { if (origin !== "imp") setOrigin("imp"); });
+  document.getElementById("originLoc").addEventListener("click", function () { if (origin !== "loc") setOrigin("loc"); });
   document.getElementById("areaEquip").addEventListener("click", function () { if (area !== "equip") setArea("equip"); });
   // every equipment move, from every month, newest first
   function equipTxAll() {
@@ -5167,6 +5215,8 @@
   } catch (e) {}
   try { if (localStorage.getItem(AREA_KEY) === "equip") area = "equip"; } catch (e) {}
   setArea(area, true);
+  try { if (localStorage.getItem(ORIGIN_KEY) === "loc") origin = "loc"; } catch (e) {}
+  setOrigin(origin, true);
   updateSearchPlaceholder();
   openSheet();
 
