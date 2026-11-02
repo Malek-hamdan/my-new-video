@@ -238,6 +238,11 @@
   .slip .s-cell.wide { grid-column: span 2; }
   .slip .s-val { margin-top: 1.4mm; font-size: 17px; font-weight: 600; color: #111; }
   .slip .s-val.big { font-size: 26px; font-weight: 700; }
+  .slip .s-mach { display: flex; align-items: center; flex-wrap: wrap; gap: 2mm 6mm; margin-top: 3mm; border: 1px solid #8a97b3; border-radius: 4px; padding: 2.6mm 3.5mm; font-size: 15px; color: #333; }
+  .slip .s-mach .s-lab { margin-right: 2mm; }
+  .slip .s-mach span { display: inline-flex; align-items: center; gap: 2mm; }
+  .slip .s-mach i { display: inline-block; width: 4.5mm; height: 4.5mm; border: 1.5px solid #333; border-radius: 1px; font-style: normal; font-size: 13px; line-height: 4.5mm; text-align: center; font-weight: 800; }
+  .slip .s-mach span.on { color: #111; font-weight: 800; }
   .slip .s-linebox { display: flex; align-items: center; justify-content: center; border: 2.5px solid #1F3864; color: #1F3864; font-size: 24px; font-weight: 700; letter-spacing: .5px; }
   .tr-dt { display: flex; gap: 8px; }
   .tr-dt input[type="date"] { flex: 1.3; min-width: 0; }
@@ -3198,6 +3203,12 @@
     tx.time = document.getElementById("trTime").value || "";
     try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(TR_BY_KEY, by); localStorage.setItem(TR_PRINT_KEY, document.getElementById("trPrint").checked ? "1" : "0"); } catch (e) {}
   }
+  // Which machine the part went to: ticked on a printed slip, blank boxes on the booklet
+  function slipMachHtml(m) {
+    return '<div class="s-mach"><span class="s-lab">Machine</span>' + MACHINES.concat(["Other"]).map(function (x) {
+      return '<span' + (x === m ? ' class="on"' : "") + "><i>" + (x === m ? "\u2713" : "") + "</i>" + x + "</span>";
+    }).join("") + "</div>";
+  }
   function slipHtml(t) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     var d = new Date(t.ts || Date.now());
@@ -3210,6 +3221,7 @@
       '<div class="s-cell s-linebox">' + (t.source === "equip" ? e(String(t.machine).toUpperCase()) : t.line ? "LINE " + e(t.line) : "\u2014") + "</div>" +
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-val">' + e(ref || "\u2014") + "</div></div>" +
       '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-val big">' + Math.abs(t.change) + "</div></div></div>" +
+      (t.source === "equip" ? "" : slipMachHtml(t.machine)) +
       '<div class="s-sign">' +
       '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(t.me) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name">' + e(t.by) + '</div><div class="s-line">Signature</div></div>' +
@@ -3431,7 +3443,7 @@
       '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-blank"></div></div>' +
       '<div class="s-cell s-linebox">LINE<span class="s-lnspace"></span></div>' +
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-blank"></div></div>' +
-      '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-blank big"></div></div></div>' +
+      '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-blank big"></div></div></div>' + slipMachHtml("") +
       '<div class="s-sign">' +
       '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(me) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name"></div><div class="s-line">Signature</div></div>' +
