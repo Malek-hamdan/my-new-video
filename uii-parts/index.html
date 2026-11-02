@@ -376,6 +376,8 @@
   .origin-sw button.imp[aria-pressed="true"] { border-color: #5b9dff; background: rgba(91,157,255,0.14); color: #e6eeff; }
   .origin-sw button.loc[aria-pressed="true"] { border-color: #e0a030; background: rgba(224,160,48,0.15); color: #fff3dc; }
   body.area-equip .origin-sw, body.side-view .origin-sw { display: none; }
+  /* local parts print only their purchase request, no issue slip */
+  body.origin-loc:not(.area-equip):not(.side-view) .tr-print { display: none !important; }
   body.origin-loc:not(.side-view):not(.area-equip) .tabs .tab[aria-selected="true"] { background: rgba(224,160,48,0.16); border-color: rgba(224,160,48,0.6); }
   .chip.chip-local { background: rgba(224,160,48,0.16); border-color: rgba(224,160,48,0.6); color: #ffe3a8; }
   @media (max-width: 560px) { .origin-sw button { font-size: 14px; padding: 9px; } .origin-sw button small { display: none; } }
@@ -2309,7 +2311,7 @@
 
       var act = document.createElement("td");
       act.className = "col-act";
-      if (t.change < 0) {
+      if (t.change < 0 && !t.local) {
         var pb = document.createElement("button");
         pb.type = "button";
         pb.className = "tx-print";
@@ -3189,11 +3191,11 @@
     row.quantity = String(after); row.loggedQty = row.quantity; row.baseline = false;
     var tx = cleanTx({ partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
       change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local }, uid());
-    if (!inn) stampSlip(tx);
+    if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     writeRow(row); saveDoc("transactions", tx.id, txBody(tx));
     trDlg.hidden = true;
-    if (!inn && document.getElementById("trPrint").checked) printSlip(tx);
+    if (!inn && !tx.local && document.getElementById("trPrint").checked) printSlip(tx);
     if (active !== row.machine) switchTo(row.machine); else renderRows();
     var tr = rowsEl.querySelector('tr[data-id="' + row.id + '"]');
     if (tr) { tr.scrollIntoView({ block: "center", behavior: "smooth" }); tr.classList.remove("flash"); void tr.offsetWidth; tr.classList.add("flash"); }
@@ -3210,7 +3212,7 @@
     writeSide(key, row);
     var tx = cleanTx({ partId: row.id, month: month, machine: key === "equip" ? row.type : row.machine, name: row.name, reference: row.reference,
       change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key }, uid());
-    if (!inn) stampSlip(tx);
+    if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     saveDoc("transactions", tx.id, txBody(tx));
     trDlg.hidden = true;
@@ -3248,7 +3250,7 @@
     return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 ' + (t.source === "equip" ? "Equipment" : "Spare Part") + ' Issue Slip</div><div class="s-sub">Store room</div></div>' +
       '<div class="s-no"><span class="s-k">Date</span> <b>' + e(txDate(t)) + '</b><br><span class="s-k">Time</span> <b>' + e(t.time || pad(d.getHours()) + ":" + pad(d.getMinutes())) + "</b></div></div>" +
       '<div class="s-grid">' +
-      '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-val">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + (t.local ? '<span class="s-used">LOCAL</span>' : "") + "</div></div>" +
+      '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-val">' + e(name || "\u2014") + (t.source === "used" ? '<span class="s-used">USED</span>' : "") + "</div></div>" +
       '<div class="s-cell s-linebox">' + (t.source === "equip" ? e(String(t.machine).toUpperCase()) : t.line ? "LINE " + e(t.line) : "\u2014") + "</div>" +
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-val">' + e(ref || "\u2014") + "</div></div>" +
       '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-val big">' + Math.abs(t.change) + "</div></div></div>" +
@@ -3369,7 +3371,7 @@
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     var d = new Date(), pcs = 0;
     var loc = ordMode !== "equip" && origin === "loc";
-    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request' + (ordMode === "equip" ? " \u00B7 Equipment" : loc ? " \u00B7 Local parts" : "") + '</h1><div class="p-sub">' + (ordMode === "equip" ? "Equipment and supplies to order" : loc ? "Local spare parts to buy in the country" : "Spare parts to order") + '</div>' +
+    var h = '<div class="prq"><div class="p-head"><div><h1>UII \u2014 Purchase Request' + (ordMode === "equip" ? " \u00B7 Equipment" : loc ? " \u00B7 LOCAL PARTS" : "") + '</h1><div class="p-sub">' + (ordMode === "equip" ? "Equipment and supplies to order" : loc ? "Local spare parts to buy in the country" : "Spare parts to order") + '</div>' +
       (urgent ? '<div class="p-urgent">URGENT</div>' : "") + '</div><div class="p-no">No. <b>' + prNo(no) + "</b><br>Date <b>" + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + "</b></div></div>";
     h += '<table><colgroup><col style="width:7mm"><col style="width:23mm"><col><col style="width:36mm"><col style="width:15mm"><col style="width:17mm"><col style="width:42mm"></colgroup><tr><th>#</th><th>' + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th>Notes</th></tr>";
     rows.forEach(function (x, i) {
