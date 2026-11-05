@@ -36,25 +36,27 @@ export function QuestionCard({
   const [picked, setPicked] = useState<number[]>([]);
   const [checked, setChecked] = useState<null | boolean>(null);
   const tiles = useMemo(() => (q.type === "order" ? orderTiles(q) : []), [q]);
-  const { contextSafe } = useGSAP({ scope: root });
 
   const answer: Answer | undefined =
     q.type === "mc" ? (choice ?? undefined) : q.type === "cloze" ? text : picked.map((i) => tiles[i]).join(" ");
   const ready = q.type === "mc" ? choice !== null : q.type === "cloze" ? text.trim().length > 0 : picked.length === tiles.length;
 
-  const feedback = contextSafe((ok: boolean) => {
-    if (prefersReducedMotion()) return;
-    if (ok) gsap.fromTo(".q-body", { scale: 0.985 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
-    else gsap.fromTo(".q-body", { x: -10 }, { x: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
-    gsap.fromTo(".q-feedback", { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.35, ease: "power3.out" });
-  });
+  // Runs after React has rendered the feedback panel (it doesn't exist before `checked` is set).
+  useGSAP(
+    () => {
+      if (checked === null || prefersReducedMotion()) return;
+      if (checked) gsap.fromTo(".q-body", { scale: 0.985 }, { scale: 1, duration: 0.5, ease: "back.out(3)" });
+      else gsap.fromTo(".q-body", { x: -10 }, { x: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
+      gsap.fromTo(".q-feedback", { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.35, ease: "power3.out" });
+    },
+    { scope: root, dependencies: [checked] },
+  );
 
   const check = () => {
     if (!ready || answer === undefined) return;
     const ok = isCorrect(q, answer);
     setChecked(ok);
     void tap(ok ? "success" : "error");
-    feedback(ok);
   };
 
   const prompt = q.type === "order" ? q.prompt ?? "Put the words in the right order." : q.prompt;

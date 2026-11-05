@@ -12,9 +12,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
+        // three.js and the Anthropic SDK are dynamic imports and get their own lazy chunks.
         manualChunks(id) {
-          if (id.includes("node_modules/three")) return "three";
-          if (id.includes("node_modules/@anthropic-ai")) return "anthropic";
           if (id.includes("node_modules/gsap")) return "gsap";
           return undefined;
         },

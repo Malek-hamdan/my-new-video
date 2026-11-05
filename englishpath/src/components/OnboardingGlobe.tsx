@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { prefersReducedMotion } from "@/lib/utils";
+import { StaticOrb } from "./StaticOrb";
 
 /**
  * Onboarding signature (web-3d-builder, procedural object): a "world of words" —
@@ -42,7 +43,7 @@ export default function OnboardingGlobe({ className }: { className?: string }) {
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const gold = new THREE.Color("#fdb61c");
-    const pale = new THREE.Color("#f4f1ea");
+    const pale = new THREE.Color(document.documentElement.dataset.theme === "light" ? "#021b51" : "#f4f1ea");
     const ga = Math.PI * (3 - Math.sqrt(5));
     for (let i = 0; i < count; i++) {
       const y = 1 - (i / (count - 1)) * 2;
@@ -186,16 +187,6 @@ export default function OnboardingGlobe({ className }: { className?: string }) {
       aria-label="A slowly turning globe of glowing points circled by a golden path"
     >
       {failed ? <StaticOrb /> : null}
-    </div>
-  );
-}
-
-export function StaticOrb() {
-  return (
-    <div className="grid h-full w-full place-items-center">
-      <div className="relative aspect-square w-[62%] rounded-full border border-line bg-[radial-gradient(circle_at_35%_30%,rgb(244_241_234/0.18),transparent_60%)]">
-        <div className="absolute inset-[-12%] rotate-[24deg] rounded-full border-2 border-accent/80 [transform:rotateX(64deg)]" />
-      </div>
     </div>
   );
 }

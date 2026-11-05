@@ -24,6 +24,8 @@
   --accent-fg: #0a0f1f;
   --accent-soft: rgb(253 182 28 / 0.14);
   --ink: #021b51;
+  /* chart mark colour, validated with the dataviz palette checker against --surface */
+  --chart: #bb820c;
   --success: #3dd68c;
   --success-soft: rgb(61 214 140 / 0.14);
   --danger: #ff6b5e;
@@ -45,6 +47,7 @@
   --accent-fg: #0a0f1f;
   --accent-soft: rgb(253 182 28 / 0.2);
   --ink: #021b51;
+  --chart: #a86f00;
   --success: #138a52;
   --success-soft: rgb(19 138 82 / 0.12);
   --danger: #d23c2f;
@@ -66,6 +69,7 @@
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
   --color-ink: var(--ink);
+  --color-chart: var(--chart);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-danger: var(--danger);

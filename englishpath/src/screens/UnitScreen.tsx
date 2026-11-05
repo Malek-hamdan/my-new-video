@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { LEVEL_LABEL, type UnitOutline } from "@/content";
 import { Screen } from "@/components/Screen";
 import { Button } from "@/components/ui/button";
-import { NoApiKeyError } from "@/engine/ai/client";
+import { NoApiKeyError } from "@/engine/ai/errors";
 import { indexOfLesson, isUnlocked, pathAt } from "@/engine/progress";
 import { cn } from "@/lib/utils";
 import { getUnit, learnerContext, peekUnit, useApp } from "@/state/app";
