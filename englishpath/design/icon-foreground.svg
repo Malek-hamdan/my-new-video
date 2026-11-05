@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Adaptive icon foreground (transparent), artwork kept inside the 66% safe zone. -->
+  <g transform="translate(512 512) scale(0.72) translate(-512 -512)" fill="none" stroke="#FDB61C" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M690 300 L 470 300 L 470 560 C 470 630, 650 600, 650 690 C 650 770, 440 780, 300 790" stroke-width="74"/>
+    <path d="M470 432 L 640 432" stroke-width="66"/>
+  </g>
+</svg>
