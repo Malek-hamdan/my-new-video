@@ -41,9 +41,12 @@ export function CelebrationOverlay() {
     <div ref={root} className="fixed inset-0 z-[60] bg-[#050816]" role="dialog" aria-modal="true" aria-label={current.title}>
       <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_100%,rgb(253_182_28/0.28),transparent_60%),radial-gradient(90%_60%_at_50%_0%,rgb(2_27_81/0.9),transparent_70%)]" />
       {!reduced ? (
-        <SoftAurora className="absolute inset-0 opacity-90" color1="#fdb61c" color2="#1f4fd1" brightness={0.9} speed={0.5} enableMouseInteraction={false} />
+        // SoftAurora's root is `relative h-full`; it must sit inside an absolute layer or it pushes the content off-screen.
+        <div className="absolute inset-0 opacity-70" aria-hidden>
+          <SoftAurora color1="#fdb61c" color2="#3b6cf0" spectrum={0} brightness={0.55} speed={0.5} enableMouseInteraction={false} />
+        </div>
       ) : null}
-      <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center px-8 text-center text-[#f4f1ea]">
+      <div className="safe-top safe-bottom relative flex h-full flex-col items-center justify-center px-8 text-center text-[#f4f1ea] [text-shadow:0_2px_18px_rgb(0_0_0/0.45)]">
         <div className="cel-emoji text-[84px] leading-none" aria-hidden>
           {current.emoji}
         </div>
