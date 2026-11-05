@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "EnglishPath — learn English from zero (Pre-A1) to mastery (C2).",
+  "description": "EnglishPath \u2014 learn English from zero (Pre-A1) to mastery (C2).",
   "engines": {
     "node": ">=24"
   },
@@ -16,7 +16,8 @@
     "gen:ipa": "node scripts/gen-ipa.mjs",
     "gen:icons": "node scripts/gen-icons.mjs",
     "cap:sync": "npm run build && cap sync android",
-    "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "e2e": "node e2e/lesson-flow.mjs && node e2e/dialogues.mjs && node e2e/ai-pipeline.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.5.0",
@@ -58,6 +59,7 @@
     "@types/three": "0.187.0",
     "@vitejs/plugin-react": "6.2.1",
     "jsdom": "30.1.3",
+    "playwright-core": "1.63.0",
     "tailwindcss": "4.3.4",
     "typescript": "7.0.2",
     "vite": "8.3.6",
