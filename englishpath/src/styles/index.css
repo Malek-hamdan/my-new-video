@@ -182,3 +182,8 @@ textarea {
 @keyframes sheet-up {
   from { transform: translateY(100%); }
 }
+
+/* Saffron fills stay bright, but saffron *text* needs a darker ink on light surfaces (≥4.5:1). */
+:root[data-theme="light"] .text-accent {
+  color: #8a5a00;
+}
