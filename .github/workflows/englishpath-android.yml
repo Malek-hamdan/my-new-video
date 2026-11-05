@@ -24,23 +24,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: englishpath/package-lock.json
 
       - name: Set up JDK 21 (required by Capacitor 8 / AGP 8)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The default ("tools") no longer exists in the SDK repository. Gradle installs
+          # platform 36 + build-tools itself; licences are accepted by this step.
+          packages: platform-tools
 
       - name: Install dependencies (exact lockfile)
         run: npm ci
@@ -69,7 +73,7 @@ jobs:
           ls -la ../dist-apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: EnglishPath-apk
           path: dist-apk/*.apk
