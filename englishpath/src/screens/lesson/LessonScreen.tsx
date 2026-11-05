@@ -160,7 +160,7 @@ export function LessonScreen({ lessonId }: { lessonId: string }) {
 
       {/* Body: native scroll */}
       <div className="scroll-area flex-1">
-        <div ref={body} className="mx-auto flex min-h-full w-full max-w-xl flex-col px-4 pt-2 [&>div]:flex-1 pb-[max(env(safe-area-inset-bottom),20px)]">
+        <div ref={body} className="mx-auto flex min-h-full w-full max-w-xl flex-col px-4 pt-2 [&>div]:flex-1 pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),20px)]">
           {load.state === "loading" ? <Loading text="Opening lesson…" /> : null}
           {load.state === "generating" ? <Loading text="Writing a new lesson for your level…" sub="This takes about a minute the first time. It's saved for offline use afterwards." /> : null}
           {load.state === "needs-key" ? (

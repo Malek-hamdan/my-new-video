@@ -10,6 +10,11 @@ const config: CapacitorConfig = {
     captureInput: true,
   },
   plugins: {
+    // Android 15+ draws edge-to-edge: Capacitor injects --safe-area-inset-* CSS variables.
+    SystemBars: {
+      insetsHandling: "css",
+      initialViewportFitValueHint: "cover",
+    },
     SplashScreen: {
       launchShowDuration: 900,
       launchAutoHide: true,

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EnglishPath</string>
+    <string name="title_activity_main">EnglishPath</string>
+    <string name="package_name">app.englishpath.learn</string>
+    <string name="custom_url_scheme">app.englishpath.learn</string>
+</resources>
