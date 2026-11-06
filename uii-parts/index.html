@@ -381,25 +381,6 @@
   body.origin-loc:not(.side-view):not(.area-equip) .tabs .tab[aria-selected="true"] { background: rgba(224,160,48,0.16); border-color: rgba(224,160,48,0.6); }
   .chip.chip-local { background: rgba(224,160,48,0.16); border-color: rgba(224,160,48,0.6); color: #ffe3a8; }
   @media (max-width: 560px) { .origin-sw button { font-size: 14px; padding: 9px; } .origin-sw button small { display: none; } }
-  /* Part photos: one per part, shown in every month */
-  body:not(.photos-on) th.col-photo, body:not(.photos-on) td.col-photo { display: none !important; }
-  th.col-photo { width: 64px; }
-  td.col-photo { padding: 6px 8px; }
-  .ph-btn { display: block; width: 48px; height: 36px; padding: 0; border-radius: 7px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.04) center / cover no-repeat; cursor: zoom-in; overflow: hidden; }
-  .ph-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .ph-btn.add { border-style: dashed; color: var(--muted); font-size: 17px; cursor: pointer; }
-  .ph-btn.add:hover { color: var(--text); border-color: var(--border-strong); }
-  .ph-btn.busy { cursor: progress; opacity: 0.6; }
-  .ph-card { max-width: 640px; }
-  #phPick[hidden], #phActs[hidden], #phBig[hidden], #phNote[hidden] { display: none !important; }
-  .ph-big { width: 100%; max-height: 60vh; object-fit: contain; border-radius: 12px; background: #0b0d12; display: block; margin: 10px 0 12px; }
-  .ph-sub { color: var(--muted); font-size: 13px; }
-  .ph-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 8px; }
-  .ph-pick .btn { justify-content: center; flex-direction: column; gap: 2px; padding: 16px 10px; font-size: 15px; }
-  .ph-pick .btn small { font-weight: 600; opacity: 0.75; font-size: 12px; }
-  .tr-picked .ph-pk { width: 88px; height: 66px; object-fit: cover; border-radius: 9px; border: 1px solid rgba(255,255,255,0.2); flex: none; }
-  .tr-picked > div:first-of-type { flex: 1; }
-  @media (max-width: 760px) { td.col-photo .ph-btn { width: 64px; height: 48px; } }
   /* Two areas: Spare Parts and Equipment */
   .area-sw { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
   .area-sw button { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px 18px; border-radius: 16px; border: 2px solid var(--border); background: rgba(255,255,255,0.03); color: var(--muted); font-family: inherit; font-size: 19px; font-weight: 800; text-align: left; cursor: pointer; }
@@ -1152,7 +1133,6 @@
       <thead id="thead">
         <tr>
           <th class="col-num">#</th>
-          <th class="col-photo">Photo</th>
           <th class="col-name">Name</th>
           <th class="col-ref">Reference</th>
           <th class="col-qty" title="Use the arrows or type, then press Enter to save">Quantity</th>
@@ -1198,7 +1178,6 @@
       <div class="dlg-actions">
         <button class="btn btn-primary" id="fullBackupBtn" type="button">Download full backup</button>
         <button class="btn" id="restoreFileBtn" type="button">Restore from file…</button>
-        <button class="btn" id="photosZipBtn" type="button" hidden>Download photos</button>
         <input type="file" id="restoreFile" accept=".xlsx,.json" hidden>
       </div>
       <h4>Year archive</h4>
@@ -1353,23 +1332,6 @@
         <button class="btn" id="txDelOnly" type="button">Delete only, keep the stock</button>
         <button class="btn btn-primary" id="txDelYes" type="button">Delete and fix the stock</button>
       </div>
-    </div>
-  </div>
-  <div class="confirm" id="phDlg" hidden role="dialog" aria-modal="true" aria-labelledby="phTitle">
-    <div class="confirm-card ph-card">
-      <div class="dlg-head"><div><strong id="phTitle"></strong><div class="ph-sub" id="phSub"></div></div><button class="btn" id="phClose" type="button">Close</button></div>
-      <img class="ph-big" id="phBig" alt="">
-      <div class="ph-pick" id="phPick">
-        <button class="btn btn-primary" id="phCamera" type="button">&#128247; Take photo<small>phone camera</small></button>
-        <button class="btn" id="phFile" type="button">&#128444;&#65039; Choose file<small>from the laptop</small></button>
-      </div>
-      <div class="dlg-actions" id="phActs">
-        <button class="btn" id="phChange" type="button">&#128247; Change photo</button>
-        <button class="btn btn-danger" id="phRemove" type="button">Remove photo</button>
-      </div>
-      <p class="muted-p" id="phNote" style="margin-top:10px !important">The same photo shows in every month. It is made smaller before it is saved.</p>
-      <input type="file" id="phCamIn" accept="image/*" capture="environment" hidden>
-      <input type="file" id="phFileIn" accept="image/*" hidden>
     </div>
   </div>
   <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -3011,11 +2973,6 @@
       num.className = "col-num";
       num.textContent = i + 1;
       tr.appendChild(num);
-      var phTd = document.createElement("td");
-      phTd.className = "col-photo";
-      phTd.setAttribute("data-label", "Photo");
-      fillPhotoCell(phTd, row);
-      tr.appendChild(phTd);
 
       tr.appendChild(makeCell(row, "name", "Name"));
       tr.appendChild(makeCell(row, "reference", "Reference"));
@@ -3158,8 +3115,6 @@
       row.hidden = true; list.innerHTML = "";
       var r = trState.part, pk = document.createElement("div"); pk.className = "tr-picked"; pk.id = "trPicked";
       pk.innerHTML = '<div><div class="n"></div><div class="r"></div></div><div class="stock">In stock<b></b></div>';
-      var pph = trState.kind === "part" ? photoOf(r) : null;
-      if (pph) { var pim = document.createElement("img"); pim.className = "ph-pk"; pim.alt = ""; pim.src = "/_blob/" + pph.thumb; pk.insertBefore(pim, pk.firstChild); }
       pk.querySelector(".n").textContent = r.name || "(no name)"; pk.querySelector(".r").textContent = r.reference;
       trBadges(pk.querySelector(".n"), trState.kind, r);
       pk.querySelector("b").textContent = trStock(r);
@@ -4589,7 +4544,7 @@
     function u16(v) { return [v & 0xFF, (v >>> 8) & 0xFF]; }
     function u32(v) { return [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF]; }
     files.forEach(function (f) {
-      var name = enc.encode(f[0]), body = f[1] instanceof Uint8Array ? f[1] : enc.encode(f[1]), crc = crc32(body);
+      var name = enc.encode(f[0]), body = enc.encode(f[1]), crc = crc32(body);
       var common = [].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(body.length), u32(body.length), u16(name.length), u16(0));
       var local = new Uint8Array([].concat(u32(0x04034B50), common));
       chunks.push(local, name, body);
@@ -5247,154 +5202,6 @@
     return null;
   }
 
-  // ---- Part photos ----
-  // One photo per part, found by its reference (or machine and name), so it shows
-  // in every month. The pictures live in the artifact's asset store; the "photos"
-  // collection maps each part to its picture. Only the shared site has them.
-  var photos = {}, photoStore = null, phRow = null, phArmed = false;
-  var phDlg = document.getElementById("phDlg");
-  function photoKey(r) { var ref = norm(r.reference || ""); return ref ? "r:" + ref : "n:" + r.machine + ":" + norm(r.name || ""); }
-  function photoDocId(key) {
-    var h = 0x811c9dc5;
-    for (var i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-    return "p" + h.toString(16) + key.length.toString(36);
-  }
-  function photoOf(r) { return r && (r.reference || r.name) ? photos[photoKey(r)] || null : null; }
-  function fillPhotoCell(td, row) {
-    td.innerHTML = "";
-    var ph = photoOf(row), b = document.createElement("button");
-    b.type = "button";
-    if (ph) {
-      b.className = "ph-btn";
-      b.title = "Show the photo";
-      var im = document.createElement("img"); im.loading = "lazy"; im.alt = ""; im.src = "/_blob/" + ph.thumb;
-      b.appendChild(im);
-    } else if (photoStore && !readOnly && (row.name || row.reference)) {
-      b.className = "ph-btn add";
-      b.title = "Add a photo";
-      b.textContent = "\uD83D\uDCF7";
-    } else return;
-    b.addEventListener("click", function () { openPhoto(findRow(row.id) || row); });
-    td.appendChild(b);
-  }
-  function refreshPhotos() {
-    rowsEl.querySelectorAll("td.col-photo").forEach(function (td) {
-      var r = findRow(td.parentNode.getAttribute("data-id"));
-      if (r) fillPhotoCell(td, r);
-    });
-  }
-  function openPhoto(r) {
-    phRow = r; phArmed = false;
-    var ph = photoOf(r), canEdit = !!photoStore && !readOnly;
-    document.getElementById("phTitle").textContent = r.name || "(no name)";
-    document.getElementById("phSub").textContent = r.machine + (r.reference ? " \u00B7 " + r.reference : "") + (r.local ? " \u00B7 Local" : "");
-    var big = document.getElementById("phBig");
-    big.hidden = !ph; if (ph) big.src = "/_blob/" + ph.full;
-    document.getElementById("phPick").hidden = !!ph || !canEdit;
-    document.getElementById("phActs").hidden = !ph || !canEdit;
-    document.getElementById("phRemove").textContent = "Remove photo";
-    document.getElementById("phNote").hidden = !canEdit;
-    phDlg.hidden = false;
-    document.getElementById("phClose").focus();
-  }
-  // a phone photo is several MB: keep a 1280 px picture and a small one for the lists
-  function shrink(img, max, q) {
-    var k = Math.min(1, max / Math.max(img.width, img.height));
-    var c = document.createElement("canvas");
-    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-    return new Promise(function (res, rej) { c.toBlob(function (b) { b ? res(b) : rej({ code: "decode" }); }, "image/jpeg", q); });
-  }
-  function readImage(file) {
-    return new Promise(function (res, rej) {
-      var url = URL.createObjectURL(file), img = new Image();
-      img.onload = function () { URL.revokeObjectURL(url); res(img); };
-      img.onerror = function () { URL.revokeObjectURL(url); rej({ code: "decode" }); };
-      img.src = url;
-    });
-  }
-  function photoError(e) {
-    var c = e && e.code;
-    setStatus(c === "decode" ? "This photo can't be read. Take it again or choose a JPG or PNG."
-      : c === "quota_or_state" ? "Photo storage is full. Remove photos that are not needed."
-      : c === "rate_limited" ? "Too many photos at once. Wait a moment and try again."
-      : c === "too_large" ? "This photo is too big. Choose a smaller one."
-      : "Photo not saved. Check your connection and try again.", "error");
-  }
-  function savePhoto(file) {
-    var r = phRow;
-    if (!file || !r || !photoStore || !db) return;
-    var key = photoKey(r), old = photos[key];
-    phDlg.hidden = true;
-    setStatus("Saving the photo\u2026");
-    readImage(file).then(function (img) {
-      return Promise.all([shrink(img, 1280, 0.82), shrink(img, 240, 0.72)]);
-    }).then(function (bl) {
-      return photoStore.upload(bl[0], { type: "image/jpeg" }).then(function (full) {
-        return photoStore.upload(bl[1], { type: "image/jpeg" }).then(function (thumb) {
-          var doc = { key: key, machine: r.machine, reference: r.reference || "", name: r.name || "", full: full.id, thumb: thumb.id, at: Date.now() };
-          return db.collection("photos").doc(photoDocId(key)).set(doc).then(function () {
-            photos[key] = doc;
-            if (old) { photoStore.delete(old.full).catch(function () {}); photoStore.delete(old.thumb).catch(function () {}); }
-            refreshPhotos();
-            setStatus("Photo saved", "saved");
-          });
-        });
-      });
-    }).catch(photoError);
-  }
-  function removePhoto() {
-    var r = phRow, key = r ? photoKey(r) : "", ph = photos[key];
-    if (!ph || !photoStore || !db) return;
-    if (!phArmed) { phArmed = true; document.getElementById("phRemove").textContent = "Tap again to remove"; return; }
-    phDlg.hidden = true;
-    db.collection("photos").doc(photoDocId(key)).delete().then(function () {
-      delete photos[key];
-      photoStore.delete(ph.full).catch(function () {}); photoStore.delete(ph.thumb).catch(function () {});
-      refreshPhotos();
-      setStatus("Photo removed", "saved");
-    }, function () { setStatus("Photo not removed. Check your connection and try again.", "error"); });
-  }
-  ["phCamIn", "phFileIn"].forEach(function (id) {
-    var inp = document.getElementById(id);
-    inp.addEventListener("change", function () { var f = inp.files && inp.files[0]; inp.value = ""; savePhoto(f); });
-  });
-  document.getElementById("phCamera").addEventListener("click", function () { document.getElementById("phCamIn").click(); });
-  document.getElementById("phFile").addEventListener("click", function () { document.getElementById("phFileIn").click(); });
-  document.getElementById("phChange").addEventListener("click", function () { document.getElementById("phPick").hidden = false; document.getElementById("phActs").hidden = true; });
-  document.getElementById("phRemove").addEventListener("click", removePhoto);
-  document.getElementById("phClose").addEventListener("click", function () { phDlg.hidden = true; });
-  phDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") phDlg.hidden = true; });
-  function applyPhotos(snap) {
-    photos = {};
-    snap.docs.forEach(function (d) { var v = d.data() || {}; if (v.key && v.full && v.thumb) photos[v.key] = v; });
-    refreshPhotos();
-    document.getElementById("photosZipBtn").hidden = !Object.keys(photos).length;
-  }
-  // every photo in one zip, named by machine, part and reference, to keep on Drive or a USB stick
-  document.getElementById("photosZipBtn").addEventListener("click", function () {
-    var btn = this, list = Object.keys(photos).map(function (k) { return photos[k]; }), used = {};
-    if (!list.length) return;
-    btn.disabled = true;
-    setStatus("Collecting " + list.length + (list.length === 1 ? " photo\u2026" : " photos\u2026"));
-    Promise.all(list.map(function (ph) {
-      return fetch("/_blob/" + ph.full).then(function (res) { if (!res.ok) throw new Error("gone"); return res.arrayBuffer(); })
-        .then(function (buf) { return [ph, new Uint8Array(buf)]; }, function () { return null; });
-    })).then(function (got) {
-      var files = [];
-      got.forEach(function (g) {
-        if (!g) return;
-        var base = (g[0].machine + " - " + (g[0].name || "part") + (g[0].reference ? " - " + g[0].reference : "")).replace(/[\\/:*?"<>|]+/g, "-").slice(0, 90), name = base, n = 2;
-        while (used[name]) name = base + " (" + n++ + ")";
-        used[name] = 1;
-        files.push([name + ".jpg", g[1]]);
-      });
-      btn.disabled = false;
-      if (!files.length) { setStatus("No photos could be read. Try again.", "error"); return; }
-      saveFile("UII-Photos-" + ymd(Date.now()) + ".zip", zipStore(files), "application/zip", btn, "Photo download");
-    });
-  });
-
   // ---- Boot ----
   try {
     var savedTab = localStorage.getItem(TAB_KEY);
@@ -5443,9 +5250,6 @@
       }
       db = store;
       setStatus("");
-      document.body.classList.add("photos-on");
-      db.collection("photos").onSnapshot(applyPhotos, function () {});
-      window.claude.use("assets").then(function (a) { photoStore = a; refreshPhotos(); }, function () {});
       var lost = function () { setStatus("Lost connection to saved data. Reload the page.", "error"); };
       // the daily copy waits until both lists have loaded once
       var gotParts = false, gotTx = false;
