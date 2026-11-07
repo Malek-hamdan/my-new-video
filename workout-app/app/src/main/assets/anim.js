@@ -77,6 +77,69 @@
       frames: [{ aN: [60, 165], aF: [60, 165] }, { aN: [165, 165], aF: [165, 165] }],
       props: [{ type: "torsoPad", off: -13 }, { type: "rect", x: 116, y: 144, w: 34, h: 8 },
               { type: "rect", x: 128, y: 152, w: 6, h: 33 }, { type: "db", at: "handN" }]
+    },
+    "bulgarian-split-squat": {
+      anchor: "feet", ankle: [140, 180],
+      base: { aN: [0, 0], aF: [0, 0] },
+      frames: [{ u: 5, lN: [10, 0], lF: [-20, -80] }, { u: 12, lN: [75, -20], lF: [-25, -120] }],
+      props: [{ type: "rect", x: 30, y: 152, w: 50, h: 8 }, { type: "rect", x: 50, y: 160, w: 6, h: 25 }, { type: "db", at: "handN" }]
+    },
+    "overhead-cable-triceps": {
+      anchor: "feet", ankle: [130, 180],
+      base: { u: 20, lN: [10, -5], lF: [-15, 0] },
+      frames: [{ aN: [160, -60], aF: [160, -60] }, { aN: [160, 160], aF: [160, 160] }],
+      props: [{ type: "cable", at: "handN", to: [18, 40] }, { type: "circle", cx: 18, cy: 40, r: 6 }, { type: "db", at: "handN" }]
+    },
+    "pallof-press": {
+      anchor: "feet", ankle: [120, 180],
+      base: { u: 0, lN: [5, 0], lF: [-5, 0] },
+      frames: [{ aN: [20, 150], aF: [20, 150] }, { aN: [88, 88], aF: [88, 88] }],
+      props: [{ type: "db", at: "handN" }]
+    },
+    "leg-press": {
+      anchor: "hip", hip: [80, 150],
+      base: { u: -55, aN: [20, 60], aF: [20, 60] },
+      frames: [{ lN: [150, 100], lF: [150, 100] }, { lN: [125, 125], lF: [125, 125] }],
+      props: [{ type: "torsoPad", off: -13 }, { type: "rect", x: 64, y: 156, w: 40, h: 8 }, { type: "rect", x: 80, y: 164, w: 6, h: 21 },
+              { type: "sled", at: "ankleN" }]
+    },
+    "machine-chest-press": {
+      anchor: "hip", hip: [100, 140],
+      base: { u: -5, lN: [90, 0], lF: [90, 0] },
+      frames: [{ aN: [-40, 90], aF: [-40, 90] }, { aN: [90, 90], aF: [90, 90] }],
+      props: [{ type: "rect", x: 76, y: 146, w: 50, h: 8 }, { type: "rect", x: 74, y: 78, w: 8, h: 68 },
+              { type: "rect", x: 96, y: 154, w: 6, h: 31 }, { type: "plate", at: "handN", r: 5 }]
+    },
+    "one-arm-db-row": {
+      anchor: "feet", ankle: [110, 180],
+      base: { u: 75, lN: [30, -10], lF: [30, -10], aF: [0, 0] },
+      frames: [{ aN: [0, 0] }, { aN: [-75, -10] }],
+      props: [{ type: "rect", x: 125, y: 152, w: 60, h: 8 }, { type: "rect", x: 150, y: 160, w: 6, h: 25 }, { type: "db", at: "handN" }]
+    },
+    "barbell-hip-thrust": {
+      anchor: "hip",
+      frames: [{ hip: [112, 178], u: -54, lN: [130, 28], lF: [130, 28], aN: [54, 54], aF: [54, 54] },
+               { hip: [120, 145], u: -95, lN: [90, 0], lF: [90, 0], aN: [90, 80], aF: [90, 80] }],
+      props: [{ type: "rect", x: 30, y: 155, w: 48, h: 8 }, { type: "rect", x: 50, y: 163, w: 6, h: 22 }, { type: "plate", at: "hip", r: 15 }]
+    },
+    "face-pull": {
+      anchor: "feet", ankle: [110, 180],
+      base: { u: -5, lN: [5, 0], lF: [-10, 0] },
+      frames: [{ aN: [100, 100], aF: [100, 100] }, { aN: [90, -80], aF: [90, -80] }],
+      props: [{ type: "cable", at: "handN", to: [222, 48] }, { type: "circle", cx: 222, cy: 48, r: 6 }, { type: "plate", at: "handN", r: 4 }]
+    },
+    "cable-lateral-raise": { view: "front", single: true, frames: [{ a: 8 }, { a: 85 }] },
+    "curl-pushdown-superset": {
+      anchor: "feet", ankle: [120, 180],
+      base: { u: 0, lN: [0, 0], lF: [0, 0] },
+      frames: [{ aN: [0, 0], aF: [0, 0] }, { aN: [-8, 150], aF: [-8, 150] }],
+      props: [{ type: "db", at: "handN" }]
+    },
+    "hanging-knee-raise": {
+      anchor: "hip", hip: [120, 104],
+      base: { u: 0, aN: [178, 178], aF: [178, 178] },
+      frames: [{ lN: [0, 0], lF: [0, 0] }, { lN: [100, 10], lF: [100, 10] }],
+      props: [{ type: "rect", x: 70, y: 0, w: 100, h: 5 }]
     }
   };
 
@@ -94,7 +157,7 @@
     if (def.anchor === "feet") {
       var knee0 = add(def.ankle, dir(pose.lN[1]), -L.SH);
       hip = add(knee0, dir(pose.lN[0]), -L.TH);
-    } else hip = def.hip;
+    } else hip = pose.hip || def.hip;
     var up = [Math.sin(rad(u)), -Math.cos(rad(u))];
     var sh = add(hip, up, L.T), head = add(hip, up, L.T + 14);
     function leg(l) {
@@ -119,7 +182,7 @@
   }
   function at(s, name) {
     return { handN: s.aN.h, handF: s.aF.h, ankleN: s.lN.a, shoulder: s.sh,
-             traps: add(add(s.sh, s.fwd, -9), s.up, -3) }[name];
+             traps: add(add(s.sh, s.fwd, -9), s.up, -3), hip: add(s.hip, s.fwd, 10) }[name];
   }
 
   function drawSide(def, pose) {
@@ -136,6 +199,11 @@
       else if (p.type === "cable") back.push(line(at(s, p.at), p.to, "#8a919c", 2));
       else if (p.type === "plate") (p.back ? back : front).push(circle(at(s, p.at), p.r, C.plate, C.metal));
       else if (p.type === "db") { var h = at(s, p.at); front.push(circle(h, 8, C.plate, C.metal)); }
+      else if (p.type === "sled") {
+        var k = at(s, p.at);
+        front.push('<rect x="' + (k[0] - 4).toFixed(1) + '" y="' + (k[1] - 26).toFixed(1) + '" width="10" height="52" rx="3" fill="' + C.bench +
+          '" transform="rotate(35 ' + k[0].toFixed(1) + ' ' + k[1].toFixed(1) + ')"/>');
+      }
       else if (p.type === "roller") { var a = at(s, p.at); front.push(circle(add(a, s.up, -6), 6, C.bench)); }
     });
     out.push(line([0, 185], [240, 185], C.floor, 2));
@@ -158,16 +226,19 @@
     return out.join("");
   }
 
-  function drawFront(pose) {
+  function drawFront(pose, def) {
     var a = pose.a, out = [line([0, 185], [240, 185], C.floor, 2)];
     out.push(line([112, 104], [108, 180], C.shorts, 13), line([128, 104], [132, 180], C.shorts, 13));
     out.push(line([108, 150], [108, 180], C.skin, 10), line([132, 150], [132, 180], C.skin, 10));
     out.push('<rect x="103" y="50" width="34" height="56" rx="10" fill="' + C.shirt + '"/>');
+    if (def && def.single) out.push(circle([62, 176], 6, C.bench));
     [[-1, 104], [1, 136]].forEach(function (sd) {
+      var a = def && def.single && sd[0] < 0 ? 8 : pose.a;
       var sh = [sd[1], 58], e = add(sh, [sd[0] * Math.sin(rad(a)), Math.cos(rad(a))], L.UA),
           h = add(e, [sd[0] * Math.sin(rad(a * 0.92)), Math.cos(rad(a * 0.92))], L.FA);
       out.push(line(sh, e, C.shirt, 9), line(e, h, C.skin, 8), '<rect x="' + (h[0] - 4).toFixed(1) + '" y="' + (h[1] - 9).toFixed(1) +
         '" width="8" height="18" rx="3" fill="' + C.plate + '" stroke="' + C.metal + '" stroke-width="2"/>');
+      if (def && def.single && sd[0] > 0) out.splice(1, 0, line(h, [62, 176], "#8a919c", 2));
     });
     out.push(circle([120, 36], 12, C.skin), '<path d="M108 33 a12 12 0 0 1 24 0 z" fill="' + C.hair + '"/>',
              circle([115.5, 38], 1.6, "#111"), circle([124.5, 38], 1.6, "#111"));
@@ -199,7 +270,7 @@
         if (!document.body.contains(container)) { stopLoop(); return; }
         try {
           var pose = framePose(def, Date.now() - t0);
-          container.innerHTML = SVG_OPEN + (def.view === "front" ? drawFront(pose) : drawSide(def, pose)) + "</svg>";
+          container.innerHTML = SVG_OPEN + (def.view === "front" ? drawFront(pose, def) : drawSide(def, pose)) + "</svg>";
         } catch (e) {
           stopLoop();
           container.innerHTML = '<div style="color:#ff5c5c;padding:12px;font-size:13px">Animation error: ' + String(e && e.message || e) + "</div>";
@@ -209,6 +280,6 @@
       timerId = setInterval(frame, 40);
     },
     stop: stopLoop,
-    _draw: function (id, t) { var d = ANIMS[id]; var p = framePose(d, t); return d.view === "front" ? drawFront(p) : drawSide(d, p); }
+    _draw: function (id, t) { var d = ANIMS[id]; var p = framePose(d, t); return d.view === "front" ? drawFront(p, d) : drawSide(d, p); }
   };
 })();
