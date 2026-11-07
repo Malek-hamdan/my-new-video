@@ -186,23 +186,29 @@
     return p;
   }
 
-  var raf = null;
+  var timerId = null;
+  var SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" width="100%" style="display:block;background:#12151b;border-radius:14px">';
+  function stopLoop() { if (timerId) clearInterval(timerId); timerId = null; }
   window.ExerciseAnim = {
     has: function (id) { return !!ANIMS[id]; },
     mount: function (container, id) {
       var def = ANIMS[id]; if (!def) return;
-      container.innerHTML = '<svg viewBox="0 0 240 200" width="100%" style="display:block;background:#12151b;border-radius:14px"></svg>';
-      var svg = container.firstChild, t0 = performance.now();
-      cancelAnimationFrame(raf);
-      function loop(now) {
-        if (!svg.isConnected) return;
-        var pose = framePose(def, now - t0);
-        svg.innerHTML = def.view === "front" ? drawFront(pose) : drawSide(def, pose);
-        raf = requestAnimationFrame(loop);
+      stopLoop();
+      var t0 = Date.now();
+      function frame() {
+        if (!document.body.contains(container)) { stopLoop(); return; }
+        try {
+          var pose = framePose(def, Date.now() - t0);
+          container.innerHTML = SVG_OPEN + (def.view === "front" ? drawFront(pose) : drawSide(def, pose)) + "</svg>";
+        } catch (e) {
+          stopLoop();
+          container.innerHTML = '<div style="color:#ff5c5c;padding:12px;font-size:13px">Animation error: ' + String(e && e.message || e) + "</div>";
+        }
       }
-      raf = requestAnimationFrame(loop);
+      frame();
+      timerId = setInterval(frame, 40);
     },
-    stop: function () { cancelAnimationFrame(raf); },
+    stop: stopLoop,
     _draw: function (id, t) { var d = ANIMS[id]; var p = framePose(d, t); return d.view === "front" ? drawFront(p) : drawSide(d, p); }
   };
 })();
