@@ -138,6 +138,7 @@
         : ["No weight logged yet"]),
       el("div", { class: "actions" }, [
         el("button", { class: "video", text: "▶ Video", onclick: function () { openUrl(videoUrl(ex)); } }),
+        el("button", { class: "cartoon", text: "🎬 Cartoon", disabled: window.ExerciseAnim && ExerciseAnim.has(ex.id) ? false : "disabled", onclick: function () { showCartoon(ex); } }),
         el("button", { text: "Alternative", disabled: ex.alt ? false : "disabled", onclick: function () { showAlt(ex); } }),
         el("button", { text: "Change video", onclick: function () { changeVideo(ex); } })
       ]),
@@ -193,7 +194,7 @@
     sheet.innerHTML = ""; nodes.forEach(function (n) { if (n) sheet.appendChild(n); });
     overlay.classList.add("show");
   }
-  function closeSheet() { overlay.classList.remove("show"); }
+  function closeSheet() { overlay.classList.remove("show"); sheet.innerHTML = ""; if (window.ExerciseAnim) ExerciseAnim.stop(); }
   overlay.addEventListener("click", function (e) { if (e.target === overlay) closeSheet(); });
 
   function showAlt(ex) {
@@ -206,6 +207,19 @@
         el("button", { text: "Close", onclick: closeSheet })
       ])
     ]);
+  }
+  function showCartoon(ex) {
+    var box = el("div");
+    openSheet([
+      el("h2", { text: ex.name }),
+      box,
+      el("p", { text: "Simplified cartoon to show the movement pattern. Watch the real video for form details.", style: "font-size:13px;color:#9aa3b2" }),
+      el("div", { class: "btns" }, [
+        el("button", { class: "primary", text: "▶ Real video", onclick: function () { openUrl(videoUrl(ex)); } }),
+        el("button", { text: "Close", onclick: closeSheet })
+      ])
+    ]);
+    ExerciseAnim.mount(box, ex.id);
   }
   function changeVideo(ex) {
     var input = el("input", { type: "url", placeholder: "Paste a YouTube link…", value: state.videos[ex.id] || "" });

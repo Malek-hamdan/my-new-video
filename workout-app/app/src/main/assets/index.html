@@ -44,9 +44,10 @@
   .stat span { font-size: 18px; font-weight: 800; }
   .last { margin-top: 10px; font-size: 14px; color: var(--muted); }
   .last b { color: var(--text); }
-  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 12px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
   .actions button { background: var(--panel2); border-radius: 10px; padding: 11px 4px; font-size: 14px; font-weight: 600; }
   .actions .video { background: #3a1c1c; color: #ffb3b3; }
+  .actions .cartoon { background: #1c2a3a; color: #b3d4ff; }
   .actions button:disabled { opacity: .35; }
   .custom { font-size: 11px; color: var(--ok); margin-top: 6px; }
   .logbtn { width: 100%; margin-top: 8px; background: transparent; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; font-weight: 600; color: var(--muted); }
@@ -106,6 +107,7 @@
 <div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
 
 <script src="data.js"></script>
+<script src="anim.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
