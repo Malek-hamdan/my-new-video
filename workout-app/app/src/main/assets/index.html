@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Strength Program</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --panel2: #20242d; --line: #2b3039;
+    --text: #f2f4f7; --muted: #9aa3b2; --accent: #ff7a1a; --accent-ink: #1a0d00;
+    --ok: #2fbf71; --warn: #ffcc4d; --danger: #ff5c5c;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding-bottom: 120px; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
+  .menu { display: flex; gap: 6px; }
+  .menu button { white-space: nowrap; background: var(--panel2); padding: 8px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+  .weeklabel { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 6px; }
+  .weeklabel b { font-size: 15px; }
+  .phase { font-size: 13px; color: var(--muted); }
+  .weeks { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+  .weeks button { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 0; font-weight: 700; font-size: 16px; }
+  .weeks button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+  .tabs button { background: var(--panel); border-radius: 12px; padding: 12px 0; font-weight: 700; font-size: 16px; border: 1px solid var(--line); }
+  .tabs button.on { background: var(--text); color: var(--bg); }
+  .tabs .today { display: block; font-size: 11px; font-weight: 600; opacity: .7; }
+  main { padding: 12px 16px; display: grid; gap: 12px; }
+  .notice { background: #2a2312; border: 1px solid #574515; color: var(--warn); border-radius: 12px; padding: 12px 14px; font-weight: 600; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 10px; line-height: 1.5; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card h3 { margin: 0; font-size: 19px; line-height: 1.25; }
+  .num { color: var(--muted); font-weight: 600; margin-right: 6px; }
+  .badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 4px 7px; border-radius: 6px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; }
+  .stat { background: var(--panel2); border-radius: 10px; padding: 8px 4px; text-align: center; }
+  .stat small { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .stat span { font-size: 18px; font-weight: 800; }
+  .last { margin-top: 10px; font-size: 14px; color: var(--muted); }
+  .last b { color: var(--text); }
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 12px; }
+  .actions button { background: var(--panel2); border-radius: 10px; padding: 11px 4px; font-size: 14px; font-weight: 600; }
+  .actions .video { background: #3a1c1c; color: #ffb3b3; }
+  .actions button:disabled { opacity: .35; }
+  .custom { font-size: 11px; color: var(--ok); margin-top: 6px; }
+  .logbtn { width: 100%; margin-top: 8px; background: transparent; border: 1px dashed var(--line); border-radius: 10px; padding: 10px; font-weight: 600; color: var(--muted); }
+  .log { margin-top: 10px; display: grid; gap: 8px; }
+  .row { display: grid; grid-template-columns: 46px 1fr 1fr 96px; gap: 6px; align-items: center; }
+  .row label { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .row input { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 11px 8px; font-size: 17px; font-weight: 700; text-align: center; }
+  .row input::placeholder { color: #5b6372; font-weight: 500; }
+  .row button { background: var(--accent); color: var(--accent-ink); border-radius: 10px; padding: 12px 4px; font-weight: 800; font-size: 13px; }
+  .row.done button { background: var(--ok); color: #04210f; }
+  .timer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: #11141a; border-top: 2px solid var(--accent); padding: 12px 16px 16px; display: none; }
+  .timer.show { display: block; }
+  .timer.finished { border-color: var(--ok); background: #0d2418; }
+  .timer .t-top { display: flex; justify-content: space-between; align-items: center; }
+  .timer .t-name { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .timer .t-time { font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .timer .t-btns { display: flex; gap: 6px; }
+  .timer .t-btns button { background: var(--panel2); border-radius: 10px; padding: 10px 12px; font-weight: 700; }
+  .bar { height: 6px; background: var(--panel2); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 100%; }
+  .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.6); display: none; align-items: flex-end; }
+  .overlay.show { display: flex; }
+  .sheet { background: var(--panel); width: 100%; max-height: 88vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 18px 16px 22px; }
+  .sheet h2 { margin: 0 0 10px; font-size: 20px; }
+  .sheet p, .sheet pre { line-height: 1.55; color: #d6dae2; }
+  .sheet pre { white-space: pre-wrap; font-family: inherit; font-size: 16px; margin: 0; }
+  .sheet input { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 12px; font-size: 15px; }
+  .sheet .btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .sheet .btns button { flex: 1; background: var(--panel2); border-radius: 10px; padding: 12px; font-weight: 700; }
+  .sheet .btns .primary { background: var(--accent); color: var(--accent-ink); }
+  .err { color: var(--danger); font-size: 13px; min-height: 18px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Strength Program</h1>
+    <div class="menu">
+      <button id="btnWarmup">Warm-up</button>
+      <button id="btnProg">Progression</button>
+    </div>
+  </div>
+  <div class="weeklabel"><b id="weekTitle">Week 1</b><span class="phase" id="phaseLabel"></span></div>
+  <div class="weeks" id="weeks"></div>
+  <div class="tabs" id="tabs"></div>
+</header>
+<main id="list"></main>
+
+<div class="timer" id="timer">
+  <div class="t-top">
+    <div><div class="t-name" id="tName"></div><div class="t-time" id="tTime">0:00</div></div>
+    <div class="t-btns"><button id="tPlus">+15s</button><button id="tStop">Stop</button></div>
+  </div>
+  <div class="bar"><i id="tBar"></i></div>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
