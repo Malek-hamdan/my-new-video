@@ -555,7 +555,7 @@
   .arch-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 10px; }
   .arch-row select { font-size: 14px; padding: 7px 10px; }
   .arch-row .muted-p { margin: 0; }
-  .arch-actions .btn:disabled, #ordPrint:disabled { opacity: 0.45; cursor: not-allowed; }
+  .arch-actions .btn:disabled, #ordPrint:disabled, #ordXlsx:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn.btn-danger { border-color: rgba(255,120,120,0.55); color: #ffb4b4; }
   .ysum { width: 190mm; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
   .ysum h1 { margin: 0; font-size: 22px; color: #1F3864; }
@@ -1280,6 +1280,7 @@
       <div class="order-sel" id="ordSel"></div>
       <div class="confirm-actions" style="margin-top:18px">
         <button class="btn" id="ordCancel" type="button">Cancel</button>
+        <button class="btn btn-export" id="ordXlsx" type="button">Export Excel</button>
         <button class="btn btn-primary" id="ordPrint" type="button">Print request</button>
       </div>
     </div>
@@ -3327,8 +3328,8 @@
     });
     // what goes on the request
     var sel = document.getElementById("ordSel"), rows = ordRows();
-    if (!rows.length) { sel.innerHTML = '<div class="order-empty">' + (ordMode === "equip" ? "No items yet. Tick an item above or add one." : "No parts yet. Tick a part above or add one.") + "</div>"; document.getElementById("ordPrint").disabled = true; return; }
-    document.getElementById("ordPrint").disabled = false;
+    if (!rows.length) { sel.innerHTML = '<div class="order-empty">' + (ordMode === "equip" ? "No items yet. Tick an item above or add one." : "No parts yet. Tick a part above or add one.") + "</div>"; document.getElementById("ordPrint").disabled = document.getElementById("ordXlsx").disabled = true; return; }
+    document.getElementById("ordPrint").disabled = document.getElementById("ordXlsx").disabled = false;
     var t = document.createElement("table");
     t.innerHTML = '<colgroup><col style="width:36px"><col style="width:100px"><col><col style="width:200px"><col style="width:90px"><col style="width:120px"><col style="width:40px"></colgroup>' + "<tr><th>#</th><th>" + (ordMode === "equip" ? "Type" : "Machine") + "</th><th>" + (ordMode === "equip" ? "Item" : "Part name") + "</th><th>Reference</th><th>In stock</th><th>Qty to order</th><th></th></tr>";
     rows.forEach(function (x, i) {
@@ -3364,7 +3365,7 @@
     var n = 0, rows = ordRows();
     rows.forEach(function (x) { n += x.qty; });
     var el = document.getElementById("ordTot"); if (el) el.textContent = rows.length + ordWord(rows.length) + " \u00B7 " + n + " pcs";
-    document.getElementById("ordPrint").disabled = !rows.length || rows.some(function (x) { return x.qty < 1; });
+    document.getElementById("ordPrint").disabled = document.getElementById("ordXlsx").disabled = !rows.length || rows.some(function (x) { return x.qty < 1; });
   }
   function prNo(n) { return String(n); }
   function prHtml(no, by, urgent, rows) {
@@ -3413,6 +3414,32 @@
     try { localStorage.setItem(PR_NEXT_KEY, String(no + 1)); localStorage.setItem(TR_ME_KEY, by); } catch (e) {}
     orderDlg.hidden = true;
     printHtml('<div class="spage">' + prHtml(no, by, document.getElementById("ordUrgent").checked, rows) + "</div>");
+  });
+
+  // The same request as an Excel file: parts by reference only (no name); equipment keeps its item name
+  document.getElementById("ordXlsx").addEventListener("click", function () {
+    var rows = ordRows(), no = Math.max(1, parseInt(document.getElementById("ordNo").value, 10) || 1), by = document.getElementById("ordBy").value.trim();
+    if (!rows.length) return;
+    try { localStorage.setItem(PR_NEXT_KEY, String(no + 1)); localStorage.setItem(TR_ME_KEY, by); } catch (e) {}
+    var eq = ordMode === "equip", loc = !eq && origin === "loc", d = new Date(), pcs = 0;
+    function z(name, i) { return name + (i % 2 ? "Z" : ""); }
+    var cells = rows.map(function (x, i) {
+      pcs += x.qty;
+      var c = [{ v: i + 1, s: z("center", i) }, { v: ordWhere(x.r), s: z("text", i) }];
+      if (eq) c.push({ v: x.r.name || "", s: z("text", i) });
+      return c.concat([{ v: x.r.reference || "", s: z("text", i) }, { v: trStock(x.r), s: z("center", i) }, { v: x.qty, s: z("bold", i) }, { v: "", s: z("text", i) }]);
+    });
+    var th = eq ? "EQUIP" : "UII", tot = [{ v: "Total \u00B7 " + rows.length + ordWord(rows.length), s: "totL_" + th }, { v: "", s: "totN_" + th }];
+    if (eq) tot.push({ v: "", s: "totN_" + th });
+    tot.push({ v: "", s: "totN_" + th }, { v: "", s: "totN_" + th }, { v: pcs, s: "totN_" + th }, { v: "", s: "totN_" + th });
+    var cols = [{ name: "#", width: 6 }, { name: eq ? "Type" : "Machine", width: 14 }];
+    if (eq) cols.push({ name: "Item", width: 34 });
+    cols = cols.concat([{ name: "Reference", width: 26 }, { name: "In stock", width: 11 }, { name: "Qty to order", width: 14 }, { name: "Notes", width: 34 }]);
+    var title = "UII \u2014 Order Request" + (eq ? " \u00B7 Equipment" : loc ? " \u00B7 LOCAL PARTS" : "");
+    var sub = "No. " + prNo(no) + " \u00B7 " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + (by ? " \u00B7 Requested by " + by : "") + (document.getElementById("ordUrgent").checked ? " \u00B7 URGENT" : "");
+    var book = packXlsx([{ name: "Order request", xml: sheetXml({ title: title, subtitle: sub, theme: th, rows: cells, totals: [tot], columns: cols }) }]);
+    var file = "UII-" + (eq ? "Equipment-" : loc ? "Local-" : "") + "Order-Request-" + prNo(no) + "-" + ymd(Date.now()) + ".xlsx";
+    saveFile(file, book, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
 
   // ---- Blank slips: empty issue slips to fill by hand in the store room ----
