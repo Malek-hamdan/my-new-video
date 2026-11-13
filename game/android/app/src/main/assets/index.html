@@ -177,7 +177,8 @@ const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
 // The game runs in "track space": x across the 5 lanes, y up from the track, z distance travelled.
 // Rendering bends that space into hills and curves; the rules never see them.
 const COLS = 5, HALF = 2.5, ROW = 2, R = 0.35, BLOCK_H = 0.9, VIEW = 80;
-const viewDist = () => clamp(VIEW + (ball.speed - 24) * 2.5, VIEW, 210);
+const viewDist = () => { const v = clamp(VIEW + (ball.speed - 24) * 2.5, VIEW, 210), e = typeof dropEdge === 'function' && dropEdge();
+  return e && e - ball.z < 500 ? Math.max(v, 320) : v; };   // see the end of the track coming from further off
 const FLOOR = 0, HOLE = 1, BLOCK = 2, PAD = 3;   // and CRACK (worlds)
 const BOX_STEP = 0.35;   // a ball this close to a box's top rides over it rather than crashing
 const MOVER_HW = 0.42;   // half width of a sliding wall
@@ -344,8 +345,18 @@ function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power
 
 function makeRow(i) {
   const row = newRow();
+  // the end of the track before a Rhythm World is laid down as soon as it comes into view, so it is seen
+  // coming from far off: a clear run-up, the launch ramp across all lanes, then nothing
+  const e = dropEdge();
+  if (e != null && i >= Math.round(e / ROW) - 200) gen.tunnelLeft = 0;   // nothing in the way of the view of it
+  if (e != null && i >= Math.round(e / ROW) - DROP_CLEAR) {
+    const E = Math.round(e / ROW);
+    row.cells.fill(i < E ? FLOOR : i === E ? PAD : HOLE); row.hard = S.hard > 0;
+    row.portal = i === E + 3;   // a big glowing ring just past the ramp, to fly through
+    return row;
+  }
   if (gen.tunnelLeft > 0 && !inCity(i * ROW)) { row.tunnel = true; gen.tunnelLeft--; }
-  else if (i * ROW > 350 && Math.random() < 0.012 + 0.02 * S.hard) gen.tunnelLeft = ri(25, 40);
+  else if (i * ROW > 350 && !(e != null && i >= Math.round(e / ROW) - 250) && Math.random() < 0.012 + 0.02 * S.hard) gen.tunnelLeft = ri(25, 40);
   row.hard = S.hard > 0;
   if (i * ROW < S.startZ + (S.startZ ? 60 : 24)) return row;   // a calm stretch where each run starts (longer when resuming at speed)
   if (gen.queue.length) { gen.queue.shift()(row); return row; }
@@ -437,7 +448,7 @@ function reset() {
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
-  S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0; S.world = 'run'; S.rpts = 0;
+  S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0; S.world = 'run'; S.rpts = 0; S.edgeSaid = null;
   if (typeof hopClear === 'function') hopClear();
   const w = curW();
   S.turbo = !w && S.startZ >= TURBO_AT ? 1 : 0;
@@ -998,6 +1009,9 @@ function step(dt) {
         if (S.nextFast % step) { say(`Faster! ⚡\n${Math.round(b.speed)} m/s`, '#ffd60a'); sfx.boost(); buzz([30, 30, 30]); }
         S.nextFast += 1000;
       }
+      // the end of the track is in sight
+      const de = dropEdge();
+      if (de != null && de - b.z < 450 && S.edgeSaid !== de) { S.edgeSaid = de; say('Rhythm World ahead 🎵', '#c8b6ff'); }
       // gems caught by the magnet fly into the ball
       pulled = pulled.filter(g => {
         const k = Math.min(1, dt * 9);
@@ -1007,14 +1021,14 @@ function step(dt) {
         if (g.mesh) scene.remove(g.mesh);
         return false;
       });
-      const w = curW();
-      if (w && b.z - S.levelZ >= w.len && S.world === 'run') {
+      const w = curW(), early = dropEdge() != null ? DROP_RUN : 0;   // into the finale a little before the edge
+      if (w && b.z - S.levelZ >= w.len - early && S.world === 'run') {
         S.level++; S.levelZ += w.len; sfx.level();
         if (S.level > (+load('rb_wlv_' + S.wid) || 1)) save('rb_wlv_' + S.wid, S.level);
         S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
         if (S.level > w.levels) startDrop();   // the world's finale: off the end of the track into its Rhythm World
         else say(`Level ${S.level}/${w.levels}\n${LEVEL_WORDS[(S.level - 2) % LEVEL_WORDS.length]}`, TH.msg);
-      } else if (!w && b.z - S.levelZ >= LEVEL_LEN) {
+      } else if (!w && b.z - S.levelZ >= LEVEL_LEN - early) {
         S.level++; S.levelZ += LEVEL_LEN; sfx.level();
         if (!S.mighty && S.level > S.savedLevel) { S.savedLevel = S.level; save('rb_level', S.level); }
         S.bank += S.gems - S.banked; S.banked = S.gems; save('rb_bank', S.bank);
@@ -1187,6 +1201,9 @@ function initWorld() {
   MAT.magnet = new THREE.MeshStandardMaterial({ color: 0xf72585, emissive: 0x7a0a40, roughness: 0.3 });
   GEO.tip = new THREE.BoxGeometry(0.15, 0.12, 0.15);
   MAT.tip = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x555555 });
+  GEO.portal = new THREE.TorusGeometry(4.2, 0.32, 12, 64); GEO.portalDisc = new THREE.CircleGeometry(4, 48);
+  MAT.portal = new THREE.MeshBasicMaterial({ color: 0xffd166, fog: false });
+  MAT.portalDisc = new THREE.MeshBasicMaterial({ color: 0xff5fa2, transparent: true, opacity: 0.28, fog: false, depthWrite: false, side: THREE.DoubleSide });
   GEO.arch = new THREE.TorusGeometry(4.8, 0.06, 6, 32, Math.PI);   // tall enough to clear the camera
   MAT.archA = new THREE.MeshBasicMaterial({ color: 0x4cc9f0 });
   MAT.archB = new THREE.MeshBasicMaterial({ color: 0xf72585 });
@@ -1668,6 +1685,11 @@ function buildRow(i) {
     grp.add(m); row.moverMeshes.push([mv, m]);
   }
   row.walkers = city ? cityDecor(grp, i, zc) : null;
+  if (row.portal) {   // the gate into the Rhythm World, bright through the haze, square to the track
+    const ring = new THREE.Mesh(GEO.portal, MAT.portal), disc = new THREE.Mesh(GEO.portalDisc, MAT.portalDisc);
+    const a = Wp(0, 0, zc - 2), c = Wp(0, 0, zc + 2);
+    for (const m of [ring, disc]) { Wp(0, 3, zc, m.position); m.rotation.y = Math.atan2(c.x - a.x, c.z - a.z); grp.add(m); }
+  }
   if (row.laser && !row.laser.gone) {
     const l = row.laser, add = (geo, mat, x, y) => { const m = new THREE.Mesh(geo, mat); Wp(x, y, zc, m.position); grp.add(m); return m; };
     if (l.type === 'fence') {
@@ -1943,16 +1965,26 @@ const isRhythmLevel = n => n >= RHYTHM_FIRST && (n - RHYTHM_FIRST) % RHYTHM_EVER
 const HOP = { tiles: [], live: [], k: 0, lv: null, perfect: 0 };
 const flash = (on) => $('flash').classList.toggle('on', on);
 
+// where the track ends before the next Rhythm World, while that end is still ahead on the track
+const DROP_RUN = 50, DROP_CLEAR = 45;   // the finale starts 50 m before the edge; the last 90 m are clear
+function dropEdge() {
+  if (S.world !== 'run' || S.mighty) return null;
+  const w = curW();
+  if (w) return S.level === w.levels ? S.levelZ + w.len : null;
+  return isRhythmLevel(S.level + 1) ? S.levelZ + LEVEL_LEN : null;
+}
 function startDrop() {
   const b = ball, i = Math.floor(b.z / ROW);
   S.world = 'drop'; S.wt = 0; S.launched = 0; runMusicStop(true);
   for (const c of cars) if (c.mesh) scene.remove(c.mesh);
   cars = [];
-  // a clear run-up, a ramp across all lanes, then the track simply ends
-  const edge = i + Math.round(50 / ROW);
-  for (let j = i - 2; j < edge + 80; j++) {
-    const r = rowAt(j);
-    Object.assign(r, { cells: r.cells.fill(j < edge ? FLOOR : j === edge ? PAD : HOLE), movers: [], laser: null, power: null, gems: [], tunnel: false, dirty: true });
+  // a clear run-up, a ramp across all lanes, then the track simply ends. Normally all of it is already
+  // there (the edge is the level's end, laid down far ahead); when a run resumes at a finale it is made here.
+  const laid = S.levelZ > b.z, edge = laid ? Math.round(S.levelZ / ROW) : i + Math.round(DROP_RUN / ROW);
+  for (let j = laid ? edge + 1 : i - 2; j < edge + 80; j++) {
+    const r = rowAt(j), c = j < edge ? FLOOR : j === edge ? PAD : HOLE;
+    if (laid && r.cells.every(x => x === c) && !r.movers.length && !r.laser) continue;
+    Object.assign(r, { cells: r.cells.fill(c), movers: [], laser: null, power: null, gems: [], tunnel: false, dirty: true });
   }
   S.edgeZ = edge * ROW + 0.6;
   const w = curW();
@@ -2178,7 +2210,7 @@ function warmUp() {
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
   for (const [g, m] of [[GEO.beamH, MAT.beam], [GEO.beamHGlow, MAT.beamGlow], [GEO.beamH, MAT.beamOff], [GEO.post, MAT.post], [GEO.emitter, MAT.emitter], [GEO.gantry, MAT.post]]) add(new THREE.Mesh(g, m));
   add(new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(RHYTHM_THEME.rail))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(0xff5fa2))); add(new THREE.Mesh(GEO.tile, MAT.tileHit));
-  add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB));
+  add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB)); add(new THREE.Mesh(GEO.portal, MAT.portal)); add(new THREE.Mesh(GEO.portalDisc, MAT.portalDisc));
   for (const [g, m] of [[GEO.icicle, MAT.icicle], [GEO.nozzle, MAT.nozzle], [GEO.jet, MAT.jet], [GEO.jetCore, MAT.jetCore], [GEO.spire, MAT.iceSpire], [GEO.rock, MAT.rock],
     [GEO.pool, MAT.pool], [GEO.tower, MAT.tower], [GEO.rock, MAT.asteroid], [GEO.pillar, MAT.marble], [GEO.cap, MAT.goldCap], [GEO.cloud, MAT.cloud]]) add(new THREE.Mesh(g, m));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
