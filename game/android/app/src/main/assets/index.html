@@ -520,8 +520,9 @@ function start(mighty, fresh, wid) {
   if (typeof mighty === 'boolean') { S.mighty = mighty; S.wid = wid || null; }   // Play Again keeps the current mode
   if (S.mighty && !S.mightyOpen) return;
   const w = curW();
-  // normal runs start at the furthest level reached so far, unless asked to start over; worlds at their own
-  S.startZ = w ? (clamp(+load('rb_wlv_' + S.wid) || 1, 1, w.levels + 1) - 1) * w.len : S.mighty || fresh ? 0 : (S.savedLevel - 1) * LEVEL_LEN;
+  // normal runs start at the furthest level reached so far, unless asked to start over; worlds at their own.
+  // Play Again goes back to where this run began (only a paid continue picks up where the ball was lost)
+  if (typeof mighty === 'boolean') S.startZ = w ? (clamp(+load('rb_wlv_' + S.wid) || 1, 1, w.levels + 1) - 1) * w.len : S.mighty || fresh ? 0 : (S.savedLevel - 1) * LEVEL_LEN;
   applyTheme(S.wid || 'classic');
   ac(); reset();
   S.phase = 'play';
