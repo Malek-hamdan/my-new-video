@@ -72,6 +72,31 @@ rep('  /* Two areas: Spare Parts and Equipment */', '''  /* Accounts and permiss
   .users-table select, .nu-row input, .nu-row select, .pw-row input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.03); color: var(--text); }
   .users-table .btn { padding: 5px 10px; font-size: 12px; }
   .users-table tr.off td { opacity: 0.5; }
+  .pend-btn .pend-n { display: inline-flex; min-width: 22px; height: 22px; padding: 0 6px; margin-left: 8px; align-items: center; justify-content: center; border-radius: 11px; background: rgba(255,255,255,0.1); font-size: 12px; }
+  .pend-btn.has-wait { border-color: #e0a030; color: #fcd34d; }
+  .pend-btn.has-wait .pend-n { background: #e0a030; color: #1a1205; }
+  .pend-btn[hidden] { display: none !important; }
+  .pend-tools { display: flex; gap: 8px; margin: 4px 0 12px; }
+  .pend-tools [hidden] { display: none; }
+  .pend-note { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: rgba(91,157,255,0.1); color: var(--text); font-weight: 600; font-size: 14px; }
+  .pend-note[hidden] { display: none; }
+  .pend-table td.pin { color: #4ade80; font-weight: 700; white-space: nowrap; }
+  .pend-table td.pout { color: #f87171; font-weight: 700; white-space: nowrap; }
+  .pend-act { white-space: nowrap; }
+  .pend-act .btn { padding: 6px 12px; font-size: 13px; margin-right: 6px; }
+  .pend-err { color: #f87171; font-size: 12px; margin-top: 4px; white-space: normal; }
+  .pend-st { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+  .pend-st.waiting { background: rgba(224,160,48,0.18); color: #fcd34d; }
+  .pend-st.approved { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .pend-st.rejected { background: rgba(248,113,113,0.15); color: #f87171; }
+  body.signed-in.can-needsOk:not(.can-edit) #recvTop, body.signed-in.can-needsOk:not(.can-edit) #recvBottom { display: none !important; }
+  @media (max-width: 640px) {
+    .pend-table thead { display: none; }
+    .pend-table tr { display: grid !important; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+    .pend-table td { display: block !important; width: auto !important; padding: 0 !important; border: 0 !important; }
+    .pend-table td:nth-child(n+3) { grid-column: 1 / -1; }
+    .pend-table td:empty { display: none !important; }
+  }
   .imp-bar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; padding: 9px 16px; background: #7c2d12; color: #ffedd5; font-weight: 600; font-size: 14px; text-align: center; }
   .imp-bar[hidden] { display: none; }
   .imp-bar .btn { padding: 6px 12px; font-size: 13px; background: #ffedd5; color: #7c2d12; border-color: #ffedd5; }
@@ -119,6 +144,7 @@ rep('''      <span id="exportLabel">Export to Excel</span>
     </div>
   </header>''', '''      <span id="exportLabel">Export to Excel</span>
     </button>
+    <button class="btn pend-btn" id="pendBtn" type="button" hidden title="Receive and Transfer waiting for approval"><span>Waiting</span><b class="pend-n">0</b></button>
     <button class="btn" id="actBtn" type="button" title="Who changed what, and when"><span>Activity</span></button>
     <button class="btn" id="usersBtn" type="button" title="Accounts and what each person may do"><span>Users</span></button>
     <div class="me-chip" id="meChip" hidden><span class="av"></span><span class="me-txt"><span class="who"></span><span class="role"></span></span><button class="btn" id="signOut" type="button">Sign out</button></div>
@@ -131,6 +157,13 @@ rep('  <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" 
       <div class="dlg-head"><div><strong id="actTitle">Activity</strong><p class="muted-p">Who changed what, and when. Nobody can edit or delete this list.</p></div><button class="btn" id="actClose" type="button">Close</button></div>
       <div class="act-filter" id="actFilter"></div>
       <div class="users-scroll" id="actList"></div>
+    </div>
+  </div>
+  <div class="confirm" id="pendDlg" hidden role="dialog" aria-modal="true" aria-labelledby="pendTitle">
+    <div class="confirm-card users-card">
+      <div class="dlg-head"><div><strong id="pendTitle">Waiting for approval</strong><p class="muted-p">Receive and Transfer from people marked "Needs approval". The stock changes only when it is approved.</p></div><button class="btn" id="pendClose" type="button">Close</button></div>
+      <div class="pend-tools"><button class="btn btn-primary" id="pendAll" type="button">Approve all</button><button class="btn" id="pendToggle" type="button">Show history</button></div>
+      <div class="users-scroll" id="pendList"></div>
     </div>
   </div>
   <div class="confirm" id="usersDlg" hidden role="dialog" aria-modal="true" aria-labelledby="usersTitle">
@@ -154,6 +187,7 @@ rep('  <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" 
 rep('''  function addRow(received) {
     if (sideView) { addSide(); return; }''', '''  function addRow(received) {
     if (!(received ? can("receive") || can("edit") : can("edit"))) return;
+    if (received && can("needsOk") && !can("edit")) return;
     if (sideView) { addSide(); return; }''')
 rep('''    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency(), local: origin === "loc" }, active);''',
     '''    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency(), local: origin === "loc" }, active);
@@ -188,6 +222,11 @@ rep('''  function saveDoc(coll, id, body) {
 rep('''  function deleteDoc(coll, id) {
 ''', '''  function deleteDoc(coll, id) {
     trackDel(coll, id);
+''')
+
+rep('''    if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
+''', '''    if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
+    if (pendingIntercept()) return;
 ''')
 
 # ---------- sign-in, permissions, Activity, Users
