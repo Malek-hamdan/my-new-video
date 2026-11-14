@@ -55,7 +55,38 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 .shopTitle{font-size:28px;font-weight:900;letter-spacing:3px;background:linear-gradient(90deg,#4cc9f0,#c77dff,#f72585);-webkit-background-clip:text;background-clip:text;color:transparent}
 .bankPill{background:linear-gradient(180deg,#ffffff22,#ffffff0c);border:1px solid #ffffff30;border-radius:20px;padding:6px 14px;font-weight:900;font-size:18px}
 .tabs{display:flex;gap:6px;background:#ffffff14;border-radius:14px;padding:5px;width:calc(100% - 28px);box-sizing:border-box}
-.tabs button{flex:1;border:0;background:none;color:#fff;font:800 15px system-ui;padding:9px 0;border-radius:10px;opacity:.7}
+.tabs button{position:relative;flex:1;border:0;background:none;color:#fff;font:800 12px system-ui;line-height:1.25;padding:6px 0;border-radius:10px;opacity:.7}
+.dot{position:absolute;top:3px;right:6px;width:11px;height:11px;border-radius:50%;background:#ff3355;box-shadow:0 0 8px #ff3355}
+.btn.shop{position:relative}
+.trailPrev{width:100%;height:64px;border-radius:12px;margin:4px 0 2px;background:#0b0820;position:relative;overflow:hidden}
+.trailPrev b{position:absolute;right:10px;top:21px;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#8fd3ff 45%,#2a6fd6)}
+.trailPrev i{position:absolute;left:8px;right:22px;top:26px;height:12px;border-radius:8px;filter:blur(2px)}
+.ucard{display:flex;align-items:center;gap:10px;border-radius:16px;padding:10px 12px;margin-bottom:9px;background:linear-gradient(180deg,#ffffff16,#ffffff06);border:1.5px solid #ffffff22}
+.ucard .ui{font-size:30px;width:40px;text-align:center}
+.ucard .ut{flex:1;text-align:left}
+.ucard .ut b{display:block;font-size:15px}
+.ucard .ut small{opacity:.8;font-size:12px}
+.pips{display:flex;gap:4px;margin-top:5px}
+.pips span{width:22px;height:6px;border-radius:3px;background:#ffffff25}
+.pips span.on{background:linear-gradient(90deg,#7ae582,#25a244)}
+.ucard .buy{width:96px;margin:0}
+.fbox{border-radius:18px;padding:12px;margin-bottom:12px;background:linear-gradient(180deg,#ffffff16,#ffffff06);border:1.5px solid #ffd16688;text-align:center}
+.fbox h3{margin:2px 0 4px;font-size:19px}
+.fbox p{margin:0 0 8px;font-size:13px;opacity:.85}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:6px 0 10px}
+.days div{border-radius:9px;padding:5px 0;background:#ffffff14;font-size:10px;font-weight:800}
+.days div b{display:block;font-size:12px}
+.days div.got{background:linear-gradient(180deg,#7ae582,#25a244)}
+.days div.now{outline:2px solid #ffd166;background:#ffd16633}
+.boxArt{font-size:54px;margin:4px 0;display:inline-block;animation:wob 2.2s ease-in-out infinite}
+@keyframes wob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg) scale(1.06)}}
+#gift{position:absolute;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:9}
+#gift.hidden{display:none}
+.gbox{width:78%;border-radius:22px;padding:20px 16px;background:radial-gradient(circle at 50% 20%,#4b2bb3,#1a0f4a);border:2px solid #ffd166;text-align:center;animation:pop .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.gicon{font-size:64px}
+.gtitle{font-size:22px;font-weight:900;margin:6px 0}
+.gtext{font-size:15px;opacity:.9;margin-bottom:12px}
 .tabs button.on{background:linear-gradient(180deg,#4cc9f0,#3a86ff);opacity:1}
 #shopList{flex:1;width:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:4px 14px 18px;box-sizing:border-box}
 .sgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
@@ -107,7 +138,7 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
   <h1>Rolling Ball</h1>
   <button class="btn" id="play">Play</button>
   <button class="btn small hidden" id="playFresh">Start from Level 1</button>
-  <div class="menuRow"><button class="btn worlds" id="openWorlds">🌍 Worlds</button><button class="btn shop" id="openShop">🛒 Shop</button></div>
+  <div class="menuRow"><button class="btn worlds" id="openWorlds">🌍 Worlds</button><button class="btn shop" id="openShop">🛒 Shop<i class="dot hidden" id="shopDot"></i></button></div>
   <button class="btn mighty" id="playMighty">💀 Mighty Level</button>
   <p id="mightyNote"></p>
   <button class="btn small" id="openSettings">⚙️ Settings</button>
@@ -134,8 +165,9 @@ h1{font-size:38px;margin:0;line-height:1.3;background:linear-gradient(90deg,#4cc
 
 <div id="shop" class="overlay hidden">
   <div class="shopTop"><div class="shopTitle" id="shopTitle">SHOP</div><div class="bankPill" id="shopBank">💎 0</div></div>
-  <div class="tabs"><button data-t="balls" class="on">🔵 Balls</button><button data-t="worlds">🌍 Worlds</button></div>
+  <div class="tabs"><button data-t="balls" class="on">🔵<br>Balls</button><button data-t="trails">✨<br>Trails</button><button data-t="boosts">⚡<br>Boosts</button><button data-t="free">🎁<br>Free<i class="dot hidden" id="freeDot"></i></button><button data-t="worlds">🌍<br>Worlds</button></div>
   <div id="shopList"></div>
+  <div id="gift" class="hidden"><div class="gbox"><div class="gicon" id="giftIcon">🎁</div><div class="gtitle" id="giftTitle"></div><div class="gtext" id="giftText"></div><button class="buy green" id="giftOk">Nice!</button></div></div>
   <button class="btn" id="shopClose" style="margin:0 0 calc(env(safe-area-inset-bottom) + 14px)">Done</button>
 </div>
 <div id="wdone" class="overlay hidden">
@@ -338,7 +370,7 @@ const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vi
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), bestMighty: +(load('rb_best_mighty') || 0), mightyOpen: load('rb_mighty') === '1',
   mighty: false, level: 1, levelZ: 0, startZ: 0, savedLevel: Math.max(1, +(load('rb_level') || 1)), shake: 0, combo: 0,
   bank: +(load('rb_bank') || 0), banked: 0, wid: null, wOwned: loadJSON('rb_wown', []), wDone: loadJSON('rb_wdone', []),
-  balls: loadJSON('rb_balls', ['classic']), skin: load('rb_skin') || 'classic', continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0, world: 'run', wt: 0, pulse: 0, rpts: 0 };
+  balls: loadJSON('rb_balls', ['classic']), skin: load('rb_skin') || 'classic', trails: loadJSON('rb_trails', ['none']), trail: load('rb_trail') || 'none', up: loadJSON('rb_up', {}), continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0, world: 'run', wt: 0, pulse: 0, rpts: 0 };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power: null, movers: [], tunnel: false, group: null, dirty: false }; }
@@ -366,7 +398,7 @@ function makeRow(i) {
     // calm row: drift the safe path and maybe lay a gem or a power-up on it
     if (Math.random() < 0.35) gen.safe = clamp(gen.safe + (Math.random() < 0.5 ? -1 : 1), 0, COLS - 1);
     // power-ups come more often the further you get: every ~120 m at first, every ~36 m from 2 km on
-    if (z > 150 && i - gen.lastPower > Math.max(18, 60 - z * 0.02) && Math.random() < 0.05 + Math.min(0.07, z / 20000)) {
+    if (z > 150 && i - gen.lastPower > Math.max(18, 60 - z * 0.02) && Math.random() < (0.05 + Math.min(0.07, z / 20000)) * (1 + 0.15 * upLv('luck'))) {
       row.power = { k: gen.safe, type: pickPower(z) }; gen.lastPower = i;
     } else if (Math.random() < 0.3) row.gems.push(gen.safe);
     return row;
@@ -546,6 +578,7 @@ function start(mighty, fresh, wid) {
     else say(`${w.icon} ${w.n}\nLevel ${S.level}/${w.levels}`, TH.msg);
   } else if (S.mighty) say('MIGHTY LEVEL 💀', '#ff3355');
   else if (S.startZ > 0) say(`Level ${S.level}`, '#80ffdb');
+  if (upLv('start')) ball.shield = 5;   // the shop's head-start shield
   if (!w && !S.mighty && isRhythmLevel(S.level)) startDrop();   // resuming at a Rhythm World level
   hud();
 }
@@ -557,6 +590,7 @@ function goMenu() {
   menuUI(); $('menu').classList.remove('hidden');
 }
 function menuUI() {
+  shopDots();
   $('play').textContent = S.savedLevel > 1 ? `▶ Play · Level ${S.savedLevel}` : 'Play';
   $('playFresh').classList.toggle('hidden', S.savedLevel <= 1);
   $('playMighty').disabled = !S.mightyOpen;
@@ -585,9 +619,53 @@ function worldState(id) {
   if (S.wOwned.includes(id)) return 'play';
   return i === 0 || S.wDone.includes(prev) ? 'buy' : 'locked';
 }
+// trails: a glowing streak behind the ball (looks only)
+const TRAILS = [['none', 'No Trail', 'common', 0, 'transparent'], ['fire', 'Fire', 'common', 300, 'linear-gradient(90deg,#ff2e0000,#ff2e00,#ff7b00,#ffd166)'],
+  ['ice', 'Frost', 'common', 300, 'linear-gradient(90deg,#4cc9f000,#4cc9f0,#7ad7ff,#e0fbff)'], ['stars', 'Stardust', 'rare', 500, 'radial-gradient(circle,#fff 1.5px,transparent 2.5px) 0 0/9px 9px'],
+  ['gold', 'Gold Dust', 'rare', 700, 'linear-gradient(90deg,#ffb70300,#ffb703,#ffd166,#fff1c1)'], ['neon', 'Neon', 'epic', 900, 'linear-gradient(90deg,#ff2bd600,#ff2bd6,#00f5ff)'],
+  ['rainbow', 'Rainbow', 'legend', 1500, 'linear-gradient(90deg,#ff000000,#ff0000,#ff9900,#ffee00,#33dd33,#3399ff,#aa44ff)']];
+// upgrades: bought once per level and kept for good
+const UPS = [['shield', '🛡️', 'Longer Shield', 'Shield lasts +3 s per level', [400, 800, 1500]],
+  ['magnet', '🧲', 'Stronger Magnet', 'Magnet lasts +3 s per level', [400, 800, 1500]],
+  ['gems', '💎', 'Gem Rush', 'Double and ×5 gems last +3 s per level', [500, 1000, 2000]],
+  ['luck', '🍀', 'Lucky', '15% more power-ups per level', [500, 1000, 2000]],
+  ['revive', '❤️', 'Cheaper Second Chance', 'Continuing costs 25% less per level', [600, 1200]],
+  ['start', '🚀', 'Head Start Shield', 'Every run starts with a 5 s shield', [1200]]];
+const upLv = k => +(S.up[k] || 0);
+// the daily gift: come back on following days for bigger gifts (missing a day starts over)
+const DAILY = [100, 150, 200, 300, 400, 500, 1000], BOX_PRICE = 500;
+const dayKey = (d = new Date()) => d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+function dailyState() {
+  const d = loadJSON('rb_daily', {}), today = dayKey(), yest = dayKey(new Date(Date.now() - 864e5));
+  if (d.day === today) return { ready: false, streak: d.streak };   // already taken today
+  return { ready: true, streak: d.day === yest ? d.streak % 7 : 0 };   // the day number about to be taken, from 0
+}
+function shopDots() { const r = dailyState().ready; $('shopDot').classList.toggle('hidden', !r); $('freeDot').classList.toggle('hidden', !r); }
+function giftPopup(icon, title, text) {
+  $('giftIcon').textContent = icon; $('giftTitle').textContent = title; $('giftText').innerHTML = text;
+  $('gift').classList.remove('hidden'); sfx.power(); buzz([30, 40, 80]);
+}
+$('giftOk').onclick = () => { $('gift').classList.add('hidden'); renderShop(); };
+function openBox() {
+  if (!spend(BOX_PRICE)) return;
+  const ballsLeft = BALLS.filter(b => b[2] !== 'royal' && !S.balls.includes(b[0])), trailsLeft = TRAILS.filter(t => !S.trails.includes(t[0]));
+  const r = Math.random();
+  if (r < 0.15 && ballsLeft.length) {
+    const b = ballsLeft[ri(0, ballsLeft.length - 1)]; S.balls.push(b[0]); save('rb_balls', JSON.stringify(S.balls));
+    return giftPopup('🔵', 'New ball!', `<b>${b[1]}</b> is yours.<br>Equip it in Balls.`);
+  }
+  if (r < 0.4 && trailsLeft.length) {
+    const t = trailsLeft[ri(0, trailsLeft.length - 1)]; S.trails.push(t[0]); save('rb_trails', JSON.stringify(S.trails));
+    return giftPopup('✨', 'New trail!', `<b>${t[1]}</b> is yours.<br>Equip it in Trails.`);
+  }
+  const n = [250, 300, 400, 500, 600, 800, 1000, 1500][Math.min(7, Math.floor(Math.random() ** 1.8 * 8))];
+  S.bank += n; save('rb_bank', S.bank);
+  giftPopup('💎', `+${n} gems`, n > BOX_PRICE ? 'Lucky! More than the box cost.' : 'Better luck next box!');
+}
 function renderShop() {
   $('shopBank').textContent = '💎 ' + S.bank.toLocaleString();
-  $('shopTitle').textContent = shopTab === 'balls' ? 'SHOP' : 'WORLDS';
+  $('shopTitle').textContent = { balls: 'SHOP', trails: 'TRAILS', boosts: 'BOOSTS', free: 'FREE', worlds: 'WORLDS' }[shopTab];
+  shopDots();
   for (const b of document.querySelectorAll('#shop .tabs button')) b.classList.toggle('on', b.dataset.t === shopTab);
   const L = $('shopList');
   if (shopTab === 'balls') {
@@ -598,6 +676,28 @@ function renderShop() {
       return `<div class="card ${eq ? 'eq' : ''}" style="--c:${c}${r === 'royal' ? ';grid-column:span 3;box-shadow:0 0 22px #ffd16655' : ''}"><img src="shop/ball_${id}.png" alt="">` +
         `<div class="nm">${n}</div><div class="rl">${label}</div>${r === 'royal' ? '<div style="font-size:11px;opacity:.9;margin:2px 0">Opens the secret 👑 Golden Kingdom</div>' : ''}${btn}</div>`;
     }).join('') + '</div>';
+  } else if (shopTab === 'trails') {
+    L.innerHTML = '<div class="sgrid">' + TRAILS.map(([id, n, r, p, css]) => {
+      const own = S.trails.includes(id), eq = S.trail === id, [c, label] = RARITY[r];
+      const btn = eq ? '<button class="buy eq">Equipped</button>' : own ? `<button class="buy own" data-utrail="${id}">Use</button>`
+        : `<button class="buy ${r === 'legend' ? 'gold' : ''}" data-trail="${id}" ${S.bank < p ? 'disabled' : ''}>💎 ${p.toLocaleString()}</button>`;
+      return `<div class="card ${eq ? 'eq' : ''}" style="--c:${c}"><div class="trailPrev"><i style="background:${css}"></i><b></b></div>` +
+        `<div class="nm">${n}</div><div class="rl">${id === 'none' ? '&nbsp;' : label}</div>${btn}</div>`;
+    }).join('') + '</div>';
+  } else if (shopTab === 'boosts') {
+    L.innerHTML = UPS.map(([id, ic, n, txt, costs]) => {
+      const lv = upLv(id), max = costs.length, cost = costs[lv];
+      const btn = lv >= max ? '<button class="buy own" disabled>MAX</button>' : `<button class="buy ${lv ? 'green' : ''}" data-up="${id}" ${S.bank < cost ? 'disabled' : ''}>💎 ${cost.toLocaleString()}</button>`;
+      return `<div class="ucard"><div class="ui">${ic}</div><div class="ut"><b>${n}</b><small>${txt}</small>` +
+        `<div class="pips">${costs.map((_, k) => `<span class="${k < lv ? 'on' : ''}"></span>`).join('')}</div></div>${btn}</div>`;
+    }).join('');
+  } else if (shopTab === 'free') {
+    const ds = dailyState(), shown = ds.ready ? ds.streak : ds.streak - 1;
+    L.innerHTML = `<div class="fbox"><h3>🎁 Daily Gift</h3><p>Come back every day for bigger gifts. Day 7: 1,000 💎!</p>` +
+      `<div class="days">${DAILY.map((g, k) => `<div class="${k < (ds.ready ? ds.streak : ds.streak) ? 'got' : ''} ${ds.ready && k === shown ? 'now' : ''}">Day ${k + 1}<b>${g >= 1000 ? '1K' : g}</b></div>`).join('')}</div>` +
+      (ds.ready ? `<button class="buy gold" data-daily="1">Claim ${DAILY[ds.streak]} 💎</button>` : '<button class="buy own" disabled>✅ Come back tomorrow</button>') + '</div>' +
+      `<div class="fbox"><h3>📦 Mystery Box</h3><div class="boxArt">🎁</div><p>Gems (up to 1,500), a new trail, or even a new ball!</p>` +
+      `<button class="buy" data-box="1" ${S.bank < BOX_PRICE ? 'disabled' : ''}>Open · 💎 ${BOX_PRICE}</button></div>`;
   } else {
     L.innerHTML = WORLD_ORDER.map((id, i) => {
       const w = WORLDS[id], st = worldState(id), [c, label] = RARITY[WORLD_RAR[id]], done = S.wDone.includes(id), lv = clamp(+load('rb_wlv_' + id) || 1, 1, w.levels + 1);
@@ -624,6 +724,18 @@ $('shopList').onclick = e => {
     S.balls.push(d.ball); save('rb_balls', JSON.stringify(S.balls)); S.skin = d.ball; save('rb_skin', d.ball); applySkin();
     sfx.power(); buzz([30, 30, 60]);
   } else if (d.use) { S.skin = d.use; save('rb_skin', d.use); applySkin(); sfx.gem(); }
+  else if (d.trail) {
+    if (!spend(TRAILS.find(x => x[0] === d.trail)[3])) return;
+    S.trails.push(d.trail); save('rb_trails', JSON.stringify(S.trails)); S.trail = d.trail; save('rb_trail', d.trail); sfx.power(); buzz([30, 30, 60]);
+  } else if (d.utrail) { S.trail = d.utrail; save('rb_trail', d.utrail); sfx.gem(); }
+  else if (d.up) {
+    const u = UPS.find(x => x[0] === d.up); if (!spend(u[4][upLv(d.up)])) return;
+    S.up[d.up] = upLv(d.up) + 1; save('rb_up', JSON.stringify(S.up)); sfx.power(); buzz([30, 30, 60]);
+  } else if (d.daily) {
+    const ds = dailyState(); if (!ds.ready) return;
+    const g = DAILY[ds.streak]; S.bank += g; save('rb_bank', S.bank); save('rb_daily', JSON.stringify({ day: dayKey(), streak: ds.streak + 1 }));
+    return giftPopup('🎁', `Day ${ds.streak + 1}: +${g} 💎`, ds.streak < 6 ? `Tomorrow: ${DAILY[ds.streak + 1]} 💎` : 'You made it to day 7! 🎉');
+  } else if (d.box) return openBox();
   else if (d.world) {
     if (!spend(WORLDS[d.world].price)) return;
     S.wOwned.push(d.world); save('rb_wown', JSON.stringify(S.wOwned)); sfx.power(); buzz([30, 30, 60]);
@@ -638,7 +750,7 @@ $('openWorlds').onclick = () => openShop('worlds');
 $('wdNext').onclick = () => { $('wdone').classList.add('hidden'); S.wid = null; S.phase = 'menu'; applyTheme('classic'); reset(); for (const id of ['hud', 'powers', 'lvbar']) $(id).classList.add('hidden'); openShop('worlds'); };
 $('wdMenu').onclick = goMenu;
 
-const contCost = () => 20 * 2 ** S.continues;   // 20, 40, 80... per run
+const contCost = () => Math.round(20 * 2 ** S.continues * (1 - 0.25 * upLv('revive')));   // 20, 40, 80... per run, less with the upgrade
 function revive() {
   const cost = contCost();
   if (S.phase !== 'over' || S.bank < cost) return;
@@ -980,11 +1092,12 @@ function step(dt) {
           r2.power = null; if (r2.powerMesh) r2.powerMesh.visible = false;
           // another of the same power adds its time to what is left, rather than starting over
           const add = (k, t, msg, c) => { b[k] = Math.max(0, b[k]) + t; say(`${msg}\n${Math.ceil(b[k])} s`, c); };
-          if (pw.type === 'magnet') add('magnet', 10, 'Magnet! 🧲', '#ff5fa2');
+          const gx = 3 * upLv('gems');   // the shop's upgrades make each power last longer
+          if (pw.type === 'magnet') add('magnet', 10 + 3 * upLv('magnet'), 'Magnet! 🧲', '#ff5fa2');
           else if (pw.type === 'slow') add('slow', 6, 'Slow motion! 🐢', '#9fd8ff');
-          else if (pw.type === 'double') add('double', 10, 'Double gems! ✖️2', '#ffd60a');
-          else if (pw.type === 'five') add('five', 10, 'Gems ×5! 💎', '#ff4fd8');
-          else add('shield', 15, 'Shield! 🛡️', '#80ffdb');
+          else if (pw.type === 'double') add('double', 10 + gx, 'Double gems! ✖️2', '#ffd60a');
+          else if (pw.type === 'five') add('five', 10 + gx, 'Gems ×5! 💎', '#ff4fd8');
+          else add('shield', 15 + 3 * upLv('shield'), 'Shield! 🛡️', '#80ffdb');
           sfx.power(); buzz([20, 30, 20]);
           burst(b.x, 0.6, b.z + 0.5, [0x80ffdb, 0xffffff, 0x4cc9f0], 20, 3);
         }
@@ -1290,6 +1403,7 @@ function initWorld() {
   for (let i = 0; i < 160; i++) partPool.push(new THREE.Mesh(GEO.part, MAT.boxEdge));
   partPool.forEach(m => { m.visible = false; scene.add(m); });
   MAT.partFor = c => partMats[c] || (partMats[c] = new THREE.MeshBasicMaterial({ color: c }));
+  initTrail();
   initCity();
   applySkin();
 }
@@ -1524,6 +1638,46 @@ function burst(x, y, z, cols, n, sp) {
     m.position.copy(at); m.visible = true; m.scale.setScalar(1);
     parts.push({ mesh: m, vx: rand(-sp, sp), vy: rand(0, sp * 1.4), vz: -(rand(-sp, sp) + ball.speed * 0.5), life: rand(0.5, 1) });
   }
+}
+
+// ---------- the ball's trail ----------
+// glowing specks laid along the ball's path (filling the gap at high speed), fading and shrinking away
+const TRAIL_FX = {
+  fire: { cols: [0xffd166, 0xff7b00, 0xff2e00], life: 0.32, size: 1.1, vy: 1.6 },
+  ice: { cols: [0xe0fbff, 0x7ad7ff, 0x4cc9f0], life: 0.34, size: 1, vy: 0 },
+  stars: { cols: [0xffffff, 0xfff3a0, 0xbfe6ff], life: 0.6, size: 0.65, vy: 0, spread: 0.4, tw: true },
+  gold: { cols: [0xffd166, 0xffb703, 0xfff1c1], life: 0.5, size: 0.8, vy: -0.6, spread: 0.28, tw: true },
+  neon: { cols: [0xff2bd6, 0x00f5ff], life: 0.34, size: 0.95, vy: 0 },
+  rainbow: { rainbow: true, life: 0.42, size: 1, vy: 0 } };
+let trailPool = [], trailLast = null, trailT = 0, trailN = 0;
+function initTrail() {
+  GEO.trail = new THREE.SphereGeometry(0.15, 8, 6);
+  for (let i = 0; i < 150; i++) {
+    const m = new THREE.Mesh(GEO.trail, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+    m.visible = false; m.frustumCulled = false; scene.add(m); trailPool.push({ m, life: 0, max: 1, s: 1, vy: 0, tw: 0 });
+  }
+}
+function trailUpdate() {
+  const dt = clamp(time - trailT, 0, 0.1); trailT = time;
+  for (const p of trailPool) {
+    if (p.life <= 0) continue;
+    p.life -= dt; if (p.life <= 0) { p.m.visible = false; continue; }
+    const k = p.life / p.max;
+    p.m.material.opacity = k * (p.tw ? 0.55 + 0.45 * Math.sin(time * 28 + p.tw) : 0.9);
+    p.m.scale.setScalar(p.s * (0.25 + 0.75 * k)); p.m.position.y += p.vy * dt;
+  }
+  const fx = TRAIL_FX[S.trail], pos = ballGroup.position;
+  if (!fx || ball.dead || ball.fall || !ballGroup.visible) { trailLast = null; return; }
+  if (!trailLast || pos.distanceTo(trailLast) > 25) { trailLast = pos.clone(); return; }   // just started, or jumped somewhere new
+  const n = clamp(Math.ceil(pos.distanceTo(trailLast) / 0.28), 1, 8);
+  for (let k = 1; k <= n; k++) {
+    const p = trailPool[trailN++ % trailPool.length], sp = fx.spread || 0.12;
+    p.m.position.lerpVectors(trailLast, pos, k / n); p.m.position.x += rand(-sp, sp); p.m.position.y += rand(-sp, sp) - R * 0.25;
+    if (fx.rainbow) p.m.material.color.setHSL((time * 0.4 + trailN * 0.025) % 1, 1, 0.55);
+    else p.m.material.color.setHex(fx.cols[trailN % fx.cols.length]);
+    p.max = p.life = fx.life * rand(0.8, 1.2); p.s = fx.size * rand(0.8, 1.2); p.vy = fx.vy; p.tw = fx.tw ? rand(1, 6) : 0; p.m.visible = true;
+  }
+  trailLast.copy(pos);
 }
 
 // scenery beside the track, the same each time a row is rebuilt
@@ -1797,6 +1951,7 @@ function render() {
   shieldWire.rotation.y = time; shieldWire.rotation.x = time * 0.7;
   magnetRings.visible = !b.dead && blink(b.magnet, 2);
   magnetRings.position.copy(ballGroup.position); magnetRings.rotation.y = time * 3;
+  trailUpdate();
 
   // camera follows from behind, tilts with the track, and leans over holes
   const cz = b.z - cam.back;
@@ -2210,7 +2365,7 @@ function warmUp() {
   add(new THREE.Mesh(GEO.magnet, MAT.magnet)); add(new THREE.Mesh(GEO.tip, MAT.tip));
   for (const [g, m] of [[GEO.beamH, MAT.beam], [GEO.beamHGlow, MAT.beamGlow], [GEO.beamH, MAT.beamOff], [GEO.post, MAT.post], [GEO.emitter, MAT.emitter], [GEO.gantry, MAT.post]]) add(new THREE.Mesh(g, m));
   add(new THREE.Mesh(GEO.tile, tileMat(RHYTHM_THEME))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(RHYTHM_THEME.rail))); add(new THREE.LineSegments(GEO.tileEdges, glowLine(0xff5fa2))); add(new THREE.Mesh(GEO.tile, MAT.tileHit));
-  add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB)); add(new THREE.Mesh(GEO.portal, MAT.portal)); add(new THREE.Mesh(GEO.portalDisc, MAT.portalDisc));
+  add(new THREE.Mesh(GEO.arch, MAT.archA)); add(new THREE.Mesh(GEO.arch, MAT.archB)); add(new THREE.Mesh(GEO.portal, MAT.portal)); add(new THREE.Mesh(GEO.trail, trailPool[0].m.material)); add(new THREE.Mesh(GEO.portalDisc, MAT.portalDisc));
   for (const [g, m] of [[GEO.icicle, MAT.icicle], [GEO.nozzle, MAT.nozzle], [GEO.jet, MAT.jet], [GEO.jetCore, MAT.jetCore], [GEO.spire, MAT.iceSpire], [GEO.rock, MAT.rock],
     [GEO.pool, MAT.pool], [GEO.tower, MAT.tower], [GEO.rock, MAT.asteroid], [GEO.pillar, MAT.marble], [GEO.cap, MAT.goldCap], [GEO.cloud, MAT.cloud]]) add(new THREE.Mesh(g, m));
   for (const c of [0x4cc9f0, 0xffffff, 0xf72585, 0xffd60a, 0x80ffdb, 0xb5179e]) add(new THREE.Mesh(GEO.part, MAT.partFor(c)));
