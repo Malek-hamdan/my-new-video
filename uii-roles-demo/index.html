@@ -1412,6 +1412,7 @@
       <div class="dlg-head"><div><strong id="actTitle">Activity</strong><p class="muted-p">Who changed what, and when. Nobody can edit or delete this list.</p></div><button class="btn" id="actClose" type="button">Close</button></div>
       <div class="act-filter" id="actFilter"></div>
       <div class="users-scroll" id="actList"></div>
+      <div id="actDiag" style="margin-top:10px;font-size:11px;color:var(--muted);font-family:ui-monospace,monospace"></div>
     </div>
   </div>
   <div class="confirm" id="usersDlg" hidden role="dialog" aria-modal="true" aria-labelledby="usersTitle">
@@ -4782,8 +4783,17 @@
     usersArrived();
   }
   // Live lists from the shared database. If a live link drops, start it again; never fail silently.
+  var ACT_COLL = "actlog";
   var actErr = "", actLoading = false;
-  function fillActs(snap) {
+  // what the shared database said, shown in small print under Activity
+  var diag = { live: "waiting", liveN: 0, read: "-", write: "-" };
+  function showDiag() {
+    var el = document.getElementById("actDiag");
+    if (el) el.textContent = "live: " + diag.live + " (" + diag.liveN + ") \u00B7 read: " + diag.read + " \u00B7 last save: " + diag.write;
+  }
+  function fillActs(snap, how) {
+    if (how === "read") diag.read = "ok " + snap.docs.length; else { diag.live = "ok"; diag.liveN = snap.docs.length; }
+    showDiag();
     acts = {};
     snap.docs.forEach(function (d) { var v = d.data() || {}; v.id = d.id; acts[d.id] = v; });
     actErr = "";
@@ -4802,8 +4812,8 @@
       snap.docs.forEach(function (d) { var v = d.data() || {}; if (v.username) users[v.username] = v; });
       usersArrived();
     }, function (code) { setStatus("Accounts list lost its connection (" + code + "). Retrying\u2026", "error"); });
-    listen("activity", fillActs, function (code) {
-      actErr = code;
+    listen(ACT_COLL, fillActs, function (code) {
+      actErr = code; diag.live = "error " + code; showDiag();
       if (!document.getElementById("actDlg").hidden) renderActivity();
     });
   }
@@ -4812,8 +4822,9 @@
     if (!db) { renderActivity(); return; }
     actLoading = true; renderActivity();
     setTimeout(function () { if (actLoading) { actLoading = false; actErr = actErr || "no answer"; renderActivity(); } }, 8000);
-    db.collection("activity").get().then(function (snap) { actLoading = false; fillActs(snap); },
-      function (e) { actLoading = false; actErr = (e && e.code) || "unavailable"; renderActivity(); });
+    diag.read = "waiting"; showDiag();
+    db.collection(ACT_COLL).get().then(function (snap) { actLoading = false; fillActs(snap, "read"); },
+      function (e) { actLoading = false; actErr = (e && e.code) || "unavailable"; diag.read = "error " + actErr + " " + ((e && e.message) || ""); showDiag(); renderActivity(); });
   }
 
   // ---- what the signed-in person sees and may touch ----
@@ -4897,7 +4908,9 @@
     if (db) {
       // stored like the other lists: plain text and numbers only, no empty (null) values, no id inside
       var body = { ts: doc.ts, seq: doc.seq, user: doc.user, name: doc.name, what: doc.what, part: doc.part || "", from: doc.from || "", to: doc.to || "" };
-      db.collection("activity").doc(doc.id).set(body).catch(function (e) { setStatus("Activity not saved (" + ((e && e.code) || "error") + ")", "error"); });
+      diag.write = "saving"; showDiag();
+      db.collection(ACT_COLL).doc(doc.id).set(body).then(function () { diag.write = "ok"; showDiag(); },
+        function (e) { diag.write = "error " + ((e && e.code) || ""); showDiag(); setStatus("Activity not saved (" + ((e && e.code) || "error") + ")", "error"); });
     }
     else {
       var list = Object.keys(acts).map(function (k) { return acts[k]; }).sort(function (a, b) { return actOrder(b) - actOrder(a); }).slice(0, 2000);
