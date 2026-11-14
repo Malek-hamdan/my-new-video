@@ -259,7 +259,7 @@
       });
       rc.appendChild(rs);
       PERMS.forEach(function (p) {
-        var c = td(""); c.className = "c";
+        var c = td(""); c.className = "c"; c.setAttribute("data-perm", p[1]);
         var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!(u.perms && u.perms[p[0]]);
         cb.disabled = self && p[0] === "users";
         cb.setAttribute("aria-label", p[1] + " for " + u.username);

@@ -421,6 +421,29 @@
   .users-table select, .nu-row input, .nu-row select, .pw-row input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.03); color: var(--text); }
   .users-table .btn { padding: 5px 10px; font-size: 12px; }
   .users-table tr.off td { opacity: 0.5; }
+  @media (max-width: 640px) {
+    .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+    .header-actions > .btn { font-size: 13px; padding: 9px 8px; justify-content: center; white-space: normal; text-align: center; min-height: 42px; }
+    .header-actions .me-chip { grid-column: 1 / -1; order: -1; justify-content: space-between; }
+    .header-actions .me-chip .me-txt { flex: 1; }
+    .act-table thead, .users-table thead { display: none; }
+    .act-table tr { display: grid !important; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+    .act-table td { display: block !important; width: auto !important; padding: 0 !important; border: 0 !important; }
+    .act-table td:nth-child(n+3) { grid-column: 1 / -1; }
+    .act-table td:nth-child(4) { color: var(--muted); font-size: 13px; }
+    .act-table td:nth-child(5) { font-size: 13px; }
+    .act-table td:empty { display: none !important; }
+    .users-table tr { display: flex !important; flex-wrap: wrap; gap: 6px; padding: 12px 2px; border-bottom: 1px solid var(--border); }
+    .users-table td { display: block !important; width: auto !important; padding: 0 !important; border: 0 !important; }
+    .users-table td:nth-child(1) { font-size: 16px; }
+    .users-table td:nth-child(2) { color: var(--muted); align-self: center; flex: 1; }
+    .users-table td:nth-child(3) { flex-basis: 100%; }
+    .users-table td.c { flex-basis: calc(50% - 3px); display: flex !important; align-items: center; gap: 8px; text-align: left; padding: 6px 8px !important; border: 1px solid var(--border) !important; border-radius: 8px; font-size: 13px; }
+    .users-table td.c::after { content: attr(data-perm); }
+    .users-table td:last-child { flex-basis: 100%; }
+    .nu-row { flex-wrap: wrap; }
+    .nu-row input, .nu-row select { width: 100%; }
+  }
   .nu-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .pw-row { display: flex; gap: 6px; margin-top: 6px; }
   .users-scroll { overflow-x: auto; }
@@ -4966,7 +4989,7 @@
       });
       rc.appendChild(rs);
       PERMS.forEach(function (p) {
-        var c = td(""); c.className = "c";
+        var c = td(""); c.className = "c"; c.setAttribute("data-perm", p[1]);
         var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!(u.perms && u.perms[p[0]]);
         cb.disabled = self && p[0] === "users";
         cb.setAttribute("aria-label", p[1] + " for " + u.username);
