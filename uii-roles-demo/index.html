@@ -663,6 +663,14 @@
   .summary { padding: 18px; }
   .summary[hidden] { display: none; }
   body.sum-view table, body.sum-view #empty, body.sum-view .tx-filter, body.sum-view .add-group, body.sum-view .panel-foot { display: none !important; }
+  /* one line under a machine's table: how many need ordering, what the stock is worth */
+  .parts-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 12px 18px; border-top: 1px solid var(--border); font-size: 13.5px; color: var(--muted); }
+  .parts-sum b { color: var(--text); font-weight: 700; }
+  .parts-sum .ps-low { color: #f87171; font-weight: 700; }
+  .parts-sum .ps-ok { color: #4ade80; font-weight: 700; }
+  body.tx-view .parts-sum, body.sum-view .parts-sum, body.side-view .parts-sum { display: none !important; }
+  /* who gave and who took the part, under its name in Transaction */
+  .tx-who { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--muted); }
   .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
   .sum-card { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,0.02); }
   .sum-card.all { border-color: rgba(91,157,255,0.4); background: rgba(91,157,255,0.06); }
@@ -1223,6 +1231,8 @@
       <strong>No parts yet</strong>
       <span>Use “Add part” for stock you already have, or “New arrival” for parts that just came in.</span>
     </div>
+
+    <div class="parts-sum" id="partsSum" hidden></div>
 
     <div class="panel-foot">
       <button class="btn" id="addBottom" type="button">
@@ -2370,6 +2380,14 @@
         stag.textContent = t.source === "used" ? "Used" : "Equipment";
         (ncell.querySelector(".tx-text") || ncell).appendChild(stag);
       }
+      if (t.by || t.to) {
+        var who = document.createElement("span");
+        who.className = "tx-who";
+        who.dir = "auto";
+        who.textContent = t.by && t.to ? t.by + " \u2192 " + t.to : t.by ? "Issued by " + t.by : "Received by " + t.to;
+        who.title = "Issued by " + (t.by || "\u2014") + " \u00B7 Received by " + (t.to || "\u2014");
+        (ncell.querySelector(".tx-text") || ncell).appendChild(who);
+      }
       tr.appendChild(ncell);
       tr.appendChild(txCell("Reference", ref));
       var ttd = document.createElement("td");
@@ -2752,8 +2770,26 @@
     var q = document.getElementById("f-" + r.id + "-quantity");
     if (q) q.title = low ? "Below the minimum of " + r.min + ". Order more." : "";
   }
+  // Under a machine's table: parts below their minimum and the value of the stock on hand
+  function updatePartsSum() {
+    var box = document.getElementById("partsSum");
+    if (!box) return;
+    var rows = sideView || active === TX || active === SUM ? null : data[active];
+    if (!rows || !rows.length) { box.hidden = true; return; }
+    var low = 0, bag = {};
+    rows.forEach(function (r) {
+      if (isLow(r)) low++;
+      var p = unitPrice(r), q = /^\d+$/.test(r.quantity) ? parseInt(r.quantity, 10) : null;
+      if (p !== null && q !== null) bag[r.currency || ""] = (bag[r.currency || ""] || 0) + q * p;
+    });
+    box.innerHTML = '<span class="' + (low ? "ps-low" : "ps-ok") + '"></span><span>Stock value: <b></b></span>';
+    box.children[0].textContent = low ? low + (low === 1 ? " part below min \u2014 order" : " parts below min \u2014 order") : "All parts above min";
+    box.querySelector("b").textContent = moneyBag(bag);
+    box.hidden = false;
+  }
   function updateTotal(r) {
     updateLow(r);
+    updatePartsSum();
     var el = document.getElementById("t-" + r.id + "-total");
     if (!el) return;
     var t = totalOf(r);
@@ -3046,12 +3082,13 @@
       document.getElementById("panelMeta").textContent = "Every equipment move · " + equipTxAll().length + (equipTxAll().length === 1 ? " entry" : " entries");
       return;
     }
-    if (sideView) { renderSide(focusId); return; }
+    if (sideView) { updatePartsSum(); renderSide(focusId); return; }
     panelEl.setAttribute("aria-labelledby", "tab-" + active);
     updateLockBar();
     document.body.classList.toggle("tx-view", active === TX);
     document.body.classList.toggle("sum-view", active === SUM);
     document.getElementById("summary").hidden = active !== SUM;
+    updatePartsSum();
     if (active === SUM) { renderSummary(); return; }
     if (active === TX) { renderTransactions(); return; }
     document.getElementById("thead").innerHTML = MACHINE_HEAD;
@@ -3112,6 +3149,7 @@
     });
     fitAll(rowsEl.querySelectorAll("textarea.wrap"));
     updateCounts();
+    updatePartsSum();
   }
 
   document.addEventListener("click", function () { disarmAll(null); });
