@@ -4795,7 +4795,12 @@
     if (how === "read") diag.read = "ok " + snap.docs.length; else { diag.live = "ok"; diag.liveN = snap.docs.length; }
     showDiag();
     acts = {};
-    snap.docs.forEach(function (d) { var v = d.data() || {}; v.id = d.id; acts[d.id] = v; });
+    snap.docs.forEach(function (d) {
+      // entries from the database are read-only: copy before adding the id
+      var src = d.data() || {}, v = {};
+      Object.keys(src).forEach(function (k) { v[k] = src[k]; });
+      v.id = d.id; acts[d.id] = v;
+    });
     actErr = "";
     if (!document.getElementById("actDlg").hidden) renderActivity();
   }
