@@ -72,6 +72,9 @@ rep('  /* Two areas: Spare Parts and Equipment */', '''  /* Accounts and permiss
   .users-table select, .nu-row input, .nu-row select, .pw-row input { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.03); color: var(--text); }
   .users-table .btn { padding: 5px 10px; font-size: 12px; }
   .users-table tr.off td { opacity: 0.5; }
+  .imp-bar { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; padding: 9px 16px; background: #7c2d12; color: #ffedd5; font-weight: 600; font-size: 14px; text-align: center; }
+  .imp-bar[hidden] { display: none; }
+  .imp-bar .btn { padding: 6px 12px; font-size: 13px; background: #ffedd5; color: #7c2d12; border-color: #ffedd5; }
   @media (max-width: 640px) {
     .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
     .header-actions > .btn { font-size: 13px; padding: 9px 8px; justify-content: center; white-space: normal; text-align: center; min-height: 42px; }

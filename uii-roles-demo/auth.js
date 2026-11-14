@@ -131,12 +131,23 @@
     }
     lockFields();
   }
+  // ---- Admin acting as someone else: no password needed, and Activity names the admin ----
+  var IMP_KEY = "uiird-acting-admin";
+  function actingAdmin() {
+    var a = "";
+    try { a = sessionStorage.getItem(IMP_KEY) || ""; } catch (e) {}
+    var u = a && users[a];
+    return u && u.active !== false && u.perms && u.perms.users ? u : null;
+  }
   function refreshMe() {
-    var name = "";
-    try { name = sessionStorage.getItem(SESSION_KEY) || ""; } catch (e) {}
+    var name = "", imp = "";
+    try { name = sessionStorage.getItem(SESSION_KEY) || ""; imp = sessionStorage.getItem(IMP_KEY) || ""; } catch (e) {}
     var u = name && users[name];
     me = u && u.active !== false ? u : null;
+    // acting as someone only lasts while the admin is still an admin
+    if (imp && usersLoaded && !actingAdmin()) { me = null; try { sessionStorage.removeItem(IMP_KEY); } catch (e) {} }
     if (name && usersLoaded && !me) { try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {} }
+    renderImpBar();
     gateEl.hidden = !!me;
     document.body.classList.toggle("gated", !me);
     applyPerms();
@@ -165,9 +176,43 @@
       renderRows();
     }, function () { fail("This browser can't check passwords here."); });
   });
+  var impBar = document.createElement("div");
+  impBar.className = "imp-bar"; impBar.hidden = true;
+  impBar.innerHTML = '<span class="imp-txt"></span><button type="button" class="btn">Back to my account</button>';
+  document.body.insertBefore(impBar, document.body.firstChild);
+  function renderImpBar() {
+    if (!impBar) return;
+    var a = me && actingAdmin();
+    impBar.hidden = !a;
+    document.body.classList.toggle("acting", !!a);
+    if (!a) return;
+    impBar.querySelector(".imp-txt").textContent = "You are inside " + (me.name || me.username) + "\u2019s account. Everything you do is recorded as done by " + (a.name || a.username) + ".";
+    impBar.querySelector("button").textContent = "Back to " + (a.name || a.username);
+  }
+  function actAs(target) {
+    var a = actingAdmin() || me;
+    if (!a || !(a.perms && a.perms.users) || !users[target] || users[target].active === false) return;
+    flushWrites();
+    var back = target === a.username, from = me.name || me.username;
+    if (!back) logAct("Opened the account of", users[target].name || target, "", "");
+    try {
+      if (target === a.username) sessionStorage.removeItem(IMP_KEY); else sessionStorage.setItem(IMP_KEY, a.username);
+      sessionStorage.setItem(SESSION_KEY, target);
+    } catch (e) {}
+    mineNew = {};
+    usersDlg.hidden = true;
+    refreshMe();
+    if (back) logAct("Left the account of", from, "", "");
+    renderRows();
+    setStatus(target === a.username ? "Back in your account" : "Now inside " + (users[target].name || target) + "\u2019s account", "saved");
+  }
+  impBar.querySelector("button").addEventListener("click", function () {
+    var a = actingAdmin();
+    if (a) actAs(a.username);
+  });
   document.getElementById("signOut").addEventListener("click", function () {
     flushWrites();
-    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+    try { sessionStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(IMP_KEY); } catch (e) {}
     me = null; mineNew = {};
     refreshMe();
     document.getElementById("gateUser").focus();
@@ -181,7 +226,7 @@
     acts[doc.id] = doc;
     if (db) {
       // stored like the other lists: plain text and numbers only, no empty (null) values, no id inside
-      var body = { ts: doc.ts, seq: doc.seq, user: doc.user, name: doc.name, what: doc.what, part: doc.part || "", from: doc.from || "", to: doc.to || "" };
+      var body = { ts: doc.ts, seq: doc.seq, user: doc.user, name: doc.name, via: doc.via || "", what: doc.what, part: doc.part || "", from: doc.from || "", to: doc.to || "" };
       diag.write = "saving"; showDiag();
       db.collection(ACT_COLL).doc(doc.id).set(body).then(function () { diag.write = "ok"; showDiag(); },
         function (e) { diag.write = "error " + ((e && e.code) || ""); showDiag(); setStatus("Activity not saved (" + ((e && e.code) || "error") + ")", "error"); });
@@ -214,6 +259,8 @@
     var now = nowTs(), k = key ? me.username + "|" + key : "", prev = k && lastAct[k] && now - lastAct[k].ts < 90000 ? lastAct[k] : null;
     var doc = { id: prev ? prev.id : uid(), ts: now, seq: nextSeq(now), user: me.username, name: me.name || me.username, what: what, part: part || "",
       from: String((prev ? prev.from : from) || ""), to: String(to == null ? "" : to) };
+    var adm = actingAdmin();
+    if (adm && adm.username !== me.username) doc.via = adm.name || adm.username;
     if (k) lastAct[k] = { id: doc.id, ts: now, from: doc.from };
     saveAct(doc);
   }
@@ -277,7 +324,7 @@
     shown.forEach(function (a) {
       var tr = document.createElement("tr");
       var change = !a.from && !a.to ? "" : !a.from ? a.to : !a.to ? a.from : a.from + " → " + a.to;
-      [[fmtTime(a.ts).replace("  ", " "), "when"], [a.name || a.user, "who"], [a.what, ""], [a.part, ""], [change, ""]].forEach(function (c) {
+      [[fmtTime(a.ts).replace("  ", " "), "when"], [(a.name || a.user) + (a.via ? " (by " + a.via + ")" : ""), "who"], [a.what, ""], [a.part, ""], [change, ""]].forEach(function (c) {
         var td = document.createElement("td"); td.textContent = c[0] || ""; if (c[1]) td.className = c[1]; tr.appendChild(td);
       });
       tb.appendChild(tr);
@@ -358,6 +405,13 @@
         row.appendChild(inp); row.appendChild(ok); ac.appendChild(row); inp.focus();
       });
       ac.appendChild(pw);
+      if (!self && u.active !== false) {
+        var as = document.createElement("button"); as.type = "button"; as.className = "btn btn-primary";
+        as.textContent = "Open account"; as.title = "Go into " + (u.name || u.username) + "\u2019s account without the password";
+        as.style.marginLeft = "6px";
+        as.addEventListener("click", function () { actAs(u.username); });
+        ac.appendChild(as);
+      }
       if (!self) {
         var off = document.createElement("button"); off.type = "button"; off.className = "btn" + (u.active === false ? "" : " btn-danger");
         off.textContent = u.active === false ? "Turn on" : "Turn off";
