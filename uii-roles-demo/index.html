@@ -4811,6 +4811,7 @@
   function loadActivity() {
     if (!db) { renderActivity(); return; }
     actLoading = true; renderActivity();
+    setTimeout(function () { if (actLoading) { actLoading = false; actErr = actErr || "no answer"; renderActivity(); } }, 8000);
     db.collection("activity").get().then(function (snap) { actLoading = false; fillActs(snap); },
       function (e) { actLoading = false; actErr = (e && e.code) || "unavailable"; renderActivity(); });
   }
@@ -4893,7 +4894,11 @@
   var FIELD_LABEL = { name: "Name", reference: "Reference", min: "Min", price: "Unit price", currency: "Currency", date: "Date" };
   function saveAct(doc) {
     acts[doc.id] = doc;
-    if (db) { db.collection("activity").doc(doc.id).set(doc).catch(function () {}); }
+    if (db) {
+      // stored like the other lists: plain text and numbers only, no empty (null) values, no id inside
+      var body = { ts: doc.ts, seq: doc.seq, user: doc.user, name: doc.name, what: doc.what, part: doc.part || "", from: doc.from || "", to: doc.to || "" };
+      db.collection("activity").doc(doc.id).set(body).catch(function (e) { setStatus("Activity not saved (" + ((e && e.code) || "error") + ")", "error"); });
+    }
     else {
       var list = Object.keys(acts).map(function (k) { return acts[k]; }).sort(function (a, b) { return actOrder(b) - actOrder(a); }).slice(0, 2000);
       try { localStorage.setItem(ACT_KEY, JSON.stringify(list)); } catch (e) {}
@@ -4921,7 +4926,7 @@
     if (!me) return;
     var now = nowTs(), k = key ? me.username + "|" + key : "", prev = k && lastAct[k] && now - lastAct[k].ts < 90000 ? lastAct[k] : null;
     var doc = { id: prev ? prev.id : uid(), ts: now, seq: nextSeq(now), user: me.username, name: me.name || me.username, what: what, part: part || "",
-      from: prev ? prev.from : from, to: to };
+      from: String((prev ? prev.from : from) || ""), to: String(to == null ? "" : to) };
     if (k) lastAct[k] = { id: doc.id, ts: now, from: doc.from };
     saveAct(doc);
   }
@@ -4984,7 +4989,7 @@
     var tb = document.createElement("tbody");
     shown.forEach(function (a) {
       var tr = document.createElement("tr");
-      var change = a.from == null && a.to == null ? "" : a.from == null ? a.to : a.to == null ? a.from : a.from + " → " + a.to;
+      var change = !a.from && !a.to ? "" : !a.from ? a.to : !a.to ? a.from : a.from + " → " + a.to;
       [[fmtTime(a.ts).replace("  ", " "), "when"], [a.name || a.user, "who"], [a.what, ""], [a.part, ""], [change, ""]].forEach(function (c) {
         var td = document.createElement("td"); td.textContent = c[0] || ""; if (c[1]) td.className = c[1]; tr.appendChild(td);
       });
