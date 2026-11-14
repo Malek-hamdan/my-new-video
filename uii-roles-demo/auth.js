@@ -51,17 +51,38 @@
     try { (JSON.parse(localStorage.getItem(ACT_KEY)) || []).forEach(function (a) { acts[a.id] = a; }); } catch (e) {}
     usersArrived();
   }
+  // Live lists from the shared database. If a live link drops, start it again; never fail silently.
+  var actErr = "", actLoading = false;
+  function fillActs(snap) {
+    acts = {};
+    snap.docs.forEach(function (d) { var v = d.data() || {}; v.id = d.id; acts[d.id] = v; });
+    actErr = "";
+    if (!document.getElementById("actDlg").hidden) renderActivity();
+  }
+  function listen(coll, onData, onFail) {
+    db.collection(coll).onSnapshot(onData, function (e) {
+      var code = (e && e.code) || "unavailable";
+      if (onFail) onFail(code);
+      if (code !== "revoked" && code !== "not_granted" && code !== "invalid_argument") setTimeout(function () { listen(coll, onData, onFail); }, 3000);
+    });
+  }
   function authDb() {
-    db.collection("users").onSnapshot(function (snap) {
+    listen("users", function (snap) {
       users = {};
       snap.docs.forEach(function (d) { var v = d.data() || {}; if (v.username) users[v.username] = v; });
       usersArrived();
-    }, function () {});
-    db.collection("activity").onSnapshot(function (snap) {
-      acts = {};
-      snap.docs.forEach(function (d) { var v = d.data() || {}; v.id = d.id; acts[d.id] = v; });
+    }, function (code) { setStatus("Accounts list lost its connection (" + code + "). Retrying\u2026", "error"); });
+    listen("activity", fillActs, function (code) {
+      actErr = code;
       if (!document.getElementById("actDlg").hidden) renderActivity();
-    }, function () {});
+    });
+  }
+  // opening Activity always reads the list fresh, so it shows even if the live link is down
+  function loadActivity() {
+    if (!db) { renderActivity(); return; }
+    actLoading = true; renderActivity();
+    db.collection("activity").get().then(function (snap) { actLoading = false; fillActs(snap); },
+      function (e) { actLoading = false; actErr = (e && e.code) || "unavailable"; renderActivity(); });
   }
 
   // ---- what the signed-in person sees and may touch ----
@@ -222,7 +243,11 @@
     });
     var shown = list.filter(function (a) { return !actWho || a.user === actWho; }).slice(0, 400);
     var box = document.getElementById("actList");
-    if (!shown.length) { box.innerHTML = '<div class="act-empty">Nothing yet.</div>'; return; }
+    if (!shown.length) {
+      box.innerHTML = '<div class="act-empty"></div>';
+      box.firstChild.textContent = actLoading ? "Loading\u2026" : actErr ? "Couldn't load the list (" + actErr + "). Close and open Activity again, or reload the page." : "Nothing yet.";
+      return;
+    }
     var t = document.createElement("table");
     t.className = "act-table";
     t.innerHTML = "<thead><tr><th>When</th><th>Who</th><th>What</th><th>Part</th><th>Change</th></tr></thead>";
@@ -240,7 +265,7 @@
     box.appendChild(t);
   }
   var actDlg = document.getElementById("actDlg");
-  document.getElementById("actBtn").addEventListener("click", function () { if (!can("activity")) return; actDlg.hidden = false; renderActivity(); });
+  document.getElementById("actBtn").addEventListener("click", function () { if (!can("activity")) return; actDlg.hidden = false; loadActivity(); });
   document.getElementById("actClose").addEventListener("click", function () { actDlg.hidden = true; });
   actDlg.addEventListener("keydown", function (e) { if (e.key === "Escape") actDlg.hidden = true; });
 
