@@ -4874,16 +4874,32 @@
     acts[doc.id] = doc;
     if (db) { db.collection("activity").doc(doc.id).set(doc).catch(function () {}); }
     else {
-      var list = Object.keys(acts).map(function (k) { return acts[k]; }).sort(function (a, b) { return b.ts - a.ts; }).slice(0, 2000);
+      var list = Object.keys(acts).map(function (k) { return acts[k]; }).sort(function (a, b) { return actOrder(b) - actOrder(a); }).slice(0, 2000);
       try { localStorage.setItem(ACT_KEY, JSON.stringify(list)); } catch (e) {}
     }
     if (!document.getElementById("actDlg").hidden) renderActivity();
   }
   // key: typing in one field for a while is one entry, not one per keystroke
+  // A device with a wrong clock must not push its entries to the top: take the time from the server when we can,
+  // and number every entry after the newest one already seen.
+  var clockSkew = 0, addLogged = {};
+  try {
+    if (/^https?:/.test(location.protocol)) fetch(location.href, { method: "HEAD", cache: "no-store" }).then(function (r) {
+      var d = Date.parse(r.headers.get("Date") || "");
+      if (d && Math.abs(d - Date.now()) > 120000) clockSkew = d - Date.now();
+    }, function () {});
+  } catch (e) {}
+  function nowTs() { return Date.now() + clockSkew; }
+  function actOrder(a) { return a.seq || a.ts || 0; }
+  function nextSeq(t) {
+    var m = 0;
+    Object.keys(acts).forEach(function (k) { var o = actOrder(acts[k]); if (o > m) m = o; });
+    return Math.max(t, m + 1);
+  }
   function logAct(what, part, from, to, key) {
     if (!me) return;
-    var now = Date.now(), k = key ? me.username + "|" + key : "", prev = k && lastAct[k] && now - lastAct[k].ts < 90000 ? lastAct[k] : null;
-    var doc = { id: prev ? prev.id : uid(), ts: now, user: me.username, name: me.name || me.username, what: what, part: part || "",
+    var now = nowTs(), k = key ? me.username + "|" + key : "", prev = k && lastAct[k] && now - lastAct[k].ts < 90000 ? lastAct[k] : null;
+    var doc = { id: prev ? prev.id : uid(), ts: now, seq: nextSeq(now), user: me.username, name: me.name || me.username, what: what, part: part || "",
       from: prev ? prev.from : from, to: to };
     if (k) lastAct[k] = { id: doc.id, ts: now, from: doc.from };
     saveAct(doc);
@@ -4904,9 +4920,11 @@
     }
     if (coll !== "parts") return;
     var old = prevRow[id];
-    if (!old) {
+    // only a part made just now counts as added; an older one simply wasn't on screen yet
+    if (!addLogged[id] && Date.now() - (Number(body.created) || 0) < 20000) {
+      addLogged[id] = 1;
       logAct(body.arrival ? "Added a new arrival" : "Added a part", partLabel(body), null, body.reference || "", "add|" + id);
-    } else {
+    } else if (old) {
       Object.keys(FIELD_LABEL).forEach(function (f) {
         if ((old[f] || "") !== (body[f] || "")) logAct("Changed " + FIELD_LABEL[f], partLabel(body), old[f] || "(empty)", body[f] || "(empty)", f + "|" + id);
       });
@@ -4920,7 +4938,7 @@
     if (coll === "transactions") { var t = findTxAny(id); logAct("Deleted a transaction", t ? partLabel(t) : "", t ? String(t.change) : "", null); }
   }
   function renderActivity() {
-    var list = Object.keys(acts).map(function (k) { return acts[k]; }).sort(function (a, b) { return b.ts - a.ts; });
+    var list = Object.keys(acts).map(function (k) { return acts[k]; }).sort(function (a, b) { return actOrder(b) - actOrder(a); });
     var who = {};
     list.forEach(function (a) { who[a.user] = a.name || a.user; });
     var f = document.getElementById("actFilter");
