@@ -18,7 +18,7 @@
   header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
   .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
-  .menu { display: flex; gap: 6px; }
+  .menu { display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.9fr; gap: 6px; margin-top: 10px; }
   .menu button { white-space: nowrap; background: var(--panel2); padding: 8px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; }
   .weeklabel { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 6px; }
   .weeklabel b { font-size: 15px; }
@@ -78,6 +78,37 @@
   .sheet .btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .sheet .btns button { flex: 1; background: var(--panel2); border-radius: 10px; padding: 12px; font-weight: 700; }
   .sheet .btns .primary { background: var(--accent); color: var(--accent-ink); }
+  .dayhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .dayhead b { font-size: 17px; }
+  .dayhead span { color: var(--muted); font-size: 14px; }
+  .dayhead button { background: var(--panel2); border-radius: 10px; padding: 9px 12px; font-weight: 700; font-size: 14px; white-space: nowrap; }
+  .dayhead button.on { background: var(--ok); color: #04210f; }
+  .card.editing { border-color: #3d4a5c; }
+  .edit-row { display: grid; grid-template-columns: 44px 44px 1fr 1fr 44px; gap: 6px; margin-top: 12px; }
+  .edit-row button { background: var(--panel2); border-radius: 10px; padding: 11px 4px; font-weight: 700; }
+  .edit-row button:disabled { opacity: .3; }
+  .edit-row .danger { background: #3a1c1c; color: #ffb3b3; }
+  .addbtn { background: var(--accent); color: var(--accent-ink); border-radius: 14px; padding: 16px; font-weight: 800; font-size: 17px; }
+  .sheet.tall { height: 88vh; }
+  .sheethead { display: flex; justify-content: space-between; align-items: center; }
+  .sheethead .x { background: var(--panel2); border-radius: 10px; width: 40px; height: 40px; font-weight: 800; }
+  .sheet .sub { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0; scrollbar-width: none; }
+  .chips button { background: var(--panel2); border-radius: 999px; padding: 8px 12px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+  .chips button.on { background: var(--text); color: var(--bg); }
+  .liblist { display: grid; gap: 6px; }
+  .librow { display: grid; grid-template-columns: 72px 1fr 16px; gap: 10px; align-items: center; text-align: left; background: var(--panel2); border-radius: 12px; padding: 6px 10px 6px 6px; }
+  .libtxt b { display: block; font-size: 15px; }
+  .libtxt small { color: var(--muted); font-size: 12px; }
+  .chev { color: var(--muted); font-size: 22px; }
+  .field { display: grid; gap: 4px; margin-top: 8px; }
+  .field span { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+  .sheet select { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 12px; font-size: 15px; }
+  .daysform { display: grid; gap: 10px; }
+  .dayrow { display: grid; grid-template-columns: 1fr; gap: 6px; background: var(--panel2); border-radius: 12px; padding: 10px; }
+  .sheet .btns .danger-btn { background: #3a1c1c; color: #ffb3b3; }
+  .toast { position: fixed; left: 50%; bottom: 140px; transform: translateX(-50%); background: var(--ok); color: #04210f; font-weight: 800; padding: 10px 16px; border-radius: 999px; z-index: 30; }
   .err { color: var(--danger); font-size: 13px; min-height: 18px; margin-top: 6px; }
 </style>
 </head>
@@ -85,10 +116,12 @@
 <header>
   <div class="top">
     <h1>Strength Program</h1>
-    <div class="menu">
-      <button id="btnWarmup">Warm-up</button>
-      <button id="btnProg">Progression</button>
-    </div>
+  </div>
+  <div class="menu">
+    <button id="btnLib">📚 Library</button>
+    <button id="btnDays">⚙ Days</button>
+    <button id="btnWarmup">Warm-up</button>
+    <button id="btnProg">Rules</button>
   </div>
   <div class="weeklabel"><b id="weekTitle">Week 1</b><span class="phase" id="phaseLabel"></span></div>
   <div class="weeks" id="weeks"></div>
@@ -108,6 +141,7 @@
 
 <script src="data.js"></script>
 <script src="anim.js"></script>
+<script src="library.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
