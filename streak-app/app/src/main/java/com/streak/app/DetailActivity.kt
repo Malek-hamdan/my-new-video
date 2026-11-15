@@ -101,7 +101,7 @@ class DetailActivity : Activity() {
         intArrayOf(7, 30, 100, 365).forEach { m ->
             val got = s.bestNow() >= m
             br.addView(vbox().apply {
-                gravity = Gravity.CENTER; alpha = if (got) 1f else .35f
+                gravity = Gravity.CENTER; alpha = if (got) 1f else 0.35f
                 addView(Flame(this@DetailActivity).apply { days = if (got) m else 0 }, lp(dp(30), dp(38)).apply { gravity = Gravity.CENTER })
                 addView(tv("$m يوم", 12f, if (got) C.TXT else C.DIM, got).apply { gravity = Gravity.CENTER }, lp(t = 4))
             }, lp(0, -2, 1f))

@@ -44,19 +44,19 @@ class Flame(c: Context) : View(c) {
     private fun path(w: Float, h: Float, outer: Boolean) = Path().apply {
         fun X(x: Float) = x * w; fun Y(y: Float) = y * h
         if (outer) {
-            moveTo(X(.5f), Y(0f))
-            cubicTo(X(.62f), Y(.2f), X(.92f), Y(.36f), X(.92f), Y(.64f))
-            cubicTo(X(.92f), Y(.88f), X(.73f), Y(1f), X(.5f), Y(1f))
-            cubicTo(X(.27f), Y(1f), X(.08f), Y(.88f), X(.08f), Y(.64f))
-            cubicTo(X(.08f), Y(.5f), X(.18f), Y(.4f), X(.29f), Y(.31f))
-            cubicTo(X(.29f), Y(.45f), X(.35f), Y(.52f), X(.42f), Y(.55f))
-            cubicTo(X(.37f), Y(.35f), X(.42f), Y(.17f), X(.5f), Y(0f))
+            moveTo(X(0.5f), Y(0f))
+            cubicTo(X(0.62f), Y(0.2f), X(0.92f), Y(0.36f), X(0.92f), Y(0.64f))
+            cubicTo(X(0.92f), Y(0.88f), X(0.73f), Y(1f), X(0.5f), Y(1f))
+            cubicTo(X(0.27f), Y(1f), X(0.08f), Y(0.88f), X(0.08f), Y(0.64f))
+            cubicTo(X(0.08f), Y(0.5f), X(0.18f), Y(0.4f), X(0.29f), Y(0.31f))
+            cubicTo(X(0.29f), Y(0.45f), X(0.35f), Y(0.52f), X(0.42f), Y(0.55f))
+            cubicTo(X(0.37f), Y(0.35f), X(0.42f), Y(0.17f), X(0.5f), Y(0f))
         } else {
-            moveTo(X(.5f), Y(.48f))
-            cubicTo(X(.57f), Y(.6f), X(.71f), Y(.67f), X(.71f), Y(.8f))
-            cubicTo(X(.71f), Y(.93f), X(.61f), Y(1f), X(.5f), Y(1f))
-            cubicTo(X(.39f), Y(1f), X(.29f), Y(.93f), X(.29f), Y(.8f))
-            cubicTo(X(.29f), Y(.69f), X(.43f), Y(.62f), X(.5f), Y(.48f))
+            moveTo(X(0.5f), Y(0.48f))
+            cubicTo(X(0.57f), Y(0.6f), X(0.71f), Y(0.67f), X(0.71f), Y(0.8f))
+            cubicTo(X(0.71f), Y(0.93f), X(0.61f), Y(1f), X(0.5f), Y(1f))
+            cubicTo(X(0.39f), Y(1f), X(0.29f), Y(0.93f), X(0.29f), Y(0.8f))
+            cubicTo(X(0.29f), Y(0.69f), X(0.43f), Y(0.62f), X(0.5f), Y(0.48f))
         }
         close()
     }
@@ -67,11 +67,11 @@ class Flame(c: Context) : View(c) {
         cv.save(); cv.scale(2f - flick, flick, w / 2, h)
         if (days > 0) {   // glow
             p.shader = null; p.color = Color.argb(45, Color.red(col[1]), Color.green(col[1]), Color.blue(col[1]))
-            cv.drawCircle(w / 2, h * .68f, w * .5f, p)
+            cv.drawCircle(w / 2, h * 0.68f, w * 0.5f, p)
         }
         p.shader = LinearGradient(0f, 0f, 0f, h, col[0], col[1], Shader.TileMode.CLAMP)
         cv.drawPath(path(w, h, true), p)
-        p.shader = LinearGradient(0f, h * .5f, 0f, h, 0xFFFFF6D8.toInt(), col[0], Shader.TileMode.CLAMP)
+        p.shader = LinearGradient(0f, h * 0.5f, 0f, h, 0xFFFFF6D8.toInt(), col[0], Shader.TileMode.CLAMP)
         p.alpha = if (days > 0) 230 else 90
         cv.drawPath(path(w, h, false), p); p.alpha = 255
         cv.restore()
@@ -128,7 +128,7 @@ class HoldButton(c: Context, private val label: String, private val color: Int, 
     }
 
     override fun onDraw(cv: Canvas) {
-        val w = width.toFloat(); val h = height.toFloat(); val r = h * .3f
+        val w = width.toFloat(); val h = height.toFloat(); val r = h * 0.3f
         val d = resources.displayMetrics.density
         p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f * d
         p.color = Color.argb(120, Color.red(color), Color.green(color), Color.blue(color))
@@ -144,7 +144,7 @@ class HoldButton(c: Context, private val label: String, private val color: Int, 
 fun View.pressable(onClick: () -> Unit) {
     setOnTouchListener { v, e ->
         when (e.action) {
-            MotionEvent.ACTION_DOWN -> v.animate().scaleX(.97f).scaleY(.97f).setDuration(90).start()
+            MotionEvent.ACTION_DOWN -> v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(90).start()
             MotionEvent.ACTION_UP -> { v.animate().scaleX(1f).scaleY(1f).setDuration(160).start(); v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); onClick() }
             MotionEvent.ACTION_CANCEL -> v.animate().scaleX(1f).scaleY(1f).setDuration(160).start()
         }
