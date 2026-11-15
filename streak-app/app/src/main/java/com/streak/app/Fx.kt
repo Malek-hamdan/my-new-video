@@ -42,7 +42,8 @@ class Flame(c: Context) : View(c) {
     override fun onDetachedFromWindow() { anim.cancel(); super.onDetachedFromWindow() }
 
     private fun path(w: Float, h: Float, outer: Boolean) = Path().apply {
-        fun X(x: Float) = x * w; fun Y(y: Float) = y * h
+        fun X(x: Float) = x * w
+        fun Y(y: Float) = y * h
         if (outer) {
             moveTo(X(0.5f), Y(0f))
             cubicTo(X(0.62f), Y(0.2f), X(0.92f), Y(0.36f), X(0.92f), Y(0.64f))
