@@ -344,6 +344,10 @@
   .tr-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: #ffd3c2; margin-bottom: 14px; }
   .tr-label { display: block; margin: 14px 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
   .tr-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tr-reason { margin-top: 14px; display: grid; gap: 8px; }
+  .tr-reason .tr-chip[aria-pressed="true"] { background: #f0a35b; border-color: #f0a35b; color: #1f1206; }
+  .tx-reason { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: rgba(240,163,91,0.15); color: #f0b27a; vertical-align: 1px; }
+  .tx-note { display: block; margin-top: 2px; font-size: 12px; font-style: italic; color: var(--muted); }
   .tr-chip { padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .tr-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #06101f; }
   .tr-input { width: 100%; padding: 11px 12px; border: 1px solid var(--border-strong); border-radius: 10px; background: rgba(255,255,255,0.03); color: var(--text); font: inherit; font-size: 15px; }
@@ -1271,6 +1275,11 @@
         <div><span class="tr-label">Issued by</span><input class="tr-input" id="trBy" placeholder="Who gave the part" autocomplete="off" spellcheck="false" dir="auto"></div>
         <div><span class="tr-label">Received by</span><input class="tr-input" id="trTo" placeholder="Who took the part" autocomplete="off" spellcheck="false" dir="auto"></div>
       </div>
+      <div class="tr-reason tr-out-only">
+        <span class="tr-label">Why is the part being changed?</span>
+        <div class="tr-chips" id="trReasons"></div>
+        <input class="tr-input" id="trNote" placeholder="Short note for the mechanics, e.g. cracked after 2 weeks (optional)" autocomplete="off" dir="auto" maxlength="160">
+      </div>
       <label class="tr-print tr-out-only"><input type="checkbox" id="trPrint" checked> Print a slip when I save</label>
       <div class="tr-after" id="trAfter" hidden></div>
       <div class="tr-err" id="trErr" hidden></div>
@@ -1477,6 +1486,9 @@
     };
   }
 
+  // Why a part goes out: kept with the transaction for the machine analysis
+  var REASONS = [["wear", "Worn out"], ["broken", "Broken"], ["prev", "Preventive"], ["fit", "Wrong fit / setup"], ["other", "Other"]];
+  function reasonLabel(k) { for (var i = 0; i < REASONS.length; i++) if (REASONS[i][0] === k) return REASONS[i][1]; return ""; }
   function cleanTx(t, id) {
     return {
       id: String(id || t.id),
@@ -1500,6 +1512,9 @@
       me: String(t.me || ""),
       by: String(t.by || ""),
       to: String(t.to || ""),
+      // why the part was changed (Out only) and a short note for the mechanics
+      reason: REASONS.some(function (r) { return r[0] === t.reason; }) ? t.reason : "",
+      note: String(t.note || "").slice(0, 160),
       local: !!t.local
     };
   }
@@ -1508,7 +1523,7 @@
     return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, local: !!r.local, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "", local: !!t.local };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "", reason: t.reason || "", note: t.note || "", local: !!t.local };
   }
   function ymd(ts) {
     var d = new Date(ts);
@@ -2294,6 +2309,11 @@
         stag.className = "chip src-" + t.source;
         stag.textContent = t.source === "used" ? "Used" : "Equipment";
         (ncell.querySelector(".tx-text") || ncell).appendChild(stag);
+      }
+      if (t.reason || t.note) {
+        var holder = ncell.querySelector(".tx-text") || ncell;
+        if (t.reason) { var rc = document.createElement("span"); rc.className = "tx-reason"; rc.textContent = reasonLabel(t.reason); holder.appendChild(document.createElement("br")); holder.appendChild(rc); }
+        if (t.note) { var nt = document.createElement("span"); nt.className = "tx-note"; nt.dir = "auto"; nt.textContent = "\u201C" + t.note + "\u201D"; holder.appendChild(nt); }
       }
       if (t.by || t.to) {
         var who = document.createElement("span");
@@ -3149,7 +3169,8 @@
   function trStock(r) { return /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : 0; }
   function trOpen(mode) {
     if (ro()) return;
-    trState = { machine: "All", part: null, line: "", mode: mode === "in" ? "in" : "out" };
+    trState = { machine: "All", part: null, line: "", reason: "", mode: mode === "in" ? "in" : "out" };
+    document.getElementById("trNote").value = "";
     var inn = trState.mode === "in";
     document.getElementById("trCard").classList.toggle("in", inn);
     if (area === "equip") trState.machine = "Equip";
@@ -3178,6 +3199,13 @@
       b.setAttribute("aria-pressed", on ? "true" : "false");
       b.addEventListener("click", function () { trState.machine = m; trState.part = null; trRender(); document.getElementById("trSearch").focus(); });
       mBox.appendChild(b);
+    });
+    var rBox = document.getElementById("trReasons"); rBox.innerHTML = "";
+    REASONS.forEach(function (r) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "tr-chip"; b.textContent = r[1];
+      b.setAttribute("aria-pressed", trState.reason === r[0] ? "true" : "false");
+      b.addEventListener("click", function () { trState.reason = r[0]; trRender(); });
+      rBox.appendChild(b);
     });
     var lBox = document.getElementById("trLines"); lBox.innerHTML = "";
     ["1", "2"].forEach(function (l) {
@@ -3262,12 +3290,14 @@
     var err = document.getElementById("trErr");
     var inn = trState.mode === "in";
     if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
+    if (!inn && !trState.reason && trState.kind !== "equip") { err.textContent = "Choose why the part is being changed."; err.hidden = false; return; }
     if (trState.kind === "used" || trState.kind === "equip") { trSaveSide(inn); return; }
     var row = findRow(trState.part.id) || trState.part, qty = parseInt(document.getElementById("trQty").value, 10);
     var before = trStock(row), after = inn ? before + qty : before - qty, date = document.getElementById("trDate").value;
     row.quantity = String(after); row.loggedQty = row.quantity; row.baseline = false;
     var tx = cleanTx({ partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local }, uid());
+      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local,
+      reason: inn ? "" : trState.reason, note: inn ? "" : document.getElementById("trNote").value.trim() }, uid());
     if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     writeRow(row); saveDoc("transactions", tx.id, txBody(tx));
@@ -3288,7 +3318,8 @@
     delete sideTimers[row.id];
     writeSide(key, row);
     var tx = cleanTx({ partId: row.id, month: month, machine: key === "equip" ? row.type : row.machine, name: row.name, reference: row.reference,
-      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key }, uid());
+      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key,
+      reason: inn ? "" : trState.reason, note: inn ? "" : document.getElementById("trNote").value.trim() }, uid());
     if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     saveDoc("transactions", tx.id, txBody(tx));
