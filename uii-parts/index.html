@@ -623,6 +623,13 @@
   body.tx-view .parts-sum, body.sum-view .parts-sum, body.side-view .parts-sum { display: none !important; }
   /* who gave and who took the part, under its name in Transaction */
   .tx-who { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--muted); }
+  /* Summary split in three parts */
+  .sum-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,0.02); }
+  .sum-tabs button { padding: 8px 18px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .sum-tabs button[aria-selected="true"] { background: rgba(91,157,255,0.16); color: var(--text); }
+  .sum-tabs button.has-flag { color: #f0a35b; }
+  .sum-tabs button.has-flag[aria-selected="true"] { color: #f6c08f; }
+  .sum-empty { padding: 18px; color: var(--muted); }
   /* Machine rating scorecard at the top of Summary */
   .score { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,0.02); font-feature-settings: "tnum" 1; }
   .sc-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding: 16px 18px 12px; border-bottom: 1px solid var(--border); }
@@ -654,7 +661,35 @@
   .pz-off { fill: #2a3240; } .pz-on.pz-good { fill: #0ca30c; } .pz-on.pz-warn { fill: #fab219; } .pz-on.pz-serious { fill: #ec835a; } .pz-on.pz-crit { fill: #d03b3b; }
   .sc-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
   .sc-foot b { font-weight: 600; } .sc-key { display: inline-flex; align-items: center; gap: 6px; }
+  .an-m { padding: 14px 18px 16px; border-top: 1px solid var(--border); }
+  .an-m:first-of-type { border-top: 0; }
+  .an-mh { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 10px; }
+  .an-name { font-size: 16px; font-weight: 800; }
+  .an-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
+  .an-tag svg { flex: none; }
+  .an-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .an-table { font-size: 13px; border: 1px solid var(--border); border-radius: 10px; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+  body.sum-view table.an-table { display: table !important; }
+  .an-table td, .an-table th { white-space: normal; }
+  .an-table th { vertical-align: bottom; line-height: 1.3; }
+  .an-table td.an-order { font-weight: 700; }
+  .an-sub { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .an-bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.05); }
+  .an-bar i { display: block; height: 100%; }
+  .an-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+  .an-legend b { color: var(--text); }
+  .an-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+  .rs-wear { background: #3987e5; } .rs-broken { background: #d03b3b; } .rs-prev { background: #0ca30c; } .rs-fit { background: #fab219; } .rs-other { background: #8b93a7; } .rs-none { background: #4b5566; }
+  .an-note { font-size: 13px; font-style: italic; margin: 3px 0; }
+  .an-note span { font-style: normal; color: var(--muted); font-size: 11.5px; margin-left: 4px; }
+  .an-tips { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: rgba(91,157,255,0.06); border: 1px solid rgba(91,157,255,0.22); }
+  .an-tips ol { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.55; }
+  .an-tips li { margin: 3px 0; }
   @media (max-width: 700px) {
+    .an-grid { grid-template-columns: 1fr; }
+    body.sum-view table.an-table { display: block !important; border: 0; }
+    .an-table tr { grid-template-columns: 1fr 1fr 1fr !important; }
+    .an-table td:first-child { grid-column: 1 / -1; }
     .sc-head { flex-direction: column; align-items: flex-start; } .sc-basis { text-align: left; }
     .sc-kpis { grid-template-columns: 1fr 1fr; } .sc-kpi:nth-child(2) { border-right: 0; } .sc-kpi:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
     body.sum-view table.sc-table { display: block !important; }
@@ -2502,6 +2537,93 @@
       '<polyline points="' + vals.map(function (v, i) { return X(i) + "," + Y(v); }).join(" ") + '" class="sp-line"/>' +
       '<circle cx="' + X(vals.length - 1) + '" cy="' + Y(vals[vals.length - 1]) + '" r="3.5" class="sp-dot"/></svg>';
   }
+  // ---- Analysis for machines rated High / Very high: which parts, why, which line, how often,
+  // what to expect next month and what the mechanics can check. Everything comes from the records. ----
+  function outTxOf(k, m, upTo) {
+    return (allTx[k] || []).filter(function (t) { return !t.source && t.machine === m && t.change < 0 && (!upTo || txDate(t) <= upTo); });
+  }
+  function daysBetween(a, b) { return Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 864e5); }
+  function machineAnalysis(hot, prevKeys, cut, day) {
+    var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+    var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate(), nextKey = MONTHS[MONTHS.indexOf(month) + 1];
+    var nextName = nextKey ? monthLabel(nextKey) : "next month";
+    var box = document.createElement("div");
+    box.className = "score an";
+    var html = '<div class="sc-head"><div><div class="sc-eyebrow">Analysis \u00B7 machines to act on</div><div class="sc-title">What drove the increase, and the plan for ' + e(nextName) + '</div></div>' +
+      '<div class="sc-basis">From the Transfer records: part, reason, line, date and notes<br>Suggestions to help the mechanics \u2014 they decide</div></div>';
+    hot.forEach(function (h) {
+      var m = h.m, now = outTxOf(month, m, cut(month)), byRef = {}, reasons = {}, lines = {}, notes = [];
+      // one line per part: by Reference; a record without a Reference joins the part with the same name
+      var refOfName = {};
+      [month].concat(prevKeys).forEach(function (k) { outTxOf(k, m, null).forEach(function (t) { if (t.reference && t.name) refOfName[t.name.trim().toUpperCase()] = t.reference.trim().toUpperCase(); }); });
+      var key = function (t) { var r = String(t.reference || "").trim().toUpperCase(), n = String(t.name || "").trim().toUpperCase(); return r || refOfName[n] || n || "?"; };
+      now.forEach(function (t) {
+        var k = key(t), q = -t.change;
+        byRef[k] = byRef[k] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [] };
+        if (!byRef[k].ref) byRef[k].ref = t.reference; if (!byRef[k].name) byRef[k].name = t.name;
+        byRef[k].now += q; byRef[k].dates.push(txDate(t));
+        reasons[t.reason || "none"] = (reasons[t.reason || "none"] || 0) + q;
+        if (t.line) lines[t.line] = (lines[t.line] || 0) + q;
+        if (t.note) notes.push({ d: txDate(t), n: t.note, ref: t.reference || t.name });
+      });
+      prevKeys.forEach(function (k) {
+        outTxOf(k, m, cut(k)).forEach(function (t) {
+          var r = key(t);
+          byRef[r] = byRef[r] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [] };
+          if (!byRef[r].ref) byRef[r].ref = t.reference; if (!byRef[r].name) byRef[r].name = t.name;
+          byRef[r].prev += -t.change;
+        });
+      });
+      var parts = Object.keys(byRef).map(function (k) { var x = byRef[k]; x.avg = prevKeys.length ? Math.round(x.prev / prevKeys.length * 10) / 10 : 0; x.diff = Math.round((x.now - x.avg) * 10) / 10; return x; })
+        .filter(function (x) { return x.now > 0; }).sort(function (a, b) { return b.diff - a.diff || b.now - a.now; });
+      var drivers = parts.filter(function (x) { return x.diff > 0; }).slice(0, 3);
+      if (!drivers.length) drivers = parts.slice(0, 3);
+      var total = h.now, rTot = Object.keys(reasons).reduce(function (a, k) { return a + reasons[k]; }, 0);
+      // next month: if nothing changes, the pace of this month carries on
+      var pace = day ? Math.round(h.now / day * daysIn) : h.now;
+      var row = function (x) {
+        // find the part in this month's table by its Reference, and if that is missing or not found, by its name
+        var up = function (v) { return String(v || "").trim().toUpperCase(); }, rows = (sheet[m] || []).filter(hasContent);
+        var stockRow = (x.ref && rows.filter(function (r) { return up(r.reference) === up(x.ref); })[0]) || (x.name && rows.filter(function (r) { return up(r.name) === up(x.name); })[0]) || null;
+        var stock = stockRow && /^\d+$/.test(stockRow.quantity) ? parseInt(stockRow.quantity, 10) : null, min = stockRow && /^\d+$/.test(stockRow.min) ? parseInt(stockRow.min, 10) : 0;
+        var need = day ? Math.round(x.now / day * daysIn) : x.now;
+        var order = stock === null ? null : Math.max(0, need + min - stock);
+        var ds = x.dates.slice().sort(), every = ds.length > 1 ? Math.round(daysBetween(ds[0], ds[ds.length - 1]) / (ds.length - 1) * 10) / 10 : null;
+        x.need = need; x.order = order; x.every = every; x.stock = stock;
+        var mn = e(monthLabel(month).split(" ")[0]), nx = "Expected " + e(nextName.split(" ")[0]);
+        return '<tr><td class="sc-m">' + e(x.name || "\u2014") + '<div class="sc-rs">' + e(x.ref || "") + '</div></td><td data-l="Avg before">' + x.avg.toFixed(1) + '</td><td data-l="' + mn + '"><b>' + x.now + '</b></td><td data-l="Change" class="' + (x.diff > 0 ? "sc-up" : x.diff < 0 ? "sc-down" : "") + '">' + (x.diff > 0 ? "+" : "") + x.diff + '</td><td data-l="Changed">' +
+          (every === null ? "once" : "every " + every + (every === 1 ? " day" : " days")) + '</td><td data-l="' + nx + '">' + need + '</td><td data-l="In stock">' + (stock === null ? "\u2014" : stock) + '</td><td data-l="To order" class="an-order">' + (order === null ? "\u2014" : order ? "order " + order : "enough") + "</td></tr>";
+      };
+      var tbl = '<table class="sc-table an-table"><thead><tr><th>Part (name \u00B7 reference)</th><th>Avg before</th><th>' + e(monthLabel(month).split(" ")[0].slice(0, 3)) + "</th><th>Change</th><th>How often</th><th>Need in " + e(nextName.split(" ")[0].slice(0, 3)) + "</th><th>In stock</th><th>To order</th></tr></thead><tbody>" + drivers.map(row).join("") + "</tbody></table>";
+      // why: reasons as a thin split bar with the figures beside it
+      var rk = REASONS.map(function (r) { return [r[0], r[1]]; }).concat([["none", "Not given"]]).filter(function (r) { return reasons[r[0]]; });
+      var why = '<div class="an-why"><div class="an-sub">Why the parts were changed</div><div class="an-bar">' + rk.map(function (r) { return '<i class="rs-' + r[0] + '" style="width:' + (reasons[r[0]] / rTot * 100) + '%"></i>'; }).join("") + "</div>" +
+        '<div class="an-legend">' + rk.map(function (r) { return '<span><i class="rs-' + r[0] + '"></i>' + e(r[1]) + " <b>" + reasons[r[0]] + "</b> (" + Math.round(reasons[r[0]] / rTot * 100) + "%)</span>"; }).join("") + "</div>";
+      var lk = Object.keys(lines), lTot = lk.reduce(function (a, k) { return a + lines[k]; }, 0);
+      if (lTot) why += '<div class="an-sub" style="margin-top:10px">Line</div><div class="an-legend">' + lk.sort().map(function (k) { return "<span>Line " + e(k) + " <b>" + lines[k] + "</b> (" + Math.round(lines[k] / lTot * 100) + "%)</span>"; }).join("") + "</div>";
+      if (notes.length) why += '<div class="an-sub" style="margin-top:10px">Notes from the slips</div>' + notes.slice(-3).reverse().map(function (n) { return '<div class="an-note">\u201C' + e(n.n) + '\u201D <span>' + e(n.ref) + " \u00B7 " + e(n.d) + "</span></div>"; }).join("");
+      why += "</div>";
+      // what the mechanics can check, chosen by what the records show
+      var tips = [], share = function (k) { return rTot ? (reasons[k] || 0) / rTot : 0; }, top = drivers[0];
+      var topName = top ? (top.name || top.ref) : "the parts";
+      if (share("broken") >= 0.4) tips.push("Parts are breaking, not wearing out (" + Math.round(share("broken") * 100) + "%). Check " + m + " for jams, misalignment or overload around the " + topName + ", and look for a foreign object or a loose fixing.");
+      if (share("wear") >= 0.4) tips.push("Parts are wearing out faster than before. Check lubrication, belt / spring tension, pressure and temperature settings, and the running speed. Compare the last batch of " + topName + " with the old one.");
+      if (share("fit") > 0) tips.push((reasons.fit) + " change" + (reasons.fit === 1 ? " was" : "s were") + " due to a wrong fit or setup. Check the reference before fitting, keep the setting sheet at the machine, and show the team the right setting.");
+      if (share("prev") >= 0.5) tips.push("Most changes were preventive \u2014 planned work, not a fault. If that was the plan, no extra action is needed.");
+      if (share("none") >= 0.3) tips.push("Some transfers have no reason. Ask the store to always tick a reason on the slip, so next month\u2019s analysis is sharper.");
+      lk.forEach(function (k) { if (lTot >= 3 && lines[k] / lTot >= 0.7) tips.push(Math.round(lines[k] / lTot * 100) + "% of it went to Line " + k + ". Compare Line " + k + "\u2019s settings and operator practice with the other line."); });
+      if (top && top.every !== null && top.every <= 7) tips.push("The " + topName + " was changed every " + top.every + " days this month. Inspect what it runs against before fitting the next one, or the new one will go the same way.");
+      var orders = drivers.filter(function (x) { return x.order; });
+      if (orders.length) tips.push("Order before " + nextName + ": " + orders.map(function (x) { return (x.name || x.ref) + " \u00D7" + x.order; }).join(", ") + ", so " + m + " doesn\u2019t stop if this carries on.");
+      if (!tips.length) tips.push("No single cause stands out in the records. Ask the mechanics what changed on " + m + " this month (new operator, new material, a repair).");
+      html += '<div class="an-m"><div class="an-mh"><span class="an-name">' + e(m) + '</span><span class="an-tag pz-t-' + RATE[h.lv][1] + '">' + pyramidSvg(h.lv, 17) + " " + RATE[h.lv][0] + "</span>" +
+        '<span class="sc-rs">' + total + " pcs vs average " + h.avg.toFixed(1) + (day ? " \u00B7 on pace for about " + pace + " this month" : "") + "</span></div>" +
+        '<div class="an-grid"><div>' + tbl + "</div>" + why + "</div>" +
+        '<div class="an-tips"><div class="an-sub">What the mechanics can check</div><ol>' + tips.map(function (t) { return "<li>" + e(t) + "</li>"; }).join("") + "</ol></div></div>";
+    });
+    box.innerHTML = html;
+    return box;
+  }
   function scorecard(day) {
     var idx = MONTHS.indexOf(month), prevKeys = [];
     for (var i = idx - 1; i >= 0 && prevKeys.length < 3; i--) if (monthHasData(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
@@ -2514,13 +2636,13 @@
     wrap.className = "score";
     var head = '<div class="sc-head"><div><div class="sc-eyebrow">Machine performance</div><div class="sc-title">Parts consumption rating \u2014 ' + monthLabel(month) + (day ? " (to day " + day + ")" : "") + "</div></div>" +
       '<div class="sc-basis">Parts issued (Transfer out), Imported + Local<br>' + (prevKeys.length ? "Compared with the " + prevKeys.length + "-month average, " + span + (day ? ", days 1\u2013" + day : "") : "No earlier month with data to compare yet") + "</div></div>";
-    var totAvg = 0, totNow = cur.all.outQty, flagged = 0, rows = "";
+    var totAvg = 0, totNow = cur.all.outQty, flagged = 0, rows = "", hot = [];
     MACHINES.forEach(function (m) {
       var hist = prev.map(function (st) { return st[m].outQty; }), now = cur[m].outQty;
       var avg = hist.length ? Math.round(hist.reduce(function (a, b) { return a + b; }, 0) / hist.length * 10) / 10 : null;
       if (avg !== null) totAvg += avg;
       var lv = avg === null ? -1 : rateLevel(avg, now);
-      if (lv >= 3) flagged++;
+      if (lv >= 3) { flagged++; hot.push({ m: m, lv: lv, avg: avg, now: now }); }
       var d = avg === null ? null : Math.round((now - avg) * 10) / 10, pc = avg ? Math.round((now - avg) / avg * 100) : null;
       var cls = d === null ? "" : d > 0 ? "sc-up" : d < 0 ? "sc-down" : "sc-flat", arrow = d === null ? "" : d > 0 ? "\u25B2 " : d < 0 ? "\u25BC " : "\u25A0 ";
       var vs = d === null ? "\u2014" : arrow + (pc === null ? "new" : (pc > 0 ? "+" : "") + pc + "%") + ' <span class="sc-muted">(' + (d > 0 ? "+" : "") + d + ")</span>";
@@ -2538,7 +2660,10 @@
       '<div class="sc-foot"><b>Rating scale</b>' + RATE.map(function (r, i) { return '<span class="sc-key">' + pyramidSvg(i, 17) + " " + r[0] + ": " + r[2] + "</span>"; }).join("") + "</div>";
     var kp = wrap.querySelectorAll(".sc-kpi");
     kpis.forEach(function (k, i) { kp[i].children[0].textContent = k[0]; kp[i].children[1].textContent = k[1]; kp[i].children[2].textContent = k[2]; });
-    return wrap;
+    var out = document.createElement("div");
+    out.appendChild(wrap);
+    if (hot.length) out.appendChild(machineAnalysis(hot, prevKeys, cut, day));
+    return out;
   }
 
   function renderSummary() {
@@ -2658,7 +2783,40 @@
       ins.appendChild(d);
     });
     box.appendChild(ins);
+    splitSummary(box);
     updateCounts();
+  }
+  // Summary in three separate parts, one open at a time, so nothing is piled on top of each other
+  var SUM_PART_KEY = "uii-summary-part";
+  function splitSummary(box) {
+    var top = box.firstChild, rating = top.firstChild, analysis = top.children[1] || null, details = [];
+    for (var c = top.nextSibling; c; c = c.nextSibling) details.push(c);
+    var sec = { rating: document.createElement("div"), analysis: document.createElement("div"), details: document.createElement("div") };
+    sec.rating.appendChild(rating);
+    if (analysis) sec.analysis.appendChild(analysis);
+    else sec.analysis.innerHTML = '<div class="score sum-empty">No machine is rated High or Very high this month, so there is nothing to act on. The analysis appears here when one is.</div>';
+    details.forEach(function (d) { sec.details.appendChild(d); });
+    var flagged = analysis ? analysis.querySelectorAll(".an-m").length : 0;
+    var nav = document.createElement("div");
+    nav.className = "sum-tabs";
+    nav.setAttribute("role", "tablist");
+    var cur = "rating";
+    try { var saved = localStorage.getItem(SUM_PART_KEY); if (sec[saved]) cur = saved; } catch (e) {}
+    [["rating", "Rating"], ["analysis", "Analysis" + (flagged ? " \u00B7 " + flagged : "")], ["details", "Details"]].forEach(function (t) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = t[1]; b.setAttribute("role", "tab"); b.setAttribute("data-part", t[0]);
+      if (t[0] === "analysis" && flagged) b.classList.add("has-flag");
+      b.addEventListener("click", function () { show(t[0]); try { localStorage.setItem(SUM_PART_KEY, t[0]); } catch (e) {} });
+      nav.appendChild(b);
+    });
+    function show(k) {
+      Object.keys(sec).forEach(function (x) { sec[x].hidden = x !== k; });
+      nav.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-part") === k ? "true" : "false"); });
+    }
+    box.innerHTML = "";
+    box.appendChild(nav);
+    ["rating", "analysis", "details"].forEach(function (k) { box.appendChild(sec[k]); });
+    show(cur);
   }
 
   // Removing a transaction also takes its change back off the part's stock
