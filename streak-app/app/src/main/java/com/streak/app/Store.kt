@@ -7,7 +7,7 @@ import java.util.Calendar
 
 const val DAY = 86_400_000L
 
-data class Streak(var id: Long, var title: String, var color: Int, var start: Long, var best: Int, var resets: Int, var created: Long, var notified: Int) {
+data class Streak(var id: Long, var title: String, var color: Int, var start: Long, var best: Int, var resets: Int, var created: Long, var notified: Int, var hist: String = "[]") {
     fun days(now: Long = System.currentTimeMillis()) = ((now - start) / DAY).toInt()
     fun bestNow() = maxOf(best, days())
     fun nextIn(now: Long = System.currentTimeMillis()) = DAY - ((now - start) % DAY)
@@ -19,13 +19,13 @@ object Store {
         val a = JSONArray(p(c).getString("list", "[]"))
         return (0 until a.length()).map { val o = a.getJSONObject(it)
             Streak(o.getLong("id"), o.getString("title"), o.getInt("color"), o.getLong("start"), o.optInt("best"),
-                o.optInt("resets"), o.optLong("created"), o.optInt("notified")) }.toMutableList()
+                o.optInt("resets"), o.optLong("created"), o.optInt("notified"), o.optString("hist", "[]")) }.toMutableList()
     }
     fun saveAll(c: Context, l: List<Streak>) {
         val a = JSONArray()
         l.forEach { s -> a.put(JSONObject().apply {
             put("id", s.id); put("title", s.title); put("color", s.color); put("start", s.start); put("best", s.best)
-            put("resets", s.resets); put("created", s.created); put("notified", s.notified) }) }
+            put("resets", s.resets); put("created", s.created); put("notified", s.notified); put("hist", s.hist) }) }
         p(c).edit().putString("list", a.toString()).commit()
     }
     fun get(c: Context, id: Long) = all(c).find { it.id == id }
@@ -35,6 +35,7 @@ object Store {
     }
     fun delete(c: Context, id: Long) = saveAll(c, all(c).filter { it.id != id })
     fun reset(c: Context, s: Streak) {
+        val h = JSONArray(s.hist); h.put(JSONObject().put("s", s.start).put("e", System.currentTimeMillis()).put("d", s.days())); s.hist = h.toString()
         s.best = s.bestNow(); s.resets++; s.start = System.currentTimeMillis(); s.notified = 0; upsert(c, s)
     }
 

@@ -13,11 +13,13 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
     private lateinit var body: LinearLayout
     private val h = Handler(Looper.getMainLooper())
+    private var animate = true
     private val tick = object : Runnable { override fun run() { render(); h.postDelayed(this, 60_000) } }
 
     override fun onCreate(s: Bundle?) {
@@ -25,69 +27,119 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         Rx.schedule(this)
         val root = FrameLayout(this)
-        body = vbox().apply { setPadding(dp(18), dp(22), dp(18), dp(110)) }
-        root.addView(ScrollView(this).apply { addView(body) })
-        root.addView(btn("＋ ستريك جديد", C.G, 0xFF04130D.toInt()) { addDialog() },
-            FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { setMargins(dp(20), 0, dp(20), dp(24)) })
+        body = vbox().apply { setPadding(dp(18), dp(24), dp(18), dp(120)) }
+        root.addView(ScrollView(this).apply { addView(body); isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER })
+        val add = btn("＋  ستريك جديد", C.G, 0xFF04130D.toInt()) {}
+        add.elevation = dp(8).toFloat(); add.pressable { addDialog() }
+        root.addView(add, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { setMargins(dp(20), 0, dp(20), dp(24)) })
         setContentView(root)
     }
-    override fun onResume() { super.onResume(); h.post(tick) }
+    override fun onResume() { super.onResume(); animate = true; h.post(tick) }
     override fun onPause() { super.onPause(); h.removeCallbacks(tick) }
+
+    private fun greeting(): String {
+        val hr = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return when { hr < 12 -> "صباح الخير ☀️"; hr < 18 -> "نهارك سعيد 🌤"; else -> "مسا الخير 🌙" }
+    }
 
     private fun render() {
         body.removeAllViews()
-        val list = Store.all(this)
+        val list = Store.all(this).sortedByDescending { it.days() }
+        var i = 0
+        fun add(v: View, lp: LinearLayout.LayoutParams) { body.addView(v, lp); if (animate) v.enter(i++) }
+
         val top = hbox().apply { gravity = Gravity.CENTER_VERTICAL }
         top.addView(vbox().apply {
-            addView(tv("Streak", 28f, C.TXT, true))
-            addView(tv(if (list.isEmpty()) "ما في ستريكات بعد" else "${list.size} ستريكات شغّالة", 14f, C.DIM))
+            addView(tv(greeting(), 14f, C.DIM))
+            addView(tv("ستريكاتي", 30f, C.TXT, true))
         }, lp(0, -2, 1f))
-        top.addView(tv("⚙", 24f, C.DIM).apply { setPadding(dp(10), dp(6), dp(10), dp(6))
-            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) } })
-        body.addView(top, lp(b = 16))
+        top.addView(tv("⚙", 22f, C.DIM).apply {
+            gravity = Gravity.CENTER; background = shape(C.CARD, dp(22).toFloat())
+            pressable { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+        }, lp(dp(44), dp(44)))
+        add(top, lp(b = 18))
+
+        if (list.isNotEmpty()) {
+            val total = list.sumOf { it.days() }; val best = list.maxOf { it.bestNow() }
+            val sum = hbox()
+            listOf("$total" to "مجموع الأيام", "$best" to "أفضل رقم", "${list.size}" to "ستريكات").forEach { (v, l) ->
+                sum.addView(vbox().apply {
+                    gravity = Gravity.CENTER; background = shape(C.CARD, dp(16).toFloat()); setPadding(0, dp(10), 0, dp(10))
+                    addView(tv(v, 20f, C.TXT, true).apply { gravity = Gravity.CENTER })
+                    addView(tv(l, 11f, C.DIM).apply { gravity = Gravity.CENTER })
+                }, lp(0, -2, 1f, l = 4, r = 4))
+            }
+            add(sum, lp(b = 16))
+        }
 
         if (Store.duaOn(this)) {
-            val i = Store.duaIndex(this)
-            val card = vbox().apply { background = shape(C.CARD, dp(16).toFloat()); setPadding(dp(16), dp(12), dp(16), dp(14)) }
-            if (i >= 0) {
-                val (t, r) = Store.dua(this, i)
-                card.addView(tv("🤲 دعاء اليوم • ${i + 1}/365", 12f, C.G))
-                card.addView(tv(t, 20f, C.TXT).apply { setLineSpacing(0f, 1.3f); setPadding(0, dp(6), 0, dp(4)) })
+            val di = Store.duaIndex(this)
+            val card = vbox().apply { background = shape(C.CARD, dp(18).toFloat(), dp(1), 0x333DDC97); setPadding(dp(16), dp(14), dp(16), dp(14)) }
+            if (di >= 0) {
+                val (t, r) = Store.dua(this, di)
+                card.addView(tv("🤲  آية اليوم • ${di + 1}/365", 12f, C.G, true))
+                card.addView(tv(t, 19f, C.TXT).apply { setLineSpacing(0f, 1.35f); setPadding(0, dp(8), 0, dp(6)) })
                 card.addView(tv(r, 12f, C.DIM))
-            } else card.addView(tv("🤲 الأدعية بتبلش بعد ${-i} يوم", 15f, C.G))
-            body.addView(card, lp(b = 16))
+            } else card.addView(tv("🤲  الآيات بتبلش بعد ${-di} يوم", 15f, C.G))
+            add(card, lp(b = 16))
         }
 
         for (s in list) {
-            val card = hbox().apply { gravity = Gravity.CENTER_VERTICAL; background = shape(C.CARD, dp(20).toFloat()); setPadding(dp(14), dp(14), dp(14), dp(14)) }
-            card.addView(Ring(this).apply { progress = 1f - s.nextIn() / DAY.toFloat(); color = s.color; big = s.days().toString() }, lp(dp(72), dp(72)))
-            card.addView(vbox().apply {
+            val d = s.days(); val nm = nextMile(d); val pm = prevMile(d)
+            val card = vbox().apply { background = shape(C.CARD, dp(22).toFloat()); setPadding(dp(16), dp(16), dp(16), dp(16)) }
+            val row = hbox().apply { gravity = Gravity.CENTER_VERTICAL }
+            row.addView(Flame(this).apply { days = d }, lp(dp(46), dp(56)))
+            row.addView(vbox().apply {
                 addView(tv(s.title, 18f, C.TXT, true))
-                addView(tv("أطول ستريك: ${s.bestNow()} • من ${android.text.format.DateFormat.format("d/M", s.created)}", 12f, C.DIM))
-            }, lp(0, -2, 1f, l = 14))
-            card.setOnClickListener { startActivity(Intent(this, DetailActivity::class.java).putExtra("id", s.id)) }
-            body.addView(card, lp(b = 12))
+                addView(tv(if (d == 0) "بلشت اليوم • بكرا أول يوم" else "باقي ${nm - d} لـ $nm يوم", 12f, C.DIM))
+            }, lp(0, -2, 1f, l = 14, r = 10))
+            row.addView(vbox().apply {
+                gravity = Gravity.CENTER
+                addView(tv("$d", 30f, flameColors(d)[1].let { if (d == 0) C.DIM else it }, true).apply { gravity = Gravity.CENTER })
+                addView(tv("يوم", 11f, C.DIM).apply { gravity = Gravity.CENTER })
+            })
+            card.addView(row)
+            val bar = Bar(this).apply { color = s.color }
+            card.addView(bar, lp(-1, dp(6), t = 14))
+            bar.animateTo((d - pm).toFloat() / (nm - pm).coerceAtLeast(1), if (animate) 200L + 60 * i else 0)
+            card.pressable {
+                startActivity(Intent(this, DetailActivity::class.java).putExtra("id", s.id))
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            }
+            add(card, lp(b = 12))
         }
-        if (list.isEmpty()) body.addView(tv("اكبس \"ستريك جديد\" وابدأ العدّ 🔥", 16f, C.DIM).apply { gravity = Gravity.CENTER; setPadding(0, dp(60), 0, 0) })
+        if (list.isEmpty()) {
+            val e = vbox().apply { gravity = Gravity.CENTER; setPadding(0, dp(50), 0, 0) }
+            e.addView(Flame(this).apply { days = 0 }, lp(dp(80), dp(100)).apply { gravity = Gravity.CENTER })
+            e.addView(tv("ما في ستريكات بعد", 18f, C.TXT, true).apply { gravity = Gravity.CENTER; setPadding(0, dp(16), 0, dp(4)) })
+            e.addView(tv("اكبس \"ستريك جديد\" وولّع أول نار 🔥", 14f, C.DIM).apply { gravity = Gravity.CENTER })
+            add(e, lp())
+        }
+        animate = false
     }
 
     private fun addDialog() {
         var color = C.COLORS[0]
-        val v = vbox().apply { setPadding(dp(20), dp(10), dp(20), dp(4)) }
-        v.addView(tv("العنوان", 14f, C.DIM))
-        val name = input("مثلاً: بلا دخان 🚭"); v.addView(name, lp(t = 6, b = 14))
+        val v = vbox().apply { setPadding(dp(22), dp(8), dp(22), dp(4)) }
+        val name = input("مثلاً: بلا دخان 🚭"); v.addView(name, lp(t = 6, b = 16))
         v.addView(tv("اللون", 14f, C.DIM))
-        val row = hbox(); v.addView(row, lp(t = 6))
+        val row = hbox(); v.addView(row, lp(t = 8))
         fun draw() { row.removeAllViews(); C.COLORS.forEach { col ->
-            row.addView(View(this).apply { background = shape(col, dp(18).toFloat(), if (col == color) dp(3) else 0, C.TXT)
-                setOnClickListener { color = col; draw() } }, lp(dp(36), dp(36), l = 10)) } }
+            row.addView(View(this).apply {
+                background = shape(col, dp(19).toFloat(), if (col == color) dp(3) else 0, C.TXT)
+                scaleX = if (col == color) 1.1f else 1f; scaleY = scaleX
+                setOnClickListener { color = col; draw() } }, lp(dp(38), dp(38), l = 12)) } }
         draw()
-        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("ستريك جديد").setView(v)
-            .setPositiveButton("ابدأ من اليوم") { _, _ ->
+        val dlg = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("ستريك جديد 🔥").setView(v)
+            .setPositiveButton("ابدأ من هلأ", null).setNegativeButton("إلغاء", null).create()
+        dlg.setOnShowListener {
+            dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val t = name.text.toString().trim()
-                if (t.isEmpty()) { Toast.makeText(this, "اكتب عنوان", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+                if (t.isEmpty()) { name.error = "اكتب عنوان"; return@setOnClickListener }
                 val now = System.currentTimeMillis()
-                Store.upsert(this, Streak(now, t, color, now, 0, 0, now, 0)); render()
-            }.setNegativeButton("إلغاء", null).show()
+                Store.upsert(this, Streak(now, t, color, now, 0, 0, now, 0)); dlg.dismiss(); animate = true; render()
+            }
+        }
+        dlg.show()
     }
 }
