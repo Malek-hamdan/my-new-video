@@ -623,18 +623,51 @@
   body.tx-view .parts-sum, body.sum-view .parts-sum, body.side-view .parts-sum { display: none !important; }
   /* who gave and who took the part, under its name in Transaction */
   .tx-who { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--muted); }
-  /* Machine rating inside each machine card of Summary */
-  .sum-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .rate-chip { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 800; letter-spacing: 0; text-transform: none; }
-  .rate-chip.good { background: rgba(74,222,128,0.15); color: #4ade80; }
-  .rate-chip.watch { background: rgba(250,204,21,0.15); color: #facc15; }
-  .rate-chip.high { background: rgba(248,113,113,0.17); color: #f87171; }
-  .rate-chip.none { background: rgba(255,255,255,0.07); color: var(--muted); }
-  .sum-card.rate-good { border-color: rgba(74,222,128,0.35); }
-  .sum-card.rate-watch { border-color: rgba(250,204,21,0.35); }
-  .sum-card.rate-high { border-color: rgba(248,113,113,0.45); background: rgba(248,113,113,0.05); }
-  .rate-legend { margin: 10px 2px 4px; font-size: 12.5px; color: var(--muted); line-height: 2; }
-  .rate-legend .rate-chip { font-size: 11px; padding: 2px 8px; }
+  /* Machine rating scorecard at the top of Summary */
+  .score { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,0.02); font-feature-settings: "tnum" 1; }
+  .sc-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding: 16px 18px 12px; border-bottom: 1px solid var(--border); }
+  .sc-eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .sc-title { font-size: 17px; font-weight: 700; margin-top: 2px; }
+  .sc-basis { font-size: 12px; color: var(--muted); text-align: right; }
+  .sc-kpis { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); }
+  .sc-kpi { padding: 12px 18px; border-right: 1px solid var(--border); }
+  .sc-kpi:last-child { border-right: 0; }
+  .sc-kpi .l { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .sc-kpi .v { font-size: 22px; font-weight: 700; margin-top: 2px; }
+  .sc-kpi .d { font-size: 12px; color: var(--muted); }
+  body.sum-view table.sc-table { display: table !important; }
+  .sc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .sc-table th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .sc-table th:first-child, .sc-table td:first-child { text-align: left; padding-left: 18px; }
+  .sc-table th.sc-left, .sc-table td.sc-rt { text-align: left; }
+  .sc-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: right; white-space: nowrap; vertical-align: middle; }
+  .sc-table tr:last-child td { border-bottom: 0; }
+  .sc-table td.sc-m { font-weight: 700; font-size: 15px; }
+  .sc-rating { display: flex; align-items: center; gap: 10px; }
+  .sc-rating svg, .sc-key svg { flex: none; display: block; }
+  .sc-rl { font-weight: 600; font-size: 13px; }
+  .sc-rs { font-size: 11.5px; color: var(--muted); }
+  .sc-up { color: #f08a7a; font-weight: 600; } .sc-down { color: #5ccf5c; font-weight: 600; } .sc-flat { font-weight: 600; }
+  .sc-muted { color: var(--muted); font-weight: 400; }
+  .sc-sp svg { display: block; margin-left: auto; }
+  .sp-avg { stroke: #4b5566; stroke-width: 1; stroke-dasharray: 3 3; } .sp-line { fill: none; stroke: #3987e5; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; } .sp-dot { fill: #3987e5; stroke: #12161e; stroke-width: 2; }
+  .pz-off { fill: #2a3240; } .pz-on.pz-good { fill: #0ca30c; } .pz-on.pz-warn { fill: #fab219; } .pz-on.pz-serious { fill: #ec835a; } .pz-on.pz-crit { fill: #d03b3b; }
+  .sc-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
+  .sc-foot b { font-weight: 600; } .sc-key { display: inline-flex; align-items: center; gap: 6px; }
+  @media (max-width: 700px) {
+    .sc-head { flex-direction: column; align-items: flex-start; } .sc-basis { text-align: left; }
+    .sc-kpis { grid-template-columns: 1fr 1fr; } .sc-kpi:nth-child(2) { border-right: 0; } .sc-kpi:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+    body.sum-view table.sc-table { display: block !important; }
+    .sc-table thead { display: none; }
+    .sc-table tbody { display: block; }
+    .sc-table tr { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .sc-table td { display: block !important; border: 0 !important; padding: 0 !important; text-align: left !important; white-space: normal; }
+    .sc-table td.sc-m, .sc-table td.sc-rt, .sc-table td.sc-sp { grid-column: 1 / -1; }
+    .sc-table td::before { display: none !important; }
+    .sc-table td:not(.sc-m):not(.sc-rt)::before { content: attr(data-l); display: block !important; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    .sc-sp svg { margin-left: 0; }
+    .sc-foot { flex-direction: column; }
+  }
   .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
   .sum-card { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,0.02); }
   .sum-card.all { border-color: rgba(91,157,255,0.4); background: rgba(91,157,255,0.06); }
@@ -2442,6 +2475,72 @@
   }
   function pct(now, before) { return Math.round((now - before) / before * 100); }
 
+  // ---- Machine rating (scorecard): parts issued this month against the average of up to 3 earlier months ----
+  // Imported and Local together. While a month is running, every month is cut at the same day.
+  var RATE = [["Excellent", "good", "30% or more below average"], ["Good", "good", "at or below average"], ["Watch", "warn", "up to 30% above, or under 3 pcs more"],
+    ["High", "serious", "30\u2013100% above average"], ["Very high", "crit", "100% or more above average"]];
+  function rateLevel(avg, now) {
+    var d = now - avg;
+    if (avg === 0) return now === 0 ? 1 : now < 3 ? 2 : 3;
+    if (d > 0 && d < 3) return 2;
+    var c = d / avg;
+    return c <= -0.3 ? 0 : c <= 0 ? 1 : c < 0.3 ? 2 : c < 1 ? 3 : 4;
+  }
+  function monthHasData(k) { return (allTx[k] || []).some(function (t) { return !t.source; }); }
+  function pyramidSvg(lv, w) {
+    var h = Math.round(w * 0.875), band = h / 5, half = w / 2, st = half / 5, out = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" aria-hidden="true">';
+    for (var i = 0; i < 5; i++) {
+      var y = i * band, y2 = y + band - 1;
+      out += '<path d="M' + (half - i * st) + " " + y + "L" + (half + i * st) + " " + y + "L" + (half + (i + 1) * st) + " " + y2 + "L" + (half - (i + 1) * st) + " " + y2 + 'Z" class="' + (i === lv ? "pz-on pz-" + RATE[lv][1] : "pz-off") + '"/>';
+    }
+    return out + "</svg>";
+  }
+  function sparkSvg(vals, avg) {
+    var w = 110, h = 30, mx = Math.max.apply(null, vals.concat([avg, 1])) * 1.15;
+    var X = function (i) { return 4 + i * (w - 8) / Math.max(1, vals.length - 1); }, Y = function (v) { return (h - 3 - v / mx * (h - 6)).toFixed(1); };
+    return '<svg width="' + w + '" height="' + h + '" aria-hidden="true"><line x1="0" x2="' + w + '" y1="' + Y(avg) + '" y2="' + Y(avg) + '" class="sp-avg"/>' +
+      '<polyline points="' + vals.map(function (v, i) { return X(i) + "," + Y(v); }).join(" ") + '" class="sp-line"/>' +
+      '<circle cx="' + X(vals.length - 1) + '" cy="' + Y(vals[vals.length - 1]) + '" r="3.5" class="sp-dot"/></svg>';
+  }
+  function scorecard(day) {
+    var idx = MONTHS.indexOf(month), prevKeys = [];
+    for (var i = idx - 1; i >= 0 && prevKeys.length < 3; i--) if (monthHasData(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
+    var cut = function (k) { return day ? k + "-" + pad(Math.min(day, new Date(+k.slice(0, 4), +k.slice(5), 0).getDate())) : null; };
+    var cur = monthStats(month, cut(month), null), curImp = monthStats(month, cut(month), "imp"), curLoc = monthStats(month, cut(month), "loc");
+    var prev = prevKeys.map(function (k) { return monthStats(k, cut(k), null); });
+    var short = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
+    var span = prevKeys.length ? short(prevKeys[0]) + (prevKeys.length > 1 ? "\u2013" + short(prevKeys[prevKeys.length - 1]) : "") : "";
+    var wrap = document.createElement("div");
+    wrap.className = "score";
+    var head = '<div class="sc-head"><div><div class="sc-eyebrow">Machine performance</div><div class="sc-title">Parts consumption rating \u2014 ' + monthLabel(month) + (day ? " (to day " + day + ")" : "") + "</div></div>" +
+      '<div class="sc-basis">Parts issued (Transfer out), Imported + Local<br>' + (prevKeys.length ? "Compared with the " + prevKeys.length + "-month average, " + span + (day ? ", days 1\u2013" + day : "") : "No earlier month with data to compare yet") + "</div></div>";
+    var totAvg = 0, totNow = cur.all.outQty, flagged = 0, rows = "";
+    MACHINES.forEach(function (m) {
+      var hist = prev.map(function (st) { return st[m].outQty; }), now = cur[m].outQty;
+      var avg = hist.length ? Math.round(hist.reduce(function (a, b) { return a + b; }, 0) / hist.length * 10) / 10 : null;
+      if (avg !== null) totAvg += avg;
+      var lv = avg === null ? -1 : rateLevel(avg, now);
+      if (lv >= 3) flagged++;
+      var d = avg === null ? null : Math.round((now - avg) * 10) / 10, pc = avg ? Math.round((now - avg) / avg * 100) : null;
+      var cls = d === null ? "" : d > 0 ? "sc-up" : d < 0 ? "sc-down" : "sc-flat", arrow = d === null ? "" : d > 0 ? "\u25B2 " : d < 0 ? "\u25BC " : "\u25A0 ";
+      var vs = d === null ? "\u2014" : arrow + (pc === null ? "new" : (pc > 0 ? "+" : "") + pc + "%") + ' <span class="sc-muted">(' + (d > 0 ? "+" : "") + d + ")</span>";
+      rows += "<tr><td class=\"sc-m\" data-l=\"Machine\">" + m + '</td><td class="sc-rt" data-l="Rating"><div class="sc-rating">' + (lv < 0 ? pyramidSvg(-1, 40) + '<div><div class="sc-rl">No data</div><div class="sc-rs">no earlier month to compare</div></div>' :
+        pyramidSvg(lv, 40) + '<div><div class="sc-rl">' + RATE[lv][0] + '</div><div class="sc-rs">' + RATE[lv][2] + "</div></div>") + "</div></td>" +
+        '<td data-l="Average ' + span + '">' + (avg === null ? "\u2014" : avg.toFixed(1)) + '</td><td data-l="' + monthLabel(month).split(" ")[0] + '"><b>' + now + '</b></td><td data-l="vs average" class="' + cls + '">' + vs + "</td>" +
+        '<td class="sc-sp" data-l="Trend">' + (hist.length ? sparkSvg(hist.concat([now]), avg) : "\u2014") + '</td><td data-l="Value issued">' + moneyBag(cur[m].outVal) + '</td><td data-l="Imp. / Local" class="sc-muted">' + curImp[m].outQty + " / " + curLoc[m].outQty + "</td></tr>";
+    });
+    var tpc = prevKeys.length && totAvg ? Math.round((totNow - totAvg) / totAvg * 100) : null;
+    var kpis = [["Parts issued, " + monthLabel(month).split(" ")[0], totNow + " pcs", prevKeys.length ? prevKeys.length + "-month average " + (Math.round(totAvg * 10) / 10) : "no average yet"],
+      ["Change vs average", tpc === null ? "\u2014" : (tpc > 0 ? "+" : "") + tpc + "%", tpc === null ? "" : (totNow - totAvg > 0 ? "+" : "") + (Math.round((totNow - totAvg) * 10) / 10) + " pcs"],
+      ["Value issued", moneyBag(cur.all.outVal), "all machines"], ["Machines flagged", flagged + " of " + MACHINES.length, "rated High or Very high"]];
+    wrap.innerHTML = head + '<div class="sc-kpis">' + kpis.map(function (k) { return '<div class="sc-kpi"><div class="l"></div><div class="v"></div><div class="d"></div></div>'; }).join("") + "</div>" +
+      '<table class="sc-table"><thead><tr><th>Machine</th><th class="sc-left">Rating</th><th>Avg ' + span + "</th><th>" + monthLabel(month).split(" ")[0] + "</th><th>vs average</th><th>Trend</th><th>Value issued</th><th>Imp. / Local</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+      '<div class="sc-foot"><b>Rating scale</b>' + RATE.map(function (r, i) { return '<span class="sc-key">' + pyramidSvg(i, 17) + " " + r[0] + ": " + r[2] + "</span>"; }).join("") + "</div>";
+    var kp = wrap.querySelectorAll(".sc-kpi");
+    kpis.forEach(function (k, i) { kp[i].children[0].textContent = k[0]; kp[i].children[1].textContent = k[1]; kp[i].children[2].textContent = k[2]; });
+    return wrap;
+  }
+
   function renderSummary() {
     var box = document.getElementById("summary");
     titleEl.textContent = SUM + originLabel();
@@ -2461,11 +2560,7 @@
     metaEl.textContent = monthLabel(month) + " · " + cur.all.n + (cur.all.n === 1 ? " transaction" : " transactions");
     box.innerHTML = "";
 
-    // Machine rating, shown inside each machine's card: parts used this month against last month
-    function rateOf(m) {
-      var pq = hasPrev ? prev[m].outQty : null, now = cur[m].outQty;
-      return pq === null ? ["none", "No data"] : now <= pq ? ["good", "Good"] : (now >= pq * 1.3 && now - pq >= 3) ? ["high", "High"] : ["watch", "Watch"];
-    }
+    box.appendChild(scorecard(partial ? today : 0));
 
     var grid = document.createElement("div");
     grid.className = "sum-grid";
@@ -2475,13 +2570,6 @@
       card.className = "sum-card" + (m === "all" ? " all" : "");
       var h = document.createElement("h3");
       h.textContent = m === "all" ? "All machines" : m;
-      if (m !== "all") {
-        var rt = rateOf(m), chip = document.createElement("span");
-        chip.className = "rate-chip " + rt[0]; chip.textContent = rt[1];
-        chip.title = "Parts used this month compared with " + (prevLong || "last month");
-        h.appendChild(chip);
-        card.classList.add("rate-" + rt[0]);
-      }
       card.appendChild(h);
       [["In", "+" + s.inQty + " pcs", "in"], ["In value", moneyBag(s.inVal), "in"], ["Out (used)", "−" + s.outQty + " pcs", "out"], ["Out value", moneyBag(s.outVal), "out"]].forEach(function (l) {
         var line = document.createElement("div");
@@ -2515,10 +2603,6 @@
       grid.appendChild(card);
     });
     box.appendChild(grid);
-    var legend = document.createElement("p");
-    legend.className = "rate-legend";
-    legend.innerHTML = 'Rating, parts used against ' + (prevName || "last month") + ': <span class="rate-chip good">Good</span> same or less \u00B7 <span class="rate-chip watch">Watch</span> a little more \u00B7 <span class="rate-chip high">High</span> 30% more or above (at least 3 parts more)';
-    box.appendChild(legend);
 
     // Plain-language findings, each with what to do about it
     var notes = [];
