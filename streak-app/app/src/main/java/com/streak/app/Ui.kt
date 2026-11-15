@@ -30,10 +30,9 @@ fun shape(color: Int, r: Float, stroke: Int = 0, sc: Int = 0) = GradientDrawable
 }
 fun Context.tv(s: String, size: Float = 16f, color: Int = C.TXT, bold: Boolean = false) = TextView(this).apply {
     text = s; textSize = size; setTextColor(color); if (bold) typeface = Typeface.DEFAULT_BOLD
-    textDirection = View.TEXT_DIRECTION_RTL
 }
-fun Context.vbox() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
-fun Context.hbox() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+fun Context.vbox() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_LTR }
+fun Context.hbox() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutDirection = View.LAYOUT_DIRECTION_LTR }
 fun Context.btn(s: String, bg: Int, fg: Int, stroke: Int = 0, onClick: () -> Unit) = tv(s, 17f, fg, true).apply {
     gravity = Gravity.CENTER
     background = shape(bg, dp(16).toFloat(), if (stroke != 0) dp(1) else 0, stroke)
@@ -41,7 +40,6 @@ fun Context.btn(s: String, bg: Int, fg: Int, stroke: Int = 0, onClick: () -> Uni
 }
 fun Context.input(hint: String) = EditText(this).apply {
     this.hint = hint; setHintTextColor(C.DIM); setTextColor(C.TXT); textSize = 18f; isSingleLine = true
-    textDirection = View.TEXT_DIRECTION_RTL
     background = shape(BG_IN, dp(14).toFloat(), dp(1), C.G); setPadding(dp(14), dp(14), dp(14), dp(14))
 }
 val BG_IN = 0xFF0D1412.toInt()
@@ -65,8 +63,8 @@ class Ring(c: Context) : View(c) {
     }
 }
 
-val DAY_NAMES = arrayOf("ح", "ن", "ث", "ر", "خ", "ج", "س")   // index = Calendar.DAY_OF_WEEK - 1
-fun maskText(m: Int) = if (m == 127) "كل يوم" else (0..6).filter { (m shr it) and 1 == 1 }.joinToString(" ") { DAY_NAMES[it] }
+val DAY_NAMES = arrayOf("S", "M", "T", "W", "T", "F", "S")   // index = Calendar.DAY_OF_WEEK - 1
+fun maskText(m: Int) = if (m == 127) "Every day" else (0..6).filter { (m shr it) and 1 == 1 }.joinToString(" ") { arrayOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")[it] }
 
 /** row of 7 toggle circles; returns a getter for the mask */
 fun Context.dayPicker(parent: LinearLayout, initial: Int): () -> Int {
@@ -74,7 +72,7 @@ fun Context.dayPicker(parent: LinearLayout, initial: Int): () -> Int {
     val row = hbox()
     fun draw() {
         row.removeAllViews()
-        for (i in listOf(6, 0, 1, 2, 3, 4, 5)) {   // Sat..Fri
+        for (i in 0..6) {   // Sun..Sat
             val on = (mask shr i) and 1 == 1
             row.addView(tv(DAY_NAMES[i], 15f, if (on) 0xFF04130D.toInt() else C.DIM, true).apply {
                 gravity = Gravity.CENTER

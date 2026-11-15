@@ -28,7 +28,7 @@ class Rx : BroadcastReceiver() {
 
         fun notify(c: Context, id: Int, title: String, body: String) {
             val nm = c.getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(NotificationChannel("main", "الأدعية والستريك", NotificationManager.IMPORTANCE_HIGH))
+            nm.createNotificationChannel(NotificationChannel("main", "Verses & streaks", NotificationManager.IMPORTANCE_HIGH))
             val open = PendingIntent.getActivity(c, id, Intent(c, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
             val n = Notification.Builder(c, "main").setSmallIcon(R.drawable.ic_stat).setColor(C.G)
                 .setContentTitle(title).setContentText(body).setStyle(Notification.BigTextStyle().bigText(body))
@@ -39,7 +39,7 @@ class Rx : BroadcastReceiver() {
         fun daily(c: Context) {
             if (Store.duaOn(c)) {
                 val i = Store.duaIndex(c)
-                if (i >= 0) { val (t, r) = Store.dua(c, i); notify(c, 1, "🤲 دعاء اليوم • ${i + 1}/365", "﴿ $t ﴾\n$r") }
+                if (i >= 0) { val (t, r) = Store.dua(c, i); notify(c, 1, "🤲 Verse of the day • ${i + 1}/365", "﴿ $t ﴾\n$r") }
             }
             val list = Store.all(c); var changed = false
             for (s in list) {
@@ -47,7 +47,7 @@ class Rx : BroadcastReceiver() {
                 val m = MILES.lastOrNull { d >= it } ?: continue
                 if (s.notified < m) {
                     s.notified = m; changed = true
-                    notify(c, (s.id % 100_000).toInt() + 10, "🔥 ${s.title}", "صار عندك $d يوم، كمّل!")
+                    notify(c, (s.id % 100_000).toInt() + 10, "🔥 ${s.title}", "You've reached $d days, keep going!")
                 }
             }
             if (changed) Store.saveAll(c, list)

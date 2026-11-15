@@ -96,7 +96,7 @@ class Bar(c: Context) : View(c) {
         cv.drawRoundRect(RectF(0f, 0f, width.toFloat(), h), r, r, p)
         p.color = color
         val w = width * progress
-        if (w > 0) cv.drawRoundRect(RectF(width - maxOf(w, h), 0f, width.toFloat(), h), r, r, p) // fills from the right (RTL)
+        if (w > 0) cv.drawRoundRect(RectF(0f, 0f, maxOf(w, h), h), r, r, p)
     }
 }
 
@@ -135,9 +135,9 @@ class HoldButton(c: Context, private val label: String, private val color: Int, 
         p.color = Color.argb(120, Color.red(color), Color.green(color), Color.blue(color))
         cv.drawRoundRect(RectF(d, d, w - d, h - d), r, r, p)
         p.style = Paint.Style.FILL; p.color = Color.argb(70, Color.red(color), Color.green(color), Color.blue(color))
-        cv.save(); cv.clipRect(w * (1 - prog), 0f, w, h); cv.drawRoundRect(RectF(0f, 0f, w, h), r, r, p); cv.restore()
+        cv.save(); cv.clipRect(0f, 0f, w * prog, h); cv.drawRoundRect(RectF(0f, 0f, w, h), r, r, p); cv.restore()
         t.textSize = 16 * d; t.color = color
-        cv.drawText(if (prog > 0) "كمّل ضاغط..." else label, w / 2, h / 2 + t.textSize / 3, t)
+        cv.drawText(if (prog > 0) "Keep holding..." else label, w / 2, h / 2 + t.textSize / 3, t)
     }
 }
 
