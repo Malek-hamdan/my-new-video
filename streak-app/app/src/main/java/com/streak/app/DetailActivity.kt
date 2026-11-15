@@ -86,18 +86,30 @@ class DetailActivity : Activity() {
         for (k in 6 downTo 0) {
             val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -k); set(Calendar.HOUR_OF_DAY, 12) }
             val off = !s.dayOn(cal.timeInMillis)
-            val done = !off && cal.timeInMillis >= startMid && (k > 0 || d > 0)
+            val pz = s.isPaused(cal.timeInMillis)
+            val started = cal.timeInMillis >= startMid
+            val done = !off && !pz && started && (k > 0 || d > 0)
+            val tapAt = cal.timeInMillis
             val today = k == 0
             wr.addView(vbox().apply {
                 gravity = Gravity.CENTER
                 addView(tv(names[cal.get(Calendar.DAY_OF_WEEK) - 1], 12f, if (today) C.TXT else C.DIM).apply { gravity = Gravity.CENTER })
-                addView(tv(if (done) "🔥" else if (off) "–" else "", 15f, C.DIM).apply {
+                addView(tv(if (pz) "⏸" else if (done) "🔥" else if (off) "–" else "", 15f, C.DIM).apply {
+                    if (started && !off) setOnClickListener { s.togglePause(tapAt); Store.upsert(this@DetailActivity, s); performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); build(false) }
                     gravity = Gravity.CENTER
                     background = shape(if (done) (s.color and 0x00FFFFFF or 0x40000000) else 0xFF1F2A26.toInt(), dp(17).toFloat(), if (today) dp(2) else 0, s.color)
                 }, lp(dp(34), dp(34), t = 6))
             }, lp(0, -2, 1f))
         }
-        wk.addView(wr); add(wk, lp(b = 12))
+        wk.addView(wr)
+        wk.addView(tv("Tap a day to pause it ⏸ — paused days don't count and don't break the streak.", 11f, C.DIM), lp(t = 10))
+        add(wk, lp(b = 12))
+        val todayPaused = s.isPaused(System.currentTimeMillis())
+        if (!s.pending()) add(btn(if (todayPaused) "▶  Unpause today" else "⏸  Pause today", C.CARD, if (todayPaused) s.color else C.TXT) {
+            s.togglePause(System.currentTimeMillis()); Store.upsert(this, s)
+            Toast.makeText(this, if (todayPaused) "Today counts again" else "Today is paused — your streak is safe ⏸", Toast.LENGTH_SHORT).show()
+            build(false)
+        }, lp(b = 12))
 
         // badges
         val bc = vbox().apply { background = shape(C.CARD, dp(20).toFloat()); setPadding(dp(14), dp(14), dp(14), dp(14)) }
@@ -115,7 +127,7 @@ class DetailActivity : Activity() {
 
         // stats
         val st = hbox()
-        listOf(s.bestNow().toString() to "Best streak", s.resets.toString() to "Resets",
+        listOf(s.bestNow().toString() to "Best streak", s.resets.toString() to "Resets", s.pauseCount().toString() to "Paused",
             DateFormat.format("d/M/yy", s.start).toString() to "Started").forEach { (v, l) ->
             st.addView(vbox().apply {
                 gravity = Gravity.CENTER; background = shape(C.CARD, dp(16).toFloat()); setPadding(0, dp(12), 0, dp(12))
