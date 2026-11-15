@@ -7,11 +7,23 @@ import java.util.Calendar
 
 const val DAY = 86_400_000L
 
-data class Streak(var id: Long, var title: String, var color: Int, var start: Long, var best: Int, var resets: Int, var created: Long, var notified: Int, var hist: String = "[]") {
-    fun days(now: Long = System.currentTimeMillis()) = if (now < start) 0 else ((now - start) / DAY).toInt()
+data class Streak(var id: Long, var title: String, var color: Int, var start: Long, var best: Int, var resets: Int, var created: Long, var notified: Int, var hist: String = "[]", var mask: Int = 127) {
+    private fun counts(k: Int) = mask == 127 || (mask shr (java.util.Calendar.getInstance().apply { timeInMillis = start + k * DAY }.get(java.util.Calendar.DAY_OF_WEEK) - 1) and 1) == 1
+    fun dayOn(t: Long) = mask == 127 || (mask shr (java.util.Calendar.getInstance().apply { timeInMillis = t }.get(java.util.Calendar.DAY_OF_WEEK) - 1) and 1) == 1
+    fun days(now: Long = System.currentTimeMillis()): Int {
+        if (now < start) return 0
+        val n = ((now - start) / DAY).toInt()
+        if (mask == 127) return n
+        var c = 0; for (k in 0 until n) if (counts(k)) c++; return c
+    }
     fun pending(now: Long = System.currentTimeMillis()) = now < start
     fun bestNow() = maxOf(best, days())
-    fun nextIn(now: Long = System.currentTimeMillis()) = if (now < start) start - now else DAY - ((now - start) % DAY)
+    fun nextIn(now: Long = System.currentTimeMillis()): Long {
+        if (now < start) return start - now
+        var k = ((now - start) / DAY).toInt()
+        if (mask != 127 && mask != 0) while (!counts(k)) k++
+        return start + (k + 1) * DAY - now
+    }
 }
 
 object Store {
@@ -20,13 +32,13 @@ object Store {
         val a = JSONArray(p(c).getString("list", "[]"))
         return (0 until a.length()).map { val o = a.getJSONObject(it)
             Streak(o.getLong("id"), o.getString("title"), o.getInt("color"), o.getLong("start"), o.optInt("best"),
-                o.optInt("resets"), o.optLong("created"), o.optInt("notified"), o.optString("hist", "[]")) }.toMutableList()
+                o.optInt("resets"), o.optLong("created"), o.optInt("notified"), o.optString("hist", "[]"), o.optInt("mask", 127)) }.toMutableList()
     }
     fun saveAll(c: Context, l: List<Streak>) {
         val a = JSONArray()
         l.forEach { s -> a.put(JSONObject().apply {
             put("id", s.id); put("title", s.title); put("color", s.color); put("start", s.start); put("best", s.best)
-            put("resets", s.resets); put("created", s.created); put("notified", s.notified); put("hist", s.hist) }) }
+            put("resets", s.resets); put("created", s.created); put("notified", s.notified); put("hist", s.hist); put("mask", s.mask) }) }
         p(c).edit().putString("list", a.toString()).commit()
     }
     fun get(c: Context, id: Long) = all(c).find { it.id == id }

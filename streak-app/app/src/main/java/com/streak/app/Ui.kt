@@ -64,3 +64,25 @@ class Ring(c: Context) : View(c) {
         if (small.isNotEmpty()) { t.textSize = s * 0.08f; t.color = C.DIM; cv.drawText(small, width / 2f, cy + s * 0.14f, t) }
     }
 }
+
+val DAY_NAMES = arrayOf("ح", "ن", "ث", "ر", "خ", "ج", "س")   // index = Calendar.DAY_OF_WEEK - 1
+fun maskText(m: Int) = if (m == 127) "كل يوم" else (0..6).filter { (m shr it) and 1 == 1 }.joinToString(" ") { DAY_NAMES[it] }
+
+/** row of 7 toggle circles; returns a getter for the mask */
+fun Context.dayPicker(parent: LinearLayout, initial: Int): () -> Int {
+    var mask = initial
+    val row = hbox()
+    fun draw() {
+        row.removeAllViews()
+        for (i in listOf(6, 0, 1, 2, 3, 4, 5)) {   // Sat..Fri
+            val on = (mask shr i) and 1 == 1
+            row.addView(tv(DAY_NAMES[i], 15f, if (on) 0xFF04130D.toInt() else C.DIM, true).apply {
+                gravity = Gravity.CENTER
+                background = shape(if (on) C.G else C.CHIP, dp(18).toFloat())
+                setOnClickListener { val nm = mask xor (1 shl i); if (nm != 0) { mask = nm; draw() } }
+            }, lp(0, dp(36), 1f, l = 3, r = 3))
+        }
+    }
+    draw(); parent.addView(row, lp(t = 8))
+    return { mask }
+}

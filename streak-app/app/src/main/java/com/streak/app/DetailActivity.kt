@@ -62,6 +62,7 @@ class DetailActivity : Activity() {
         add(num, lp(t = 8))
         if (anim && d > 0) ValueAnimator.ofInt(0, d).apply { duration = 1000; interpolator = DecelerateInterpolator(); startDelay = 150
             addUpdateListener { num.text = "${it.animatedValue}" } }.start() else num.text = "$d"
+        add(tv(if (s.mask != 127) "📅 ${maskText(s.mask)}" else "", 13f, s.color).apply { gravity = Gravity.CENTER }, lp())
         add(tv(if (s.pending()) "بيبلش ${DateFormat.format("d/M/yyyy", s.start)}" else if (d == 1) "يوم 🔥" else "يوم متتالي", 16f, C.DIM).apply { gravity = Gravity.CENTER }, lp())
         next = tv("", 14f, s.color).apply { gravity = Gravity.CENTER }
         add(next!!, lp(t = 6, b = 22)); countdown()
@@ -84,12 +85,13 @@ class DetailActivity : Activity() {
         val startMid = Calendar.getInstance().apply { timeInMillis = s.start; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
         for (k in 6 downTo 0) {
             val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -k); set(Calendar.HOUR_OF_DAY, 12) }
-            val done = cal.timeInMillis >= startMid && (k > 0 || d > 0)
+            val off = !s.dayOn(cal.timeInMillis)
+            val done = !off && cal.timeInMillis >= startMid && (k > 0 || d > 0)
             val today = k == 0
             wr.addView(vbox().apply {
                 gravity = Gravity.CENTER
                 addView(tv(names[cal.get(Calendar.DAY_OF_WEEK) - 1], 12f, if (today) C.TXT else C.DIM).apply { gravity = Gravity.CENTER })
-                addView(tv(if (done) "🔥" else "", 15f).apply {
+                addView(tv(if (done) "🔥" else if (off) "–" else "", 15f, C.DIM).apply {
                     gravity = Gravity.CENTER
                     background = shape(if (done) (s.color and 0x00FFFFFF or 0x40000000) else 0xFF1F2A26.toInt(), dp(17).toFloat(), if (today) dp(2) else 0, s.color)
                 }, lp(dp(34), dp(34), t = 6))
@@ -157,6 +159,8 @@ class DetailActivity : Activity() {
         val inp = input("العنوان").apply { setText(s.title) }
         var color = s.color
         val box = vbox().apply { setPadding(dp(22), dp(8), dp(22), 0); addView(inp) }
+        box.addView(tv("الأيام اللي بتنحسب", 13f, C.DIM), lp(t = 14))
+        val getMask = dayPicker(box, s.mask)
         val row = hbox(); box.addView(row, lp(t = 14))
         fun draw() { row.removeAllViews(); C.COLORS.forEach { col ->
             row.addView(View(this).apply { background = shape(col, dp(19).toFloat(), if (col == color) dp(3) else 0, C.TXT)
@@ -165,7 +169,7 @@ class DetailActivity : Activity() {
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("تعديل").setView(box)
             .setPositiveButton("احفظ") { _, _ ->
                 val t = inp.text.toString().trim(); if (t.isNotEmpty()) s.title = t
-                s.color = color; Store.upsert(this, s); build(false)
+                s.color = color; s.mask = getMask(); Store.upsert(this, s); build(false)
             }.setNegativeButton("إلغاء", null).show()
     }
 }

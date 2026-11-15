@@ -91,7 +91,7 @@ class MainActivity : Activity() {
             row.addView(Flame(this).apply { days = d }, lp(dp(46), dp(56)))
             row.addView(vbox().apply {
                 addView(tv(s.title, 18f, C.TXT, true))
-                addView(tv(if (s.pending()) "⏳ بيبلش ${android.text.format.DateFormat.format("d/M", s.start)} • بعد ${(s.nextIn() + DAY - 1) / DAY} يوم" else if (d == 0) "بلشت اليوم • بكرا أول يوم" else "باقي ${nm - d} لـ $nm يوم", 12f, C.DIM))
+                addView(tv(if (s.pending()) "⏳ بيبلش ${android.text.format.DateFormat.format("d/M", s.start)} • بعد ${(s.nextIn() + DAY - 1) / DAY} يوم" else (if (d == 0) "بلشت اليوم" else "باقي ${nm - d} لـ $nm يوم") + (if (s.mask != 127) " • ${maskText(s.mask)}" else ""), 12f, C.DIM))
             }, lp(0, -2, 1f, l = 14, r = 10))
             row.addView(vbox().apply {
                 gravity = Gravity.CENTER
@@ -130,6 +130,9 @@ class MainActivity : Activity() {
                 scaleX = if (col == color) 1.1f else 1f; scaleY = scaleX
                 setOnClickListener { color = col; draw() } }, lp(dp(38), dp(38), l = 12)) } }
         draw()
+        v.addView(tv("الأيام اللي بتنحسب", 14f, C.DIM), lp(t = 16))
+        val getMask = dayPicker(v, 127)
+        v.addView(tv("الأيام المطفية ما بتنحسب وما بتكسر الستريك.", 12f, C.DIM), lp(t = 6))
         var start = System.currentTimeMillis()
         v.addView(tv("بيبلش من", 14f, C.DIM), lp(t = 16))
         val dateBtn = btn("📅 هلأ", C.CARD, C.TXT) {}
@@ -152,7 +155,7 @@ class MainActivity : Activity() {
                 val t = name.text.toString().trim()
                 if (t.isEmpty()) { name.error = "اكتب عنوان"; return@setOnClickListener }
                 val now = System.currentTimeMillis()
-                Store.upsert(this, Streak(now, t, color, start, 0, 0, start, 0)); dlg.dismiss(); animate = true; render()
+                Store.upsert(this, Streak(now, t, color, start, 0, 0, start, 0, "[]", getMask())); dlg.dismiss(); animate = true; render()
             }
         }
         dlg.show()
