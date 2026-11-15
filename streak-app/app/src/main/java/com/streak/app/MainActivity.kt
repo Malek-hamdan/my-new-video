@@ -44,7 +44,7 @@ class MainActivity : Activity() {
 
     private fun render() {
         body.removeAllViews()
-        val list = Store.all(this).sortedByDescending { it.days() }
+        val list = Store.all(this).sortedWith(compareBy<Streak> { it.pending() }.thenByDescending { it.days() })
         var i = 0
         fun add(v: View, lp: LinearLayout.LayoutParams) { body.addView(v, lp); if (animate) v.enter(i++) }
 
@@ -91,11 +91,11 @@ class MainActivity : Activity() {
             row.addView(Flame(this).apply { days = d }, lp(dp(46), dp(56)))
             row.addView(vbox().apply {
                 addView(tv(s.title, 18f, C.TXT, true))
-                addView(tv(if (d == 0) "بلشت اليوم • بكرا أول يوم" else "باقي ${nm - d} لـ $nm يوم", 12f, C.DIM))
+                addView(tv(if (s.pending()) "⏳ بيبلش ${android.text.format.DateFormat.format("d/M", s.start)} • بعد ${(s.nextIn() + DAY - 1) / DAY} يوم" else if (d == 0) "بلشت اليوم • بكرا أول يوم" else "باقي ${nm - d} لـ $nm يوم", 12f, C.DIM))
             }, lp(0, -2, 1f, l = 14, r = 10))
             row.addView(vbox().apply {
                 gravity = Gravity.CENTER
-                addView(tv("$d", 30f, flameColors(d)[1].let { if (d == 0) C.DIM else it }, true).apply { gravity = Gravity.CENTER })
+                addView(tv(if (s.pending()) "⏳" else "$d", 30f, flameColors(d)[1].let { if (d == 0) C.DIM else it }, true).apply { gravity = Gravity.CENTER })
                 addView(tv("يوم", 11f, C.DIM).apply { gravity = Gravity.CENTER })
             })
             card.addView(row)
@@ -130,14 +130,29 @@ class MainActivity : Activity() {
                 scaleX = if (col == color) 1.1f else 1f; scaleY = scaleX
                 setOnClickListener { color = col; draw() } }, lp(dp(38), dp(38), l = 12)) } }
         draw()
+        var start = System.currentTimeMillis()
+        v.addView(tv("بيبلش من", 14f, C.DIM), lp(t = 16))
+        val dateBtn = btn("📅 هلأ", C.CARD, C.TXT) {}
+        fun showDate() { dateBtn.text = if (Math.abs(start - System.currentTimeMillis()) < 60_000) "📅 هلأ" else "📅 " + android.text.format.DateFormat.format("d/M/yyyy", start) }
+        dateBtn.setOnClickListener {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = start }
+            android.app.DatePickerDialog(this, { _, y, m, dd ->
+                val pick = java.util.Calendar.getInstance().apply { set(y, m, dd, 0, 0, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
+                val today = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
+                start = if (pick == today) System.currentTimeMillis() else pick
+                showDate()
+            }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show()
+        }
+        showDate(); v.addView(dateBtn, lp(t = 8))
+        v.addView(tv("فيك تختار تاريخ قديم (بيحسب الأيام من وقتها) أو تاريخ جاي (بيبلش لحالو).", 12f, C.DIM), lp(t = 6))
         val dlg = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("ستريك جديد 🔥").setView(v)
-            .setPositiveButton("ابدأ من هلأ", null).setNegativeButton("إلغاء", null).create()
+            .setPositiveButton("ابدأ", null).setNegativeButton("إلغاء", null).create()
         dlg.setOnShowListener {
             dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val t = name.text.toString().trim()
                 if (t.isEmpty()) { name.error = "اكتب عنوان"; return@setOnClickListener }
                 val now = System.currentTimeMillis()
-                Store.upsert(this, Streak(now, t, color, now, 0, 0, now, 0)); dlg.dismiss(); animate = true; render()
+                Store.upsert(this, Streak(now, t, color, start, 0, 0, start, 0)); dlg.dismiss(); animate = true; render()
             }
         }
         dlg.show()

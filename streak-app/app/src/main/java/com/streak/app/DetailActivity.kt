@@ -37,7 +37,10 @@ class DetailActivity : Activity() {
 
     private fun countdown() {
         val sec = s.nextIn() / 1000
-        next?.text = "اليوم الجاي بعد  %02d:%02d:%02d".format(sec / 3600, sec / 60 % 60, sec % 60)
+        next?.text = if (s.pending()) {
+            val dd = sec / 86400
+            "⏳ بيبلش بعد " + (if (dd > 0) "$dd يوم و " else "") + "%02d:%02d:%02d".format(sec / 3600 % 24, sec / 60 % 60, sec % 60)
+        } else "اليوم الجاي بعد  %02d:%02d:%02d".format(sec / 3600, sec / 60 % 60, sec % 60)
         if (sec <= 1) h.postDelayed({ build(true) }, 1500)
     }
 
@@ -59,7 +62,7 @@ class DetailActivity : Activity() {
         add(num, lp(t = 8))
         if (anim && d > 0) ValueAnimator.ofInt(0, d).apply { duration = 1000; interpolator = DecelerateInterpolator(); startDelay = 150
             addUpdateListener { num.text = "${it.animatedValue}" } }.start() else num.text = "$d"
-        add(tv(if (d == 1) "يوم 🔥" else "يوم متتالي", 16f, C.DIM).apply { gravity = Gravity.CENTER }, lp())
+        add(tv(if (s.pending()) "بيبلش ${DateFormat.format("d/M/yyyy", s.start)}" else if (d == 1) "يوم 🔥" else "يوم متتالي", 16f, C.DIM).apply { gravity = Gravity.CENTER }, lp())
         next = tv("", 14f, s.color).apply { gravity = Gravity.CENTER }
         add(next!!, lp(t = 6, b = 22)); countdown()
 

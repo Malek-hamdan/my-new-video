@@ -8,9 +8,10 @@ import java.util.Calendar
 const val DAY = 86_400_000L
 
 data class Streak(var id: Long, var title: String, var color: Int, var start: Long, var best: Int, var resets: Int, var created: Long, var notified: Int, var hist: String = "[]") {
-    fun days(now: Long = System.currentTimeMillis()) = ((now - start) / DAY).toInt()
+    fun days(now: Long = System.currentTimeMillis()) = if (now < start) 0 else ((now - start) / DAY).toInt()
+    fun pending(now: Long = System.currentTimeMillis()) = now < start
     fun bestNow() = maxOf(best, days())
-    fun nextIn(now: Long = System.currentTimeMillis()) = DAY - ((now - start) % DAY)
+    fun nextIn(now: Long = System.currentTimeMillis()) = if (now < start) start - now else DAY - ((now - start) % DAY)
 }
 
 object Store {
