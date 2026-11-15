@@ -40,6 +40,26 @@ object Store {
         s.best = s.bestNow(); s.resets++; s.start = System.currentTimeMillis(); s.notified = 0; upsert(c, s)
     }
 
+    // ---- backup code
+    fun exportCode(c: Context): String {
+        val o = JSONObject().put("v", 1).put("list", JSONArray(p(c).getString("list", "[]")))
+            .put("on", duaOn(c)).put("dstart", duaStart(c)).put("hour", duaHour(c))
+        val bos = java.io.ByteArrayOutputStream()
+        java.util.zip.GZIPOutputStream(bos).use { it.write(o.toString().toByteArray()) }
+        return "STK1-" + android.util.Base64.encodeToString(bos.toByteArray(), android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE)
+    }
+    /** returns number of streaks restored, or -1 if the code is invalid */
+    fun importCode(c: Context, code: String): Int = try {
+        val raw = code.trim().replace(Regex("\\s"), "").removePrefix("STK1-")
+        val bytes = android.util.Base64.decode(raw, android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE)
+        val txt = java.util.zip.GZIPInputStream(bytes.inputStream()).use { it.readBytes().toString(Charsets.UTF_8) }
+        val o = JSONObject(txt)
+        p(c).edit().putString("list", o.getJSONArray("list").toString()).commit()
+        val incoming = all(c)
+        setDua(c, o.optBoolean("on"), o.optLong("dstart", duaStart(c)), o.optInt("hour", 8))
+        incoming.size
+    } catch (e: Exception) { -1 }
+
     // ---- duas
     private fun sp(c: Context) = c.getSharedPreferences("streak_set", 0)
     fun duaOn(c: Context) = sp(c).getBoolean("on", false)
