@@ -641,6 +641,8 @@
   .sc-sp svg { display: block; margin-left: auto; }
   .sp-avg { stroke: #4b5566; stroke-width: 1; stroke-dasharray: 3 3; } .sp-line { fill: none; stroke: #3987e5; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; } .sp-dot { fill: #3987e5; stroke: #12161e; stroke-width: 2; }
   .pz-off { fill: #2a3240; } .pz-on.pz-good { fill: #0ca30c; } .pz-on.pz-warn { fill: #fab219; } .pz-on.pz-serious { fill: #ec835a; } .pz-on.pz-crit { fill: #d03b3b; }
+  .an-note { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .an-aside { color: #f0a050; }
   .sc-note { padding: 10px 18px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--border); background: rgba(255,200,80,0.05); }
   .sc-rs.sc-sig { color: #f0a050; }
   .sc-mm { border-top: 1px solid var(--border); }
@@ -2584,6 +2586,35 @@
     if (t.pLow < 0.10 && x < t.mu) return 0;
     return 1;
   }
+  // ---- Next month's need for one part (Gamma-Poisson, as the rating) ----
+  // hist: closed months oldest first; cur / E: the month still running and the share of it gone by (or null).
+  // One unusual month is set aside (under 1% chance and at least 2 above what was expected), never one
+  // that sits next to another unusual month: two in a row is a new level, not a bad month.
+  // Order covers 9 months in 10 (Q90). Under 3 closed months Q90 is capped at max(2, 2 x the most seen).
+  function partForecast(hist, cur, E) {
+    var obs = hist.map(function (x) { return { x: x, e: 1 }; });
+    if (cur !== null && E > 0) obs.push({ x: cur, e: E });
+    var flag = obs.map(function (o, i) {
+      if (!i) return null;
+      var S = 0, ex = 0;
+      for (var j = 0; j < i; j++) { S += obs[j].x; ex += obs[j].e; }
+      var t = rateTest(S, ex, o.x, o.e);
+      return t.pUp < 0.01 && o.x >= t.mu + 2 ? t.pUp : null;
+    });
+    var out = -1;
+    flag.forEach(function (f, i) {
+      if (f === null || flag[i - 1] != null || flag[i + 1] != null) return;
+      if (out < 0 || f < flag[out]) out = i;
+    });
+    var S = 0, ex = 0, most = 0;
+    obs.forEach(function (o, i) { most = Math.max(most, o.x); if (i !== out) { S += o.x; ex += o.e; } });
+    if (!S) return { need: 0, q90: 0, mean: 0, out: out, closed: hist.length };
+    var r = S + 0.5, beta = ex + 0.5, p = beta / (beta + 1), pk = Math.pow(p, r), cdf = 0, q = 0;
+    while (true) { cdf += pk; if (cdf >= 0.9 || q > 500) break; pk = pk * (q + r) / (q + 1) * (1 - p); q++; }
+    if (hist.length < 3) q = Math.min(q, Math.max(2, 2 * most));
+    var mean = r / beta;
+    return { need: Math.ceil(mean - 1e-9), q90: q, mean: mean, out: out, closed: hist.length };
+  }
   function monthHasData(k) { return (allTx[k] || []).some(function (t) { return !t.source; }); }
   function pyramidSvg(lv, w) {
     var h = Math.round(w * 0.875), band = h / 5, half = w / 2, st = half / 5, out = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" aria-hidden="true">';
@@ -2608,7 +2639,8 @@
   function daysBetween(a, b) { return Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 864e5); }
   function machineAnalysis(hot, prevKeys, cut, day) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-    var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate(), nextKey = MONTHS[MONTHS.indexOf(month) + 1];
+    var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate(), nextKey = MONTHS[MONTHS.indexOf(month) + 1], E = day ? day / daysIn : 1;
+    var allKeys = prevKeys.concat([month]), short3 = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
     var nextName = nextKey ? monthLabel(nextKey) : "next month";
     var box = document.createElement("div");
     box.className = "score an";
@@ -2628,15 +2660,18 @@
         if (t.to) takers[t.to.trim()] = (takers[t.to.trim()] || 0) + q;
         if (t.line) lines[t.line] = (lines[t.line] || 0) + q;
       });
-      prevKeys.forEach(function (k) {
-        outTxOf(k, m, cut(k)).forEach(function (t) {
+      // full earlier months, per part, for the average and next month's need
+      prevKeys.forEach(function (k, i) {
+        outTxOf(k, m, null).forEach(function (t) {
           var r = key(t);
           byRef[r] = byRef[r] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [] };
           if (!byRef[r].ref) byRef[r].ref = t.reference; if (!byRef[r].name) byRef[r].name = t.name;
           byRef[r].prev += -t.change;
+          byRef[r].hist = byRef[r].hist || prevKeys.map(function () { return 0; });
+          byRef[r].hist[i] += -t.change;
         });
       });
-      var parts = Object.keys(byRef).map(function (k) { var x = byRef[k]; x.avg = prevKeys.length ? Math.round(x.prev / prevKeys.length * 10) / 10 : 0; x.diff = Math.round((x.now - x.avg) * 10) / 10; return x; })
+      var parts = Object.keys(byRef).map(function (k) { var x = byRef[k]; x.avg = prevKeys.length ? Math.round(x.prev / prevKeys.length * 10) / 10 : 0; x.diff = Math.round((x.now - x.avg * E) * 10) / 10; return x; })
         .filter(function (x) { return x.now > 0; }).sort(function (a, b) { return b.diff - a.diff || b.now - a.now; });
       var drivers = parts.filter(function (x) { return x.diff > 0; }).slice(0, 3);
       if (!drivers.length) drivers = parts.slice(0, 3);
@@ -2648,15 +2683,22 @@
         var up = function (v) { return String(v || "").trim().toUpperCase(); }, rows = (sheet[m] || []).filter(hasContent);
         var stockRow = (x.ref && rows.filter(function (r) { return up(r.reference) === up(x.ref); })[0]) || (x.name && rows.filter(function (r) { return up(r.name) === up(x.name); })[0]) || null;
         var stock = stockRow && /^\d+$/.test(stockRow.quantity) ? parseInt(stockRow.quantity, 10) : null, min = stockRow && /^\d+$/.test(stockRow.min) ? parseInt(stockRow.min, 10) : 0;
-        var need = day ? Math.round(x.now / day * daysIn) : x.now;
-        var order = stock === null ? null : Math.max(0, need + min - stock);
+        // closed months: the earlier ones, plus this one once it is over; a running month counts for the days gone by
+        var hist = (x.hist || prevKeys.map(function () { return 0; })).concat(day ? [] : [x.now]).slice(-6);
+        var f = partForecast(hist, day ? x.now : null, E), need = f.need;
+        var order = stock === null ? null : Math.max(0, f.q90 + min - stock);
+        var hk = allKeys.slice(-hist.length - (day ? 1 : 0));
+        x.setAside = f.out >= 0 ? short3(hk[f.out]) + " (" + (f.out < hist.length ? hist[f.out] : x.now) + ")" : "";
+        x.safety = Math.max(0, f.q90 - need); x.early = f.closed < 3;
         var ds = x.dates.slice().sort(), every = ds.length > 1 ? Math.round(daysBetween(ds[0], ds[ds.length - 1]) / (ds.length - 1) * 10) / 10 : null;
         x.need = need; x.order = order; x.every = every; x.stock = stock;
         var mn = e(monthLabel(month).split(" ")[0]), nx = "Expected " + e(nextName.split(" ")[0]);
-        return '<tr><td class="sc-m">' + e(x.name || "\u2014") + '<div class="sc-rs">' + e(x.ref || "") + '</div></td><td data-l="Avg before">' + x.avg.toFixed(1) + '</td><td data-l="' + mn + '"><b>' + x.now + '</b></td><td data-l="Change" class="' + (x.diff > 0 ? "sc-up" : x.diff < 0 ? "sc-down" : "") + '">' + (x.diff > 0 ? "+" : "") + x.diff + '</td><td data-l="Changed">' +
-          (every === null ? "once" : "every " + every + (every === 1 ? " day" : " days")) + '</td><td data-l="' + nx + '">' + need + '</td><td data-l="In stock">' + (stock === null ? "\u2014" : stock) + '</td><td data-l="To order" class="an-order">' + (order === null ? "\u2014" : order ? "order " + order : "enough") + "</td></tr>";
+        return '<tr><td class="sc-m">' + e(x.name || "\u2014") + '<div class="sc-rs">' + e(x.ref || "") + "</div>" + (x.setAside ? '<div class="sc-rs an-aside">' + e(x.setAside) + " set aside as unusual</div>" : "") + '</td><td data-l="Avg / month">' + x.avg.toFixed(1) + '</td><td data-l="' + mn + '"><b>' + x.now + '</b></td><td data-l="Change" class="' + (x.diff > 0 ? "sc-up" : x.diff < 0 ? "sc-down" : "") + '">' + (x.diff > 0 ? "+" : "") + x.diff + '</td><td data-l="Changed">' +
+          (every === null ? "once" : "every " + every + (every === 1 ? " day" : " days")) + '</td><td data-l="' + nx + '">' + need + (x.early ? "*" : "") + '</td><td data-l="Safety">+' + x.safety + '</td><td data-l="In stock">' + (stock === null ? "\u2014" : stock) + '</td><td data-l="To order" class="an-order">' + (order === null ? "\u2014" : order ? "order " + order : "enough") + "</td></tr>";
       };
-      var tbl = '<table class="sc-table an-table"><thead><tr><th>Part (name \u00B7 reference)</th><th>Avg before</th><th>' + e(monthLabel(month).split(" ")[0].slice(0, 3)) + "</th><th>Change</th><th>How often</th><th>Need in " + e(nextName.split(" ")[0].slice(0, 3)) + "</th><th>In stock</th><th>To order</th></tr></thead><tbody>" + drivers.map(row).join("") + "</tbody></table>";
+      var tbl = '<table class="sc-table an-table"><thead><tr><th>Part (name \u00B7 reference)</th><th>Avg before</th><th>' + e(monthLabel(month).split(" ")[0].slice(0, 3)) + "</th><th>Change</th><th>How often</th><th>Need in " + e(nextName.split(" ")[0].slice(0, 3)) + "</th><th>Safety</th><th>In stock</th><th>To order</th></tr></thead><tbody>" + drivers.map(row).join("") + "</tbody></table>" +
+        '<div class="an-note">Need = average of the last ' + Math.min(6, prevKeys.length + (day ? 0 : 1)) + " closed months" + (day ? " and the days gone by this month" : "") + ", with one unusual month set aside. Safety covers 9 months in 10. To order = need + safety + Min \u2212 stock." +
+        (drivers.some(function (x) { return x.early; }) ? " *Provisional: fewer than 3 closed months." : "") + "</div>";
       // where the parts went: which line, and who took them (from the slips)
       var why = '<div class="an-why">';
       var lk = Object.keys(lines), lTot = lk.reduce(function (a, k) { return a + lines[k]; }, 0);
@@ -2672,7 +2714,9 @@
       lk.forEach(function (k) { if (lTot >= 3 && lines[k] / lTot >= 0.7) tips.push(Math.round(lines[k] / lTot * 100) + "% of it went to Line " + k + ". Compare Line " + k + "\u2019s settings and operator practice with the other line."); });
       if (top && top.every !== null && top.every <= 7) tips.push("The " + topName + " was changed every " + top.every + " days this month. Inspect what it runs against before fitting the next one, or the new one will go the same way.");
       var orders = drivers.filter(function (x) { return x.order; });
-      if (orders.length) tips.push("Order before " + nextName + ": " + orders.map(function (x) { return (x.name || x.ref) + " \u00D7" + x.order; }).join(", ") + ", so " + m + " doesn\u2019t stop if this carries on.");
+      if (orders.length) tips.push("Order before " + nextName + ": " + orders.map(function (x) { return (x.name || x.ref) + " \u00D7" + x.order; }).join(", ") + ". This covers a normal month for " + m + " with a safety margin.");
+      var aside = drivers.filter(function (x) { return x.setAside; });
+      if (aside.length) tips.push("This month was set aside as unusual for " + aside.map(function (x) { return x.name || x.ref; }).join(", ") + ", so the order is not built on it. If " + nextName.split(" ")[0] + " is high again, it counts as the new level and the order goes up.");
       if (!tips.length) tips.push("No single cause stands out in the records. Ask the mechanics what changed on " + m + " this month (new operator, new material, a repair).");
       html += '<div class="an-m"><div class="an-mh"><span class="an-name">' + e(m) + '</span><span class="an-tag pz-t-' + RATE[h.lv][1] + '">' + pyramidSvg(h.lv, 17) + " " + RATE[h.lv][0] + "</span>" +
         '<span class="sc-rs">' + total + " pcs vs average " + h.avg.toFixed(1) + (day ? " by day " + day : "") + (day ? " \u00B7 on pace for about " + pace + " this month" : "") + "</span></div>" +
