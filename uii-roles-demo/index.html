@@ -5758,7 +5758,7 @@
       var all = localSnaps();
       return Promise.resolve(Object.keys(all).map(function (k) { return all[k].meta; }));
     }
-    return db.collection("snapshots").get().then(function (q) { return q.docs.map(function (d) { var v = d.data() || {}; v.key = d.id; return v; }); });
+    return db.collection("snapshots").get().then(function (q) { return q.docs.map(function (d) { var src = d.data() || {}, v = {}; Object.keys(src).forEach(function (k) { v[k] = src[k]; }); v.key = d.id; return v; }); });
   }
   // What a copy holds, for the list: parts per machine and the months with data
   function describeData(all) {
