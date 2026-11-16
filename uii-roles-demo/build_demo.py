@@ -224,8 +224,8 @@ rep('''  function deleteDoc(coll, id) {
     trackDel(coll, id);
 ''')
 
-rep('''    if (!inn && !trState.reason && trState.kind !== "equip") { err.textContent = "Choose why the part is being changed."; err.hidden = false; return; }
-''', '''    if (!inn && !trState.reason && trState.kind !== "equip") { err.textContent = "Choose why the part is being changed."; err.hidden = false; return; }
+rep('''    if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
+''', '''    if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
     if (pendingIntercept()) return;
 ''')
 

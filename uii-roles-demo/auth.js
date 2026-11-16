@@ -500,7 +500,6 @@
       machine: r.machine || "", partName: r.name || "", reference: r.reference || "", qty: qty, line: trState.mode === "in" ? "" : (trState.line || ""),
       date: document.getElementById("trDate").value || "", time: document.getElementById("trTime").value || "",
       me: document.getElementById("trMe").value.trim(), by: document.getElementById("trBy").value.trim(), to: document.getElementById("trTo").value.trim(),
-      reason: trState.mode === "in" ? "" : (trState.reason || ""), note: trState.mode === "in" ? "" : document.getElementById("trNote").value.trim(),
       decidedBy: "", decidedTs: 0, note: "" };
     pendSave(doc);
     logAct("Asked: " + pendWhat(doc), partLabel({ machine: doc.machine, name: doc.partName, reference: doc.reference }), "", "waiting for approval");
@@ -513,8 +512,7 @@
     var row = d.kind === "part" ? findRow(d.partId) : findSide(d.kind, d.partId);
     if (!row) return d.kind === "part" && d.month !== month ? "Open " + monthLabel(d.month) + " first." : "This part is no longer in the list.";
     if (d.kind === "part" && row.month !== month) return "Open " + monthLabel(row.month) + " first.";
-    trState = { machine: d.machine || "All", part: row, kind: d.kind, line: d.line || "", reason: d.reason || "", mode: d.mode };
-    document.getElementById("trNote").value = d.note || "";
+    trState = { machine: d.machine || "All", part: row, kind: d.kind, line: d.line || "", mode: d.mode };
     document.getElementById("trQty").value = String(d.qty);
     document.getElementById("trDate").value = d.date;
     document.getElementById("trTime").value = d.time;
@@ -547,13 +545,13 @@
     document.getElementById("pendToggle").textContent = pendShowAll ? "Show waiting only" : "Show history";
     if (!list.length) { box.innerHTML = '<div class="act-empty"></div>'; box.firstChild.textContent = pendShowAll ? "Nothing yet." : "Nothing is waiting."; return; }
     var t = document.createElement("table"); t.className = "act-table pend-table";
-    t.innerHTML = "<thead><tr><th>When</th><th>Who</th><th>What</th><th>Part</th><th>Reason \u00B7 names</th><th></th></tr></thead>";
+    t.innerHTML = "<thead><tr><th>When</th><th>Who</th><th>What</th><th>Part</th><th>Names</th><th></th></tr></thead>";
     var tb = document.createElement("tbody");
     list.forEach(function (d) {
       var tr = document.createElement("tr");
       var cells = [[(d.date || "") + " " + (d.time || ""), "when"], [d.name, "who"], [pendWhat(d), d.mode === "in" ? "pin" : "pout"],
         [partLabel({ machine: d.machine, name: d.partName, reference: d.reference }) + (d.reference ? " \u00B7 " + d.reference : ""), ""],
-        [(d.reason ? reasonLabel(d.reason) + (d.note ? ": \u201C" + d.note + "\u201D" : "") + (d.by || d.to ? " \u00B7 " : "") : "") + (d.by || d.to ? (d.by || "\u2014") + " \u2192 " + (d.to || "\u2014") : ""), ""]];
+        [d.by || d.to ? (d.by || "\u2014") + " \u2192 " + (d.to || "\u2014") : "", ""]];
       cells.forEach(function (c) { var td = document.createElement("td"); td.textContent = c[0]; if (c[1]) td.className = c[1]; tr.appendChild(td); });
       var act = document.createElement("td"); act.className = "pend-act";
       if (d.status === "waiting" && can("approve")) {
