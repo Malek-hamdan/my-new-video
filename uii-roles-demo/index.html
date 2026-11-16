@@ -2646,7 +2646,7 @@
     var box = document.createElement("div");
     box.className = "score an";
     var html = '<div class="sc-head"><div><div class="sc-eyebrow">Analysis \u00B7 machines to act on</div><div class="sc-title">What drove the increase, and the plan for ' + e(nextName) + '</div></div>' +
-      '<div class="sc-basis">From the Transfer records: part, reason, line, date and notes<br>Suggestions to help the mechanics \u2014 they decide</div></div>';
+      '<div class="sc-basis">From the Transfer records: part, reference, line, date and names<br>Suggestions to help the mechanics \u2014 they decide</div></div>';
     hot.forEach(function (h) {
       var m = h.m, now = outTxOf(month, m, cut(month)), byRef = {}, lines = {}, takers = {};
       // one line per part: by Reference; a record without a Reference joins the part with the same name
