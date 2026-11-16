@@ -243,9 +243,6 @@
   .slip .s-mach span { display: inline-flex; align-items: center; gap: 2mm; }
   .slip .s-mach i { display: inline-block; width: 4.5mm; height: 4.5mm; border: 1.5px solid #333; border-radius: 1px; font-style: normal; font-size: 13px; line-height: 4.5mm; text-align: center; font-weight: 800; }
   .slip .s-mach span.on { color: #111; font-weight: 800; }
-  .slip .s-reason { margin-top: 2mm; font-size: 13.5px; gap: 2mm 4.5mm; }
-  .slip .s-note { display: flex; align-items: flex-end; gap: 3mm; margin-top: 2mm; padding: 0 3.5mm; font-size: 14px; color: #111; }
-  .slip .s-note .s-note-v { flex: 1; min-height: 6mm; border-bottom: 1px solid #8a97b3; padding-bottom: 0.5mm; font-style: italic; }
   .slip .s-linebox { display: flex; align-items: center; justify-content: center; border: 2.5px solid #1F3864; color: #1F3864; font-size: 24px; font-weight: 700; letter-spacing: .5px; }
   .tr-dt { display: flex; gap: 8px; }
   .tr-dt input[type="date"] { flex: 1.3; min-width: 0; }
@@ -333,17 +330,6 @@
   .slip .s-blank { min-height: 9mm; }
   .slip .s-lnspace { display: inline-block; width: 14mm; }
   .slip .s-blank.big { min-height: 11mm; }
-  /* two blank slips per A4 page: a little tighter so the Reason row fits */
-  .bpage .slip { padding: 5.5mm 8mm 5mm; }
-  .bpage .slip .s-head { padding-bottom: 2.5mm; margin-bottom: 3mm; }
-  .bpage .slip .s-grid { gap: 2.5mm; }
-  .bpage .slip .s-cell { padding: 2mm 3.5mm; }
-  .bpage .slip .s-blank { min-height: 7mm; }
-  .bpage .slip .s-blank.big { min-height: 8mm; }
-  .bpage .slip .s-mach { margin-top: 2.5mm; padding: 2mm 3.5mm; }
-  .bpage .slip .s-sign { margin-top: 3.5mm; }
-  .bpage .slip .s-name { height: 8mm; }
-  .bpage .slip .s-line { height: 9mm; }
   .slip .s-wline { display: inline-block; width: 36mm; border-bottom: 1px solid #333; height: 15px; vertical-align: bottom; }
   .bpage { height: 277mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; break-after: page; }
   .bpage:last-child { page-break-after: auto; break-after: auto; }
@@ -358,10 +344,6 @@
   .tr-card .tr-title { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; color: #ffd3c2; margin-bottom: 14px; }
   .tr-label { display: block; margin: 14px 0 6px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
   .tr-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .tr-reason { margin-top: 14px; display: grid; gap: 8px; }
-  .tr-reason .tr-chip[aria-pressed="true"] { background: #f0a35b; border-color: #f0a35b; color: #1f1206; }
-  .tx-reason { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: rgba(240,163,91,0.15); color: #f0b27a; vertical-align: 1px; }
-  .tx-note { display: block; margin-top: 2px; font-size: 12px; font-style: italic; color: var(--muted); }
   .tr-chip { padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
   .tr-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #06101f; }
   .tr-input { width: 100%; padding: 11px 12px; border: 1px solid var(--border-strong); border-radius: 10px; background: rgba(255,255,255,0.03); color: var(--text); font: inherit; font-size: 15px; }
@@ -676,14 +658,9 @@
   .an-table .sc-rs { white-space: nowrap; }
   .an-table td.an-order { font-weight: 700; }
   .an-sub { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
-  .an-bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.05); }
-  .an-bar i { display: block; height: 100%; }
   .an-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
   .an-legend b { color: var(--text); }
   .an-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
-  .rs-wear { background: #3987e5; } .rs-broken { background: #d03b3b; } .rs-prev { background: #0ca30c; } .rs-fit { background: #fab219; } .rs-other { background: #8b93a7; } .rs-none { background: #4b5566; }
-  .an-note { font-size: 13px; font-style: italic; margin: 3px 0; }
-  .an-note span { font-style: normal; color: var(--muted); font-size: 11.5px; margin-left: 4px; }
   .an-tips { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: rgba(91,157,255,0.06); border: 1px solid rgba(91,157,255,0.22); }
   .an-tips ol { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.55; }
   .an-tips li { margin: 3px 0; }
@@ -1359,11 +1336,6 @@
         <div><span class="tr-label">Issued by</span><input class="tr-input" id="trBy" placeholder="Who gave the part" autocomplete="off" spellcheck="false" dir="auto"></div>
         <div><span class="tr-label">Received by</span><input class="tr-input" id="trTo" placeholder="Who took the part" autocomplete="off" spellcheck="false" dir="auto"></div>
       </div>
-      <div class="tr-reason tr-out-only">
-        <span class="tr-label">Why is the part being changed?</span>
-        <div class="tr-chips" id="trReasons"></div>
-        <input class="tr-input" id="trNote" placeholder="Short note for the mechanics, e.g. cracked after 2 weeks (optional)" autocomplete="off" dir="auto" maxlength="160">
-      </div>
       <label class="tr-print tr-out-only"><input type="checkbox" id="trPrint" checked> Print a slip when I save</label>
       <div class="tr-after" id="trAfter" hidden></div>
       <div class="tr-err" id="trErr" hidden></div>
@@ -1570,9 +1542,6 @@
     };
   }
 
-  // Why a part goes out: kept with the transaction for the machine analysis
-  var REASONS = [["wear", "Worn out"], ["broken", "Broken"], ["prev", "Preventive"], ["fit", "Wrong fit / setup"], ["other", "Other"]];
-  function reasonLabel(k) { for (var i = 0; i < REASONS.length; i++) if (REASONS[i][0] === k) return REASONS[i][1]; return ""; }
   function cleanTx(t, id) {
     return {
       id: String(id || t.id),
@@ -1596,9 +1565,6 @@
       me: String(t.me || ""),
       by: String(t.by || ""),
       to: String(t.to || ""),
-      // why the part was changed (Out only) and a short note for the mechanics
-      reason: REASONS.some(function (r) { return r[0] === t.reason; }) ? t.reason : "",
-      note: String(t.note || "").slice(0, 160),
       local: !!t.local
     };
   }
@@ -1607,7 +1573,7 @@
     return { month: r.month, machine: r.machine, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency, loggedQty: r.loggedQty, date: r.date, baseline: r.baseline, arrival: r.arrival, local: !!r.local, created: r.created };
   }
   function txBody(t) {
-    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "", reason: t.reason || "", note: t.note || "", local: !!t.local };
+    return { partId: t.partId, month: t.month, machine: t.machine, name: t.name, reference: t.reference, change: t.change, after: t.after, line: t.line || "", date: t.date, ts: t.ts, source: t.source || "", slip: t.slip || "", time: t.time || "", me: t.me || "", by: t.by || "", to: t.to || "", local: !!t.local };
   }
   function ymd(ts) {
     var d = new Date(ts);
@@ -2394,11 +2360,6 @@
         stag.textContent = t.source === "used" ? "Used" : "Equipment";
         (ncell.querySelector(".tx-text") || ncell).appendChild(stag);
       }
-      if (t.reason || t.note) {
-        var holder = ncell.querySelector(".tx-text") || ncell;
-        if (t.reason) { var rc = document.createElement("span"); rc.className = "tx-reason"; rc.textContent = reasonLabel(t.reason); holder.appendChild(document.createElement("br")); holder.appendChild(rc); }
-        if (t.note) { var nt = document.createElement("span"); nt.className = "tx-note"; nt.dir = "auto"; nt.textContent = "\u201C" + t.note + "\u201D"; holder.appendChild(nt); }
-      }
       if (t.by || t.to) {
         var who = document.createElement("span");
         who.className = "tx-who";
@@ -2554,7 +2515,7 @@
     var html = '<div class="sc-head"><div><div class="sc-eyebrow">Analysis \u00B7 machines to act on</div><div class="sc-title">What drove the increase, and the plan for ' + e(nextName) + '</div></div>' +
       '<div class="sc-basis">From the Transfer records: part, reason, line, date and notes<br>Suggestions to help the mechanics \u2014 they decide</div></div>';
     hot.forEach(function (h) {
-      var m = h.m, now = outTxOf(month, m, cut(month)), byRef = {}, reasons = {}, lines = {}, notes = [];
+      var m = h.m, now = outTxOf(month, m, cut(month)), byRef = {}, lines = {}, takers = {};
       // one line per part: by Reference; a record without a Reference joins the part with the same name
       var refOfName = {};
       [month].concat(prevKeys).forEach(function (k) { outTxOf(k, m, null).forEach(function (t) { if (t.reference && t.name) refOfName[t.name.trim().toUpperCase()] = t.reference.trim().toUpperCase(); }); });
@@ -2564,9 +2525,8 @@
         byRef[k] = byRef[k] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [] };
         if (!byRef[k].ref) byRef[k].ref = t.reference; if (!byRef[k].name) byRef[k].name = t.name;
         byRef[k].now += q; byRef[k].dates.push(txDate(t));
-        reasons[t.reason || "none"] = (reasons[t.reason || "none"] || 0) + q;
+        if (t.to) takers[t.to.trim()] = (takers[t.to.trim()] || 0) + q;
         if (t.line) lines[t.line] = (lines[t.line] || 0) + q;
-        if (t.note) notes.push({ d: txDate(t), n: t.note, ref: t.reference || t.name });
       });
       prevKeys.forEach(function (k) {
         outTxOf(k, m, cut(k)).forEach(function (t) {
@@ -2580,7 +2540,7 @@
         .filter(function (x) { return x.now > 0; }).sort(function (a, b) { return b.diff - a.diff || b.now - a.now; });
       var drivers = parts.filter(function (x) { return x.diff > 0; }).slice(0, 3);
       if (!drivers.length) drivers = parts.slice(0, 3);
-      var total = h.now, rTot = Object.keys(reasons).reduce(function (a, k) { return a + reasons[k]; }, 0);
+      var total = h.now;
       // next month: if nothing changes, the pace of this month carries on
       var pace = day ? Math.round(h.now / day * daysIn) : h.now;
       var row = function (x) {
@@ -2597,22 +2557,18 @@
           (every === null ? "once" : "every " + every + (every === 1 ? " day" : " days")) + '</td><td data-l="' + nx + '">' + need + '</td><td data-l="In stock">' + (stock === null ? "\u2014" : stock) + '</td><td data-l="To order" class="an-order">' + (order === null ? "\u2014" : order ? "order " + order : "enough") + "</td></tr>";
       };
       var tbl = '<table class="sc-table an-table"><thead><tr><th>Part (name \u00B7 reference)</th><th>Avg before</th><th>' + e(monthLabel(month).split(" ")[0].slice(0, 3)) + "</th><th>Change</th><th>How often</th><th>Need in " + e(nextName.split(" ")[0].slice(0, 3)) + "</th><th>In stock</th><th>To order</th></tr></thead><tbody>" + drivers.map(row).join("") + "</tbody></table>";
-      // why: reasons as a thin split bar with the figures beside it
-      var rk = REASONS.map(function (r) { return [r[0], r[1]]; }).concat([["none", "Not given"]]).filter(function (r) { return reasons[r[0]]; });
-      var why = '<div class="an-why"><div class="an-sub">Why the parts were changed</div><div class="an-bar">' + rk.map(function (r) { return '<i class="rs-' + r[0] + '" style="width:' + (reasons[r[0]] / rTot * 100) + '%"></i>'; }).join("") + "</div>" +
-        '<div class="an-legend">' + rk.map(function (r) { return '<span><i class="rs-' + r[0] + '"></i>' + e(r[1]) + " <b>" + reasons[r[0]] + "</b> (" + Math.round(reasons[r[0]] / rTot * 100) + "%)</span>"; }).join("") + "</div>";
+      // where the parts went: which line, and who took them (from the slips)
+      var why = '<div class="an-why">';
       var lk = Object.keys(lines), lTot = lk.reduce(function (a, k) { return a + lines[k]; }, 0);
-      if (lTot) why += '<div class="an-sub" style="margin-top:10px">Line</div><div class="an-legend">' + lk.sort().map(function (k) { return "<span>Line " + e(k) + " <b>" + lines[k] + "</b> (" + Math.round(lines[k] / lTot * 100) + "%)</span>"; }).join("") + "</div>";
-      if (notes.length) why += '<div class="an-sub" style="margin-top:10px">Notes from the slips</div>' + notes.slice(-3).reverse().map(function (n) { return '<div class="an-note">\u201C' + e(n.n) + '\u201D <span>' + e(n.ref) + " \u00B7 " + e(n.d) + "</span></div>"; }).join("");
+      if (lTot) why += '<div class="an-sub">Line</div><div class="an-legend">' + lk.sort().map(function (k) { return "<span>Line " + e(k) + " <b>" + lines[k] + "</b> (" + Math.round(lines[k] / lTot * 100) + "%)</span>"; }).join("") + "</div>";
+      var tk = Object.keys(takers).sort(function (a, b) { return takers[b] - takers[a]; }), kTot = tk.reduce(function (a, k) { return a + takers[k]; }, 0);
+      if (kTot) why += '<div class="an-sub" style="margin-top:10px">Received by</div><div class="an-legend">' + tk.slice(0, 4).map(function (k) { return "<span>" + e(k) + " <b>" + takers[k] + "</b></span>"; }).join("") + "</div>";
+      if (!lTot && !kTot) why += '<div class="sc-rs">No line or names on these transfers.</div>';
       why += "</div>";
       // what the mechanics can check, chosen by what the records show
-      var tips = [], share = function (k) { return rTot ? (reasons[k] || 0) / rTot : 0; }, top = drivers[0];
+      var tips = [], top = drivers[0];
       var topName = top ? (top.name || top.ref) : "the parts";
-      if (share("broken") >= 0.4) tips.push("Parts are breaking, not wearing out (" + Math.round(share("broken") * 100) + "%). Check " + m + " for jams, misalignment or overload around the " + topName + ", and look for a foreign object or a loose fixing.");
-      if (share("wear") >= 0.4) tips.push("Parts are wearing out faster than before. Check lubrication, belt / spring tension, pressure and temperature settings, and the running speed. Compare the last batch of " + topName + " with the old one.");
-      if (share("fit") > 0) tips.push((reasons.fit) + " change" + (reasons.fit === 1 ? " was" : "s were") + " due to a wrong fit or setup. Check the reference before fitting, keep the setting sheet at the machine, and show the team the right setting.");
-      if (share("prev") >= 0.5) tips.push("Most changes were preventive \u2014 planned work, not a fault. If that was the plan, no extra action is needed.");
-      if (share("none") >= 0.3) tips.push("Some transfers have no reason. Ask the store to always tick a reason on the slip, so next month\u2019s analysis is sharper.");
+      if (top && top.diff > 0) tips.push("The " + topName + " went out " + top.now + " times against an average of " + top.avg.toFixed(1) + ". Ask the mechanics why it keeps being changed, and check what it runs against: alignment, lubrication, tension, pressure and temperature settings.");
       lk.forEach(function (k) { if (lTot >= 3 && lines[k] / lTot >= 0.7) tips.push(Math.round(lines[k] / lTot * 100) + "% of it went to Line " + k + ". Compare Line " + k + "\u2019s settings and operator practice with the other line."); });
       if (top && top.every !== null && top.every <= 7) tips.push("The " + topName + " was changed every " + top.every + " days this month. Inspect what it runs against before fitting the next one, or the new one will go the same way.");
       var orders = drivers.filter(function (x) { return x.order; });
@@ -3427,8 +3383,7 @@
   function trStock(r) { return /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : 0; }
   function trOpen(mode) {
     if (ro()) return;
-    trState = { machine: "All", part: null, line: "", reason: "", mode: mode === "in" ? "in" : "out" };
-    document.getElementById("trNote").value = "";
+    trState = { machine: "All", part: null, line: "", mode: mode === "in" ? "in" : "out" };
     var inn = trState.mode === "in";
     document.getElementById("trCard").classList.toggle("in", inn);
     if (area === "equip") trState.machine = "Equip";
@@ -3457,13 +3412,6 @@
       b.setAttribute("aria-pressed", on ? "true" : "false");
       b.addEventListener("click", function () { trState.machine = m; trState.part = null; trRender(); document.getElementById("trSearch").focus(); });
       mBox.appendChild(b);
-    });
-    var rBox = document.getElementById("trReasons"); rBox.innerHTML = "";
-    REASONS.forEach(function (r) {
-      var b = document.createElement("button"); b.type = "button"; b.className = "tr-chip"; b.textContent = r[1];
-      b.setAttribute("aria-pressed", trState.reason === r[0] ? "true" : "false");
-      b.addEventListener("click", function () { trState.reason = r[0]; trRender(); });
-      rBox.appendChild(b);
     });
     var lBox = document.getElementById("trLines"); lBox.innerHTML = "";
     ["1", "2"].forEach(function (l) {
@@ -3548,14 +3496,12 @@
     var err = document.getElementById("trErr");
     var inn = trState.mode === "in";
     if (!inn && !trState.line && !trOther()) { err.textContent = "Choose Line 1 or Line 2."; err.hidden = false; return; }
-    if (!inn && !trState.reason && trState.kind !== "equip") { err.textContent = "Choose why the part is being changed."; err.hidden = false; return; }
     if (trState.kind === "used" || trState.kind === "equip") { trSaveSide(inn); return; }
     var row = findRow(trState.part.id) || trState.part, qty = parseInt(document.getElementById("trQty").value, 10);
     var before = trStock(row), after = inn ? before + qty : before - qty, date = document.getElementById("trDate").value;
     row.quantity = String(after); row.loggedQty = row.quantity; row.baseline = false;
     var tx = cleanTx({ partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local,
-      reason: inn ? "" : trState.reason, note: inn ? "" : document.getElementById("trNote").value.trim() }, uid());
+      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local }, uid());
     if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     writeRow(row); saveDoc("transactions", tx.id, txBody(tx));
@@ -3576,8 +3522,7 @@
     delete sideTimers[row.id];
     writeSide(key, row);
     var tx = cleanTx({ partId: row.id, month: month, machine: key === "equip" ? row.type : row.machine, name: row.name, reference: row.reference,
-      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key,
-      reason: inn ? "" : trState.reason, note: inn ? "" : document.getElementById("trNote").value.trim() }, uid());
+      change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key }, uid());
     if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     saveDoc("transactions", tx.id, txBody(tx));
@@ -3608,13 +3553,6 @@
       return '<span' + (x === m ? ' class="on"' : "") + "><i>" + (x === m ? "\u2713" : "") + "</i>" + x + "</span>";
     }).join("") + "</div>";
   }
-  // Why the part was changed: tick boxes like the machine row, plus the note line
-  function slipReasonHtml(r, note) {
-    var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-    return '<div class="s-mach s-reason"><span class="s-lab">Reason</span>' + REASONS.map(function (x) {
-      return '<span' + (x[0] === r ? ' class="on"' : "") + "><i>" + (x[0] === r ? "\u2713" : "") + "</i>" + x[1] + "</span>";
-    }).join("") + '</div><div class="s-note"><span class="s-lab">Note</span><span class="s-note-v">' + e(note) + "</span></div>";
-  }
   function slipHtml(t) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     var d = new Date(t.ts || Date.now());
@@ -3628,7 +3566,6 @@
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-val">' + e(ref || "\u2014") + "</div></div>" +
       '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-val big">' + Math.abs(t.change) + "</div></div></div>" +
       (t.source === "equip" ? "" : slipMachHtml(t.machine)) +
-      (t.source === "equip" ? "" : slipReasonHtml(t.reason, t.note)) +
       '<div class="s-sign">' +
       '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(t.me) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name">' + e(t.by) + '</div><div class="s-line">Signature</div></div>' +
@@ -3876,7 +3813,7 @@
       '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-blank"></div></div>' +
       '<div class="s-cell s-linebox">LINE<span class="s-lnspace"></span></div>' +
       '<div class="s-cell wide"><div class="s-lab">Reference</div><div class="s-blank"></div></div>' +
-      '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-blank big"></div></div></div>' + slipMachHtml("") + slipReasonHtml("", "") +
+      '<div class="s-cell"><div class="s-lab">Quantity</div><div class="s-blank big"></div></div></div>' + slipMachHtml("") +
       '<div class="s-sign">' +
       '<div class="s-box"><div class="s-lab">Recorded by</div><div class="s-name">' + e(me) + '</div><div class="s-line">Signature</div></div>' +
       '<div class="s-box"><div class="s-lab">Issued by</div><div class="s-name"></div><div class="s-line">Signature</div></div>' +
