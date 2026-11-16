@@ -184,14 +184,19 @@
   impBar.className = "imp-bar"; impBar.hidden = true;
   impBar.innerHTML = '<span class="imp-txt"></span><button type="button" class="btn">Back to my account</button>';
   document.body.insertBefore(impBar, document.body.firstChild);
+  // the machines bar sticks just under this bar while it shows
+  function setStickTop() { document.documentElement.style.setProperty("--stick-top", impBar && !impBar.hidden ? impBar.offsetHeight + "px" : "0px"); }
+  window.addEventListener("resize", function () { setStickTop(); });
   function renderImpBar() {
     if (!impBar) return;
     var a = me && actingAdmin();
     impBar.hidden = !a;
     document.body.classList.toggle("acting", !!a);
+    setStickTop();
     if (!a) return;
     impBar.querySelector(".imp-txt").textContent = "You are inside " + (me.name || me.username) + "\u2019s account. Everything you do is recorded as done by " + (a.name || a.username) + ".";
     impBar.querySelector("button").textContent = "Back to " + (a.name || a.username);
+    setStickTop();
   }
   function actAs(target) {
     var a = actingAdmin() || me;

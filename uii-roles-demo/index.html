@@ -870,6 +870,28 @@
   }
   .tab[aria-selected="true"] .count { background: rgba(91,157,255,0.22); color: #cfe0ff; }
 
+  /* Machines bar stays at the top while scrolling; a small month switch shows once it is stuck */
+  .stick-sentinel { height: 0; }
+  .stickbar { position: sticky; top: var(--stick-top, 0px); z-index: 20; display: flex; align-items: stretch; gap: 8px; margin: -6px; padding: 6px; border-radius: 0 0 16px 16px; transition: background 0.2s ease, box-shadow 0.2s ease; }
+  .stickbar.stuck { background: rgba(11, 13, 18, 0.86); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
+  .stickbar .tabs { flex: 1; min-width: 0; }
+  .mini-month { display: none; align-items: center; gap: 2px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-weight: 700; font-size: 14px; white-space: nowrap; }
+  .stickbar.stuck .mini-month:not([hidden]) { display: inline-flex; animation: mmIn 0.18s ease-out; }
+  .mini-month #mmLabel { padding: 0 6px; min-width: 74px; text-align: center; }
+  .mm-btn { width: 32px; height: 100%; min-height: 32px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+  .mm-btn:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,0.06); }
+  .mm-btn:disabled { opacity: 0.3; cursor: default; }
+  @keyframes mmIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+  .panel.swap-in { animation: swapIn 0.18s ease-out; }
+  @keyframes swapIn { from { opacity: 0.4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 640px) {
+    .stickbar { flex-direction: column; gap: 6px; }
+    .stickbar.stuck .mini-month:not([hidden]) { justify-content: space-between; padding: 2px 4px; }
+    .mm-btn { min-height: 30px; width: 44px; }
+    .stickbar.stuck .tab { padding-top: 6px; padding-bottom: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .panel.swap-in, .stickbar.stuck .mini-month:not([hidden]) { animation: none; } .stickbar { transition: none; } }
+
   /* Panel */
   .panel {
     margin-top: 16px;
@@ -1293,7 +1315,15 @@
     <button type="button" class="imp" id="originImp" aria-pressed="true"><span class="ic" aria-hidden="true">&#9992;&#65039;</span><span>Imported parts<small>from abroad</small></span></button>
     <button type="button" class="loc" id="originLoc" aria-pressed="false"><span class="ic" aria-hidden="true">&#128205;</span><span>Local parts<small>bought in the country</small></span></button>
   </div>
-  <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
+  <div class="stick-sentinel" id="stickSentinel" aria-hidden="true"></div>
+  <div class="stickbar" id="stickbar">
+    <div class="mini-month" id="miniMonth" role="group" aria-label="Month">
+      <button type="button" class="mm-btn" id="mmPrev" aria-label="Previous month">&#8249;</button>
+      <span id="mmLabel"></span>
+      <button type="button" class="mm-btn" id="mmNext" aria-label="Next month">&#8250;</button>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
+  </div>
 
   <section class="panel" role="tabpanel" id="panel" aria-labelledby="">
     <div class="panel-head">
@@ -2029,6 +2059,7 @@
   }
   function renderMonths() {
     if (typeof updateExportLabel === "function") updateExportLabel();
+    if (typeof updateMiniMonth === "function") updateMiniMonth();
     if (!viewYear) viewYear = parseInt(month.slice(0, 4), 10);
     monthsEl.innerHTML = "";
 
@@ -2111,9 +2142,54 @@
     renderMonths();
     renderTabs();
     renderRows();
-    var b = document.getElementById("month-" + k);
-    if (b && b.scrollIntoView) b.scrollIntoView({ block: "nearest", inline: "nearest" });
+    showMonthChip(k);
+    navSettle();
   }
+  // bring the month's chip into view sideways only; the page itself does not move
+  function showMonthChip(k) {
+    var b = document.getElementById("month-" + k), wrap = monthsEl.parentNode;
+    if (!b || !wrap || wrap.scrollWidth <= wrap.clientWidth) return;
+    var br = b.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    if (br.left < wr.left) wrap.scrollLeft -= wr.left - br.left + 16;
+    else if (br.right > wr.right) wrap.scrollLeft += br.right - wr.right + 16;
+  }
+  // After moving to another month, tab or list: if the page is scrolled past the machines bar,
+  // start the new content right under it (the bar stays put), and fade the content in.
+  var stickbar = document.getElementById("stickbar"), stickSentinel = document.getElementById("stickSentinel"), panelEl = document.getElementById("panel");
+  function stickEls() {
+    stickbar = stickbar || document.getElementById("stickbar");
+    stickSentinel = stickSentinel || document.getElementById("stickSentinel");
+    panelEl = panelEl || document.getElementById("panel");
+  }
+  function stickTop() { return parseFloat(getComputedStyle(stickbar).top) || 0; }
+  function navSettle() {
+    stickEls();
+    var anchor = stickSentinel.getBoundingClientRect().top + window.pageYOffset - stickTop() + 6;
+    if (window.pageYOffset > anchor) window.scrollTo(0, anchor);
+    panelEl.classList.remove("swap-in");
+    void panelEl.offsetWidth;
+    panelEl.classList.add("swap-in");
+    updateStuck();
+  }
+  panelEl.addEventListener("animationend", function () { panelEl.classList.remove("swap-in"); });
+  var stuckRaf = 0;
+  function updateStuck() {
+    stuckRaf = 0;
+    stickEls();
+    stickbar.classList.toggle("stuck", stickSentinel.getBoundingClientRect().top < stickTop() - 1);
+  }
+  window.addEventListener("scroll", function () { if (!stuckRaf) stuckRaf = requestAnimationFrame(updateStuck); }, { passive: true });
+  window.addEventListener("resize", function () { if (!stuckRaf) stuckRaf = requestAnimationFrame(updateStuck); });
+  // the small month switch in the bar: previous / next month
+  function updateMiniMonth() {
+    var mm = document.getElementById("miniMonth"), i = MONTHS.indexOf(month);
+    mm.hidden = !!sideView || area === "equip";
+    document.getElementById("mmLabel").textContent = MONTH_NAMES[parseInt(month.slice(5), 10) - 1].slice(0, 3) + " " + month.slice(0, 4);
+    document.getElementById("mmPrev").disabled = i <= 0;
+    document.getElementById("mmNext").disabled = i >= MONTHS.length - 1;
+  }
+  document.getElementById("mmPrev").addEventListener("click", function () { var i = MONTHS.indexOf(month); if (i > 0) selectMonth(MONTHS[i - 1]); });
+  document.getElementById("mmNext").addEventListener("click", function () { var i = MONTHS.indexOf(month); if (i < MONTHS.length - 1) selectMonth(MONTHS[i + 1]); });
 
   function renderTabs() {
     tabsEl.innerHTML = "";
@@ -2167,6 +2243,7 @@
     try { localStorage.setItem(TAB_KEY, m); } catch (e) {}
     renderTabs();
     renderRows();
+    navSettle();
   }
 
   function tabCount(m) {
@@ -4215,6 +4292,7 @@
     renderRows();
     renderSearch();
     showSideBtn();
+    navSettle();
   }
   function openConsumables() { openSide("cons"); }
   function leaveConsumables() {
@@ -4229,6 +4307,7 @@
     try { localStorage.setItem(SIDE_TAB_KEY + sideView, tab); } catch (e) {}
     renderTabs();
     renderRows();
+    navSettle();
   }
   function renderSideTabs() {
     SIDE[sideView].tabs.forEach(function (m) {
@@ -5332,14 +5411,19 @@
   impBar.className = "imp-bar"; impBar.hidden = true;
   impBar.innerHTML = '<span class="imp-txt"></span><button type="button" class="btn">Back to my account</button>';
   document.body.insertBefore(impBar, document.body.firstChild);
+  // the machines bar sticks just under this bar while it shows
+  function setStickTop() { document.documentElement.style.setProperty("--stick-top", impBar && !impBar.hidden ? impBar.offsetHeight + "px" : "0px"); }
+  window.addEventListener("resize", function () { setStickTop(); });
   function renderImpBar() {
     if (!impBar) return;
     var a = me && actingAdmin();
     impBar.hidden = !a;
     document.body.classList.toggle("acting", !!a);
+    setStickTop();
     if (!a) return;
     impBar.querySelector(".imp-txt").textContent = "You are inside " + (me.name || me.username) + "\u2019s account. Everything you do is recorded as done by " + (a.name || a.username) + ".";
     impBar.querySelector("button").textContent = "Back to " + (a.name || a.username);
+    setStickTop();
   }
   function actAs(target) {
     var a = actingAdmin() || me;
@@ -6278,6 +6362,7 @@
     if (quiet) return;
     updateSearchPlaceholder();
     renderMonths(); renderTabs(); renderRows(); renderSearch();
+    navSettle();
   }
   document.getElementById("areaParts").addEventListener("click", function () { if (area !== "parts") setArea("parts"); });
   function originLabel() { return origin === "loc" ? " \u00B7 Local parts" : ""; }
@@ -6291,6 +6376,7 @@
     flushWrites();
     openSheet();
     renderTabs(); renderRows(); renderSearch();
+    navSettle();
   }
   document.getElementById("originImp").addEventListener("click", function () { if (origin !== "imp") setOrigin("imp"); });
   document.getElementById("originLoc").addEventListener("click", function () { if (origin !== "loc") setOrigin("loc"); });
