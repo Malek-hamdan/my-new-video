@@ -641,6 +641,16 @@
   .sc-sp svg { display: block; margin-left: auto; }
   .sp-avg { stroke: #4b5566; stroke-width: 1; stroke-dasharray: 3 3; } .sp-line { fill: none; stroke: #3987e5; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; } .sp-dot { fill: #3987e5; stroke: #12161e; stroke-width: 2; }
   .pz-off { fill: #2a3240; } .pz-on.pz-good { fill: #0ca30c; } .pz-on.pz-warn { fill: #fab219; } .pz-on.pz-serious { fill: #ec835a; } .pz-on.pz-crit { fill: #d03b3b; }
+  .sc-note { padding: 10px 18px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--border); background: rgba(255,200,80,0.05); }
+  .sc-rs.sc-sig { color: #f0a050; }
+  .sc-mm { border-top: 1px solid var(--border); }
+  .sc-mm-h { padding: 12px 18px 4px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .sc-mm-h .sc-muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .sc-go { background: none; border: 0; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; padding: 0; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .sc-go:hover { color: var(--text); }
+  .sc-table .sc-cur { background: rgba(80,140,255,0.08); }
+  .sc-table th.sc-cur .sc-go { color: var(--text); }
+  .sc-table tr.sc-tot td { font-weight: 700; border-top: 1px solid var(--border); }
   .sc-foot { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
   .sc-foot b { font-weight: 600; } .sc-key { display: inline-flex; align-items: center; gap: 6px; }
   .an-m { padding: 14px 18px 16px; border-top: 1px solid var(--border); }
@@ -2473,16 +2483,29 @@
   }
   function pct(now, before) { return Math.round((now - before) / before * 100); }
 
-  // ---- Machine rating (scorecard): parts issued this month against the average of up to 3 earlier months ----
-  // Imported and Local together. While a month is running, every month is cut at the same day.
-  var RATE = [["Excellent", "good", "30% or more below average"], ["Good", "good", "at or below average"], ["Watch", "warn", "up to 30% above, or under 3 pcs more"],
-    ["High", "serious", "30\u2013100% above average"], ["Very high", "crit", "100% or more above average"]];
-  function rateLevel(avg, now) {
-    var d = now - avg;
-    if (avg === 0) return now === 0 ? 1 : now < 3 ? 2 : 3;
-    if (d > 0 && d < 3) return 2;
-    var c = d / avg;
-    return c <= -0.3 ? 0 : c <= 0 ? 1 : c < 0.3 ? 2 : c < 1 ? 3 : 4;
+  // ---- Machine rating (scorecard): parts issued this month against the months before it ----
+  // Gamma-Poisson test: how likely is this many parts, given the earlier months and the days gone by.
+  // Imported and Local together. Up to 6 earlier months with data; 3 needed for a full rating.
+  var RATE = [["Excellent", "good", "clearly below normal"], ["Good", "good", "normal for this machine"], ["Watch", "warn", "a little above normal"],
+    ["High", "serious", "clearly above normal (under 5% chance)"], ["Very high", "crit", "far above normal (under 1% chance)"]];
+  var RATE_MIN_MONTHS = 3, RATE_MAX_MONTHS = 6;
+  // S parts over n earlier months, x parts now, E = share of the month gone by (1 for a full month)
+  function rateTest(S, n, x, E) {
+    var r = S + 0.5, beta = n + 0.5, p = beta / (beta + E), mu = r / beta * E;
+    var pk = Math.pow(p, r), below = 0, upTo = 0;
+    for (var k = 0; k <= x; k++) {
+      if (k < x) below += pk;
+      upTo += pk;
+      pk = pk * (k + r) / (k + 1) * (1 - p);
+    }
+    return { mu: mu, pUp: Math.max(0, 1 - below), pLow: Math.min(1, upTo) };
+  }
+  function rateLevel(t, x) {
+    if (t.pUp < 0.01 && x >= 3) return 4;
+    if (t.pUp < 0.05 && x >= 2) return 3;
+    if (t.pUp < 0.10 || x > 1.3 * t.mu) return 2;
+    if (t.pLow < 0.10 && x < t.mu) return 0;
+    return 1;
   }
   function monthHasData(k) { return (allTx[k] || []).some(function (t) { return !t.source; }); }
   function pyramidSvg(lv, w) {
@@ -2575,53 +2598,99 @@
       if (orders.length) tips.push("Order before " + nextName + ": " + orders.map(function (x) { return (x.name || x.ref) + " \u00D7" + x.order; }).join(", ") + ", so " + m + " doesn\u2019t stop if this carries on.");
       if (!tips.length) tips.push("No single cause stands out in the records. Ask the mechanics what changed on " + m + " this month (new operator, new material, a repair).");
       html += '<div class="an-m"><div class="an-mh"><span class="an-name">' + e(m) + '</span><span class="an-tag pz-t-' + RATE[h.lv][1] + '">' + pyramidSvg(h.lv, 17) + " " + RATE[h.lv][0] + "</span>" +
-        '<span class="sc-rs">' + total + " pcs vs average " + h.avg.toFixed(1) + (day ? " \u00B7 on pace for about " + pace + " this month" : "") + "</span></div>" +
+        '<span class="sc-rs">' + total + " pcs vs average " + h.avg.toFixed(1) + (day ? " by day " + day : "") + (day ? " \u00B7 on pace for about " + pace + " this month" : "") + "</span></div>" +
         '<div class="an-grid"><div>' + tbl + "</div>" + why + "</div>" +
         '<div class="an-tips"><div class="an-sub">What the mechanics can check</div><ol>' + tips.map(function (t) { return "<li>" + e(t) + "</li>"; }).join("") + "</ol></div></div>";
     });
     box.innerHTML = html;
     return box;
   }
+  var scoreEarly = false;
   function scorecard(day) {
     var idx = MONTHS.indexOf(month), prevKeys = [];
-    for (var i = idx - 1; i >= 0 && prevKeys.length < 3; i--) if (monthHasData(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
+    for (var i = idx - 1; i >= 0 && prevKeys.length < RATE_MAX_MONTHS; i--) if (monthHasData(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
     var cut = function (k) { return day ? k + "-" + pad(Math.min(day, new Date(+k.slice(0, 4), +k.slice(5), 0).getDate())) : null; };
+    var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate(), E = day ? day / daysIn : 1;
     var cur = monthStats(month, cut(month), null), curImp = monthStats(month, cut(month), "imp"), curLoc = monthStats(month, cut(month), "loc");
-    var prev = prevKeys.map(function (k) { return monthStats(k, cut(k), null); });
+    var prev = prevKeys.map(function (k) { return monthStats(k, null, null); });
     var short = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
+    var mName = monthLabel(month).split(" ")[0];
     var span = prevKeys.length ? short(prevKeys[0]) + (prevKeys.length > 1 ? "\u2013" + short(prevKeys[prevKeys.length - 1]) : "") : "";
+    var early = prevKeys.length > 0 && prevKeys.length < RATE_MIN_MONTHS;
+    var r1 = function (v) { return Math.round(v * 10) / 10; };
     var wrap = document.createElement("div");
     wrap.className = "score";
+    scoreEarly = early;
+    var basis = !prevKeys.length ? "No earlier month with data to compare yet" :
+      "Compared with " + span + " (" + prevKeys.length + (prevKeys.length === 1 ? " month" : " months") + ")" +
+      (day ? "<br>Month still running: day " + day + " of " + daysIn + " = " + Math.round(E * 100) + "% of the monthly average" : "");
     var head = '<div class="sc-head"><div><div class="sc-eyebrow">Machine performance</div><div class="sc-title">Parts consumption rating \u2014 ' + monthLabel(month) + (day ? " (to day " + day + ")" : "") + "</div></div>" +
-      '<div class="sc-basis">Parts issued (Transfer out), Imported + Local<br>' + (prevKeys.length ? "Compared with the " + prevKeys.length + "-month average, " + span + (day ? ", days 1\u2013" + day : "") : "No earlier month with data to compare yet") + "</div></div>";
-    var totAvg = 0, totNow = cur.all.outQty, flagged = 0, rows = "", hot = [];
+      '<div class="sc-basis">Parts issued (Transfer out), Imported + Local<br>' + basis + "</div></div>";
+    var note = early ? '<div class="sc-note">Full rating needs ' + RATE_MIN_MONTHS + " earlier months with data; there " + (prevKeys.length === 1 ? "is 1" : "are " + prevKeys.length) +
+      " so far. Until then a machine shows <b>Not enough history</b>, with an early signal when it is clearly above normal. No machine is rated High or Very high yet.</div>" : "";
+    var totExp = 0, totNow = cur.all.outQty, flagged = 0, signals = 0, rows = "", hot = [];
     MACHINES.forEach(function (m) {
-      var hist = prev.map(function (st) { return st[m].outQty; }), now = cur[m].outQty;
-      var avg = hist.length ? Math.round(hist.reduce(function (a, b) { return a + b; }, 0) / hist.length * 10) / 10 : null;
-      if (avg !== null) totAvg += avg;
-      var lv = avg === null ? -1 : rateLevel(avg, now);
-      if (lv >= 3) { flagged++; hot.push({ m: m, lv: lv, avg: avg, now: now }); }
-      var d = avg === null ? null : Math.round((now - avg) * 10) / 10, pc = avg ? Math.round((now - avg) / avg * 100) : null;
+      var hist = prev.map(function (st) { return st[m].outQty; }), now = cur[m].outQty, n = hist.length;
+      var S = hist.reduce(function (a, b) { return a + b; }, 0);
+      var t = n ? rateTest(S, n, now, E) : null, lv = t ? rateLevel(t, now) : -1;
+      var avgNow = n ? S / n * E : 0;
+      if (t) totExp += avgNow;
+      var sub = "";
+      if (t && early) { sub = lv >= 3 ? "early signal: clearly above normal" : lv === 2 ? "early signal: a little above normal" : "so far within normal"; if (lv >= 3) signals++; lv = -2; }
+      if (lv >= 3) { flagged++; hot.push({ m: m, lv: lv, avg: avgNow, now: now }); }
+      var d = t ? r1(now - avgNow) : null, pc = t && avgNow >= 0.5 ? Math.round((now - avgNow) / avgNow * 100) : null;
       var cls = d === null ? "" : d > 0 ? "sc-up" : d < 0 ? "sc-down" : "sc-flat", arrow = d === null ? "" : d > 0 ? "\u25B2 " : d < 0 ? "\u25BC " : "\u25A0 ";
-      var vs = d === null ? "\u2014" : arrow + (pc === null ? "new" : (pc > 0 ? "+" : "") + pc + "%") + ' <span class="sc-muted">(' + (d > 0 ? "+" : "") + d + ")</span>";
-      rows += "<tr><td class=\"sc-m\" data-l=\"Machine\">" + m + '</td><td class="sc-rt" data-l="Rating"><div class="sc-rating">' + (lv < 0 ? pyramidSvg(-1, 40) + '<div><div class="sc-rl">No data</div><div class="sc-rs">no earlier month to compare</div></div>' :
-        pyramidSvg(lv, 40) + '<div><div class="sc-rl">' + RATE[lv][0] + '</div><div class="sc-rs">' + RATE[lv][2] + "</div></div>") + "</div></td>" +
-        '<td data-l="Average ' + span + '">' + (avg === null ? "\u2014" : avg.toFixed(1)) + '</td><td data-l="' + monthLabel(month).split(" ")[0] + '"><b>' + now + '</b></td><td data-l="vs average" class="' + cls + '">' + vs + "</td>" +
-        '<td class="sc-sp" data-l="Trend">' + (hist.length ? sparkSvg(hist.concat([now]), avg) : "\u2014") + '</td><td data-l="Value issued">' + moneyBag(cur[m].outVal) + '</td><td data-l="Imp. / Local" class="sc-muted">' + curImp[m].outQty + " / " + curLoc[m].outQty + "</td></tr>";
+      var vs = d === null ? "\u2014" : arrow + (d > 0 ? "+" : "") + d + (pc === null ? "" : ' <span class="sc-muted">(' + (pc > 0 ? "+" : "") + pc + "%)</span>");
+      var badge = lv === -1 ? pyramidSvg(-1, 40) + '<div><div class="sc-rl">No data</div><div class="sc-rs">no earlier month to compare</div></div>' :
+        lv === -2 ? pyramidSvg(-1, 40) + '<div><div class="sc-rl">Not enough history</div><div class="sc-rs' + (sub.indexOf("clearly") > 0 ? " sc-sig" : "") + '">' + sub + "</div></div>" :
+        pyramidSvg(lv, 40) + '<div><div class="sc-rl">' + RATE[lv][0] + '</div><div class="sc-rs">' + RATE[lv][2] + "</div></div>";
+      rows += '<tr><td class="sc-m" data-l="Machine">' + m + '</td><td class="sc-rt" data-l="Rating"><div class="sc-rating">' + badge + "</div></td>" +
+        '<td data-l="Average / month">' + (n ? r1(S / n).toFixed(1) : "\u2014") + "</td>" + (day ? '<td data-l="Average by day ' + day + '">' + (n ? r1(avgNow).toFixed(1) : "\u2014") + "</td>" : "") +
+        '<td data-l="' + mName + '"><b>' + now + '</b></td><td data-l="vs average" class="' + cls + '">' + vs + "</td>" +
+        '<td class="sc-sp" data-l="Trend">' + (n ? sparkSvg(hist.concat([now]), S / n) : "\u2014") + '</td><td data-l="Value issued">' + moneyBag(cur[m].outVal) + '</td><td data-l="Imp. / Local" class="sc-muted">' + curImp[m].outQty + " / " + curLoc[m].outQty + "</td></tr>";
     });
-    var tpc = prevKeys.length && totAvg ? Math.round((totNow - totAvg) / totAvg * 100) : null;
-    var kpis = [["Parts issued, " + monthLabel(month).split(" ")[0], totNow + " pcs", prevKeys.length ? prevKeys.length + "-month average " + (Math.round(totAvg * 10) / 10) : "no average yet"],
-      ["Change vs average", tpc === null ? "\u2014" : (tpc > 0 ? "+" : "") + tpc + "%", tpc === null ? "" : (totNow - totAvg > 0 ? "+" : "") + (Math.round((totNow - totAvg) * 10) / 10) + " pcs"],
-      ["Value issued", moneyBag(cur.all.outVal), "all machines"], ["Machines flagged", flagged + " of " + MACHINES.length, "rated High or Very high"]];
-    wrap.innerHTML = head + '<div class="sc-kpis">' + kpis.map(function (k) { return '<div class="sc-kpi"><div class="l"></div><div class="v"></div><div class="d"></div></div>'; }).join("") + "</div>" +
-      '<table class="sc-table"><thead><tr><th>Machine</th><th class="sc-left">Rating</th><th>Avg ' + span + "</th><th>" + monthLabel(month).split(" ")[0] + "</th><th>vs average</th><th>Trend</th><th>Value issued</th><th>Imp. / Local</th></tr></thead><tbody>" + rows + "</tbody></table>" +
-      '<div class="sc-foot"><b>Rating scale</b>' + RATE.map(function (r, i) { return '<span class="sc-key">' + pyramidSvg(i, 17) + " " + r[0] + ": " + r[2] + "</span>"; }).join("") + "</div>";
+    var tpc = prevKeys.length && totExp >= 0.5 ? Math.round((totNow - totExp) / totExp * 100) : null;
+    var kpis = [["Parts issued, " + mName, totNow + " pcs", day ? "to day " + day : "full month"],
+      ["Average" + (day ? " by day " + day : " / month"), prevKeys.length ? r1(totExp) + " pcs" : "\u2014", tpc === null ? "no earlier months yet" : (tpc > 0 ? "+" : "") + tpc + "% vs average, " + span],
+      ["Value issued", moneyBag(cur.all.outVal), "all machines"],
+      early ? ["Machines flagged", "\u2014", signals ? signals + " early signal" + (signals > 1 ? "s" : "") + ", rating from " + RATE_MIN_MONTHS + " months" : "rating from " + RATE_MIN_MONTHS + " months of history"] :
+        ["Machines flagged", flagged + " of " + MACHINES.length, "rated High or Very high"]];
+    wrap.innerHTML = head + '<div class="sc-kpis">' + kpis.map(function () { return '<div class="sc-kpi"><div class="l"></div><div class="v"></div><div class="d"></div></div>'; }).join("") + "</div>" + note +
+      '<table class="sc-table"><thead><tr><th>Machine</th><th class="sc-left">Rating</th><th>Avg / month</th>' + (day ? "<th>Avg by day " + day + "</th>" : "") + "<th>" + mName + "</th><th>vs average</th><th>Trend</th><th>Value issued</th><th>Imp. / Local</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+      monthByMonth() +
+      '<div class="sc-foot"><b>Rating scale</b>' + RATE.map(function (r, i) { return '<span class="sc-key">' + pyramidSvg(i, 17) + " " + r[0] + ": " + r[2] + "</span>"; }).join("") +
+      '<span class="sc-key">The chance is how likely this many parts would be in a normal month, judged from the earlier months and the days gone by.</span></div>';
     var kp = wrap.querySelectorAll(".sc-kpi");
     kpis.forEach(function (k, i) { kp[i].children[0].textContent = k[0]; kp[i].children[1].textContent = k[1]; kp[i].children[2].textContent = k[2]; });
+    Array.prototype.forEach.call(wrap.querySelectorAll("[data-goto]"), function (b) { b.addEventListener("click", function () { selectMonth(b.getAttribute("data-goto")); }); });
     var out = document.createElement("div");
     out.appendChild(wrap);
     if (hot.length) out.appendChild(machineAnalysis(hot, prevKeys, cut, day));
     return out;
+  }
+  // Parts issued per machine, month by month (up to 7 months with data, the open month marked). Click a month to open it.
+  function monthByMonth() {
+    var list = MONTHS.filter(function (k) { return k === month || (k <= CURRENT_MONTH && monthHasData(k)); });
+    var at = list.indexOf(month), start = Math.max(0, Math.min(at - 3, list.length - 7));
+    list = list.slice(start, start + 7);
+    if (list.length < 2) return "";
+    var stats = list.map(function (k) { return monthStats(k, null, null); });
+    var lab = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3) + (k.slice(0, 4) !== month.slice(0, 4) ? " " + k.slice(2, 4) : ""); };
+    var td = new Date().getDate(), tdIn = new Date(+CURRENT_MONTH.slice(0, 4), +CURRENT_MONTH.slice(5), 0).getDate();
+    var running = function (k) { return k === CURRENT_MONTH && td < tdIn; };
+    var row = function (name, get, cls) {
+      return "<tr" + (cls ? ' class="' + cls + '"' : "") + '><td class="sc-m" data-l="Machine">' + name + "</td>" + list.map(function (k, i) {
+        var v = get(stats[i]), pv = i ? get(stats[i - 1]) : null;
+        var ar = pv === null || running(k) ? "" : v > pv ? ' <span class="sc-up">\u25B2</span>' : v < pv ? ' <span class="sc-down">\u25BC</span>' : "";
+        return '<td data-l="' + lab(k) + (running(k) ? " (to day " + td + ")" : "") + '"' + (k === month ? ' class="sc-cur"' : "") + ">" + (k === month ? "<b>" + v + "</b>" : v) + ar + "</td>";
+      }).join("") + "</tr>";
+    };
+    return '<div class="sc-mm"><div class="sc-mm-h">Month by month \u2014 parts issued <span class="sc-muted">\u00B7 click a month to open it</span></div>' +
+      '<table class="sc-table"><thead><tr><th>Machine</th>' + list.map(function (k) {
+        return "<th" + (k === month ? ' class="sc-cur"' : "") + '><button type="button" class="sc-go" data-goto="' + k + '">' + lab(k) + (running(k) ? " \u00B7 to day " + td : "") + "</button></th>";
+      }).join("") + "</tr></thead><tbody>" +
+      MACHINES.map(function (m) { return row(m, function (st) { return st[m].outQty; }); }).join("") +
+      row("Total", function (st) { return MACHINES.reduce(function (a, m) { return a + st[m].outQty; }, 0); }, "sc-tot") + "</tbody></table></div>";
   }
 
   function renderSummary() {
@@ -2752,7 +2821,8 @@
     var sec = { rating: document.createElement("div"), analysis: document.createElement("div"), details: document.createElement("div") };
     sec.rating.appendChild(rating);
     if (analysis) sec.analysis.appendChild(analysis);
-    else sec.analysis.innerHTML = '<div class="score sum-empty">No machine is rated High or Very high this month, so there is nothing to act on. The analysis appears here when one is.</div>';
+    else sec.analysis.innerHTML = '<div class="score sum-empty">' + (scoreEarly ? "The analysis starts once the rating has " + RATE_MIN_MONTHS + " earlier months with data to compare with. Until then, see the early signals under Rating." :
+      "No machine is rated High or Very high this month, so there is nothing to act on. The analysis appears here when one is.") + "</div>";
     details.forEach(function (d) { sec.details.appendChild(d); });
     var flagged = analysis ? analysis.querySelectorAll(".an-m").length : 0;
     var nav = document.createElement("div");
