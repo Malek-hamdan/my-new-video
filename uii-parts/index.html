@@ -663,6 +663,11 @@
   .mc-foot { padding: 2px 18px 6px; font-size: 11.5px; color: var(--muted); }
   @media (max-width: 900px) { .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 640px) { .mc-grid { padding: 8px 12px 4px; gap: 8px; } .mc-h { flex-direction: column; gap: 0; } .mc { padding: 8px 8px 2px; } }
+  #qtyWarn { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 60; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: #2a2110; border: 1px solid #fab219; box-shadow: 0 12px 30px rgba(0,0,0,0.45); max-width: 720px; margin: 0 auto; }
+  #qtyWarn[hidden] { display: none; }
+  #qtyWarn .qw-t { display: flex; flex-direction: column; gap: 2px; font-size: 14px; } #qtyWarn .qw-t b { color: #fab219; }
+  #qtyWarn .qw-b { display: flex; gap: 8px; margin-left: auto; }
+  .btn-danger { background: #d03b3b; border-color: #d03b3b; color: #fff; }
   .an-note { margin-top: 8px; font-size: 12px; color: var(--muted); }
   .an-aside { color: #f0a050; }
   .sc-note { padding: 10px 18px; font-size: 12.5px; color: var(--muted); border-bottom: 1px solid var(--border); background: rgba(255,200,80,0.05); }
@@ -1808,6 +1813,49 @@
     queues[id] = next.catch(function () {});
     return next;
   }
+  // ---- Changes waiting to reach the shared store ----
+  // Every write is kept in this browser (one key per document) until the store confirms it.
+  // A write that fails for lack of connection is sent again: every 8 seconds, when the
+  // connection comes back, and the next time the site opens on this device.
+  var OUTBOX = "uii-outbox:", obSeq = 0, obTimer = 0, inflight = 0;
+  function obKey(coll, id) { return OUTBOX + coll + "/" + id; }
+  function obPut(coll, id, op, body, tag) { try { localStorage.setItem(obKey(coll, id), JSON.stringify({ op: op, coll: coll, id: id, body: body || null, tag: tag })); } catch (e) {} }
+  function obDrop(coll, id, tag) {
+    try { var k = obKey(coll, id), v = JSON.parse(localStorage.getItem(k) || "null"); if (v && v.tag === tag) localStorage.removeItem(k); } catch (e) {}
+  }
+  function obList() {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(OUTBOX) === 0) { var v = JSON.parse(localStorage.getItem(k) || "null"); if (v && v.coll && v.id) out.push(v); } } } catch (e) {}
+    return out;
+  }
+  function permanentError(e) { var c = e && e.code; return c === "invalid_argument" || c === "not_granted" || c === "revoked" || c === "quota_exceeded"; }
+  function sendDoc(coll, id, op, body, tag) {
+    tag = tag || Date.now() + "-" + (++obSeq);
+    obPut(coll, id, op, body, tag);
+    inflight++;
+    return enqueue(coll + "/" + id, function () { var d = db.collection(coll).doc(id); return op === "del" ? d.delete() : d.set(body); })
+      .then(function () { inflight--; obDrop(coll, id, tag); return true; }, function (e) {
+        inflight--;
+        if (permanentError(e)) obDrop(coll, id, tag); else obLater();
+        onWriteError(e);
+        return false;
+      });
+  }
+  function obLater() { if (!obTimer) obTimer = setTimeout(flushOutbox, 8000); }
+  function flushOutbox() {
+    obTimer = 0;
+    if (!db) return;
+    var list = obList();
+    if (!list.length) return;
+    Promise.all(list.map(function (v) { return sendDoc(v.coll, v.id, v.op, v.body, v.tag); })).then(function (res) {
+      if (res.every(Boolean)) setStatus("Saved · changes made offline were sent", "saved");
+    });
+  }
+  window.addEventListener("online", function () { clearTimeout(obTimer); flushOutbox(); });
+  // leaving while a change is on its way, or a quantity is typed but not saved
+  window.addEventListener("beforeunload", function (e) {
+    if (inflight > 0 || (db && obList().length) || document.querySelector("input.dirty")) { e.preventDefault(); e.returnValue = ""; }
+  });
   function onWriteError(e) {
     var code = e && e.code;
     if (code === "invalid_argument" || code === "not_granted" || code === "revoked") {
@@ -1817,18 +1865,16 @@
     } else if (code === "quota_exceeded") {
       setStatus("Storage is full. Delete unused rows to add more.", "error");
     } else {
-      setStatus("Not saved. Check your connection and try again.", "error");
+      setStatus("Not saved yet: no connection. It is kept on this device and sent when the connection is back.", "error");
     }
   }
   function saveDoc(coll, id, body) {
-    if (!db) { saveLocal(); return; }
-    enqueue(coll + "/" + id, function () { return db.collection(coll).doc(id).set(body); })
-      .then(function () { setStatus("Saved", "saved"); }, onWriteError);
+    if (!db) { saveLocal(); return Promise.resolve(true); }
+    return sendDoc(coll, id, "set", body).then(function (ok) { if (ok && !obTimer) setStatus("Saved", "saved"); return ok; });
   }
   function deleteDoc(coll, id) {
-    if (!db) { saveLocal(); return; }
-    enqueue(coll + "/" + id, function () { return db.collection(coll).doc(id).delete(); })
-      .then(function () { setStatus("Deleted", "saved"); }, onWriteError);
+    if (!db) { saveLocal(); return Promise.resolve(true); }
+    return sendDoc(coll, id, "del").then(function (ok) { if (ok && !obTimer) setStatus("Deleted", "saved"); return ok; });
   }
   function writeRow(row) { saveDoc("parts", row.id, rowBody(row)); }
 
@@ -1896,6 +1942,13 @@
 
   // Parts that already have a saved stock show the Line box; new ones don't need it
   function needsLine(row) { return !row.baseline && String(row.loggedQty).trim() !== ""; }
+  // the day a change made in the table is recorded on: today in the running month (blank = the day it was made);
+  // in an earlier month opened to correct it, the part's Date if it is in that month, else the month's last day
+  function txDayFor(row) {
+    if (row.month === monthOf(null, Date.now())) return "";
+    if (row.date && row.date.slice(0, 7) === row.month) return row.date;
+    return row.month + "-" + pad(new Date(+row.month.slice(0, 4), +row.month.slice(5), 0).getDate());
+  }
   function commitQuantity(row, confirmed, line) {
     var before = parseInt(row.loggedQty, 10) || 0;
     var after = parseInt(row.quantity, 10) || 0;
@@ -1912,7 +1965,7 @@
     }
     var tx = cleanTx({
       partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
-      change: after - before, after: after, line: after < before ? line : "", date: row.date, ts: Date.now(), local: row.local
+      change: after - before, after: after, line: after < before ? line : "", date: txDayFor(row), ts: Date.now(), local: row.local
     }, uid());
     var sel = document.getElementById("f-" + row.id + "-line");
     if (sel) { sel.value = ""; sel.classList.add("no-line"); sel.classList.remove("need"); }
@@ -2449,8 +2502,15 @@
       din.title = "Recorded " + fmtTime(t.ts).replace("  ", " at ");
       din.setAttribute("aria-label", "Transaction date");
       din.readOnly = ro();
+      din.min = t.month + "-01";
+      din.max = t.month + "-" + pad(new Date(+t.month.slice(0, 4), +t.month.slice(5), 0).getDate());
       din.addEventListener("change", function () {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(din.value)) { din.value = txDate(t); return; }
+        if (din.value.slice(0, 7) !== t.month) {
+          din.value = txDate(t);
+          setStatus("Pick a day in " + monthLabel(t.month) + ". To move it to another month, delete it and record it there.", "error", 8000);
+          return;
+        }
         t.date = din.value;
         sortTx(txList);
         saveDoc("transactions", t.id, txBody(t));
@@ -3031,6 +3091,12 @@
         delete editTimers[part.id];
         writeRow(part);
       }
+      // every later entry of the same part in that month
+      list.forEach(function (x) {
+        if (x === t || x.partId !== t.partId || (x.source || "") !== (t.source || "") || x.ts < t.ts) return;
+        x.after = x.after - t.change;
+        saveDoc("transactions", x.id, txBody(x));
+      });
     }
     list.splice(idx, 1);
     deleteDoc("transactions", t.id);
@@ -3306,7 +3372,15 @@
       scheduleWrite(cur);
     });
     if (field === "quantity") {
-      // saved only with Enter; Esc puts the saved number back
+      // saved only with Enter; Esc puts the saved number back. Leaving it unsaved shows a warning.
+      input.addEventListener("blur", function () {
+        var typed = input.value;
+        setTimeout(function () {
+          var tr = input.closest("tr"), a = document.activeElement;
+          if (!input.classList.contains("dirty") || (tr && a && tr.contains(a) && document.body.contains(tr)) || (a && a.closest && a.closest("#qtyWarn"))) return;
+          showQtyWarn(row.id, typed);
+        }, 0);
+      });
       input.addEventListener("keydown", function (e) {
         if (e.key === "Enter") { e.preventDefault(); saveQty(row.id); }
         else if (e.key === "Escape") { var cur = findRow(row.id) || row; input.value = cur.quantity; markQty(input, cur); }
@@ -3339,6 +3413,36 @@
   }
   // yellow until saved with Enter
   var qtyHintShown = false;
+  // "Quantity not saved": Save records it (with Line and "Is that right?" as usual), Cancel puts the saved number back
+  var qtyPending = null;
+  function showQtyWarn(id, typed) {
+    var cur = findRow(id);
+    if (!cur) return;
+    qtyPending = { id: id, value: typed, month: month, machine: cur.machine };
+    var bar = document.getElementById("qtyWarn");
+    if (!bar) {
+      bar = document.createElement("div"); bar.id = "qtyWarn"; bar.setAttribute("role", "alert");
+      bar.innerHTML = '<div class="qw-t"><b>Quantity not saved</b><span></span></div><div class="qw-b"><button type="button" class="btn" data-a="no">Cancel</button><button type="button" class="btn btn-primary" data-a="yes">Save</button></div>';
+      document.body.appendChild(bar);
+      bar.querySelector('[data-a="no"]').addEventListener("click", function () {
+        var q = qtyPending; bar.hidden = true; qtyPending = null;
+        var c = q && findRow(q.id), el = q && document.getElementById("f-" + q.id + "-quantity");
+        if (c && el) { el.value = c.quantity; markQty(el, c); }
+      });
+      bar.querySelector('[data-a="yes"]').addEventListener("click", function () {
+        var q = qtyPending; bar.hidden = true; qtyPending = null;
+        if (!q) return;
+        if (q.month !== month) selectMonth(q.month);
+        if (active !== q.machine) switchTo(q.machine);
+        var el = document.getElementById("f-" + q.id + "-quantity"), c = findRow(q.id);
+        if (!el || !c) return;
+        el.value = q.value; markQty(el, c);
+        saveQty(q.id);
+      });
+    }
+    bar.querySelector("span").textContent = cur.machine + " \u00B7 " + (cur.name || cur.reference || "this part") + ": " + cur.quantity + " \u2192 " + typed + ". Nothing is recorded until you save.";
+    bar.hidden = false;
+  }
   function markQty(input, row) {
     var cur = findRow(row.id) || row;
     var dirty = input.value !== String(cur.quantity);
@@ -3362,8 +3466,9 @@
     input.classList.remove("dirty");
     input.title = "";
     clearTimeout(editTimers[cur.id]);
-    if (String(cur.loggedQty) === cur.quantity || cur.baseline || !needsLine(cur) || after >= before) {
-      // nothing taken out: plain save
+    if (String(cur.loggedQty) === cur.quantity || cur.baseline) {
+      // no change to record: plain save. Anything else is saved together with its transaction,
+      // after "Is that right?" when the change is big
       writeRow(cur); updateTotal(cur);
     }
     commitQuantity(cur, false, sel ? sel.value : "");
@@ -3542,7 +3647,7 @@
       act.appendChild(deleteButton("Delete row " + (i + 1), function () {
         var cur = findRow(row.id) || row;
         return (cur.name + cur.reference + cur.quantity + cur.price + cur.date).trim() !== "";
-      }, function () { deleteRow(row.id); }));
+      }, function () { askDeleteRow(row.id); }));
       tr.appendChild(act);
 
       rowsEl.appendChild(tr);
@@ -3576,6 +3681,26 @@
     renderRows(row.id);
   }
 
+  // a part with transactions: say how many go with it, and let the user decide
+  function askDeleteRow(id) {
+    var cur = findRow(id), n = 0;
+    if (!cur) return;
+    Object.keys(allTx).forEach(function (k) { allTx[k].forEach(function (t) { if (t.partId === id && !t.source) n++; }); });
+    if (!n) { deleteRow(id); return; }
+    var dlg = document.getElementById("delWarn");
+    if (!dlg) {
+      dlg = document.createElement("div"); dlg.id = "delWarn"; dlg.className = "confirm"; dlg.setAttribute("role", "dialog"); dlg.setAttribute("aria-modal", "true");
+      dlg.innerHTML = '<div class="confirm-card"><strong>Delete this part and its history?</strong><p></p><div class="confirm-actions"><button class="btn" type="button" data-a="no">Keep it</button><button class="btn btn-danger" type="button" data-a="yes">Delete part and moves</button></div></div>';
+      document.body.appendChild(dlg);
+      dlg.querySelector('[data-a="no"]').addEventListener("click", function () { dlg.hidden = true; renderRows(); });
+      dlg.addEventListener("keydown", function (e) { if (e.key === "Escape") { dlg.hidden = true; renderRows(); } });
+    }
+    dlg.querySelector("p").textContent = cur.machine + " \u00B7 " + (cur.name || cur.reference || "this part") + " has " + n + (n === 1 ? " move" : " moves") +
+      " in Transaction. Deleting the part deletes " + (n === 1 ? "it" : "them") + " too: the stock history, the Summary and the rating change.";
+    dlg.querySelector('[data-a="yes"]').onclick = function () { dlg.hidden = true; deleteRow(id); };
+    dlg.hidden = false;
+    dlg.querySelector('[data-a="no"]').focus();
+  }
   function deleteRow(id) {
     var list = data[active];
     var idx = list.findIndex(function (r) { return r.id === id; });
@@ -3772,12 +3897,41 @@
   }
   // ---- Issue slip: printed when parts go out, signed by the person who takes them ----
   var TR_ME_KEY = "uii-recorded-by", TR_BY_KEY = "uii-issued-by", TR_PRINT_KEY = "uii-print-slip";
+  // slips numbered on this device (kept for a while), so a clash with another phone can be fixed here
+  var MY_SLIPS_KEY = "uii-my-slips";
+  function mySlip(id) {
+    try { var l = JSON.parse(localStorage.getItem(MY_SLIPS_KEY) || "[]"); l.push(id); localStorage.setItem(MY_SLIPS_KEY, JSON.stringify(l.slice(-300))); } catch (e) {}
+  }
+  function fixSlipClash() {
+    var mine = {};
+    try { JSON.parse(localStorage.getItem(MY_SLIPS_KEY) || "[]").forEach(function (id) { mine[id] = 1; }); } catch (e) { return; }
+    Object.keys(allTx).forEach(function (k) {
+      var by = {}, top = 0, prefix = k.replace("-", "") + "-";
+      allTx[k].forEach(function (t) {
+        if (!t.slip || t.slip.indexOf(prefix) !== 0) return;
+        top = Math.max(top, parseInt(t.slip.slice(prefix.length), 10) || 0);
+        (by[t.slip] = by[t.slip] || []).push(t);
+      });
+      Object.keys(by).forEach(function (no) {
+        if (by[no].length < 2) return;
+        // the first one recorded keeps the number; a later one from this device takes the next free number
+        by[no].sort(function (a, b) { return a.ts - b.ts || (a.id < b.id ? -1 : 1); }).slice(1).forEach(function (t) {
+          if (!mine[t.id]) return;
+          var old = t.slip;
+          t.slip = prefix + ("00" + (++top)).slice(-3);
+          saveDoc("transactions", t.id, txBody(t));
+          setStatus("Slip " + old + " was also used on another phone at the same time. This one is now " + t.slip + ": reprint it from Transaction.", "error", 15000);
+        });
+      });
+    });
+  }
   function stampSlip(tx) {
     var me = document.getElementById("trMe").value.trim(), by = document.getElementById("trBy").value.trim(), to = document.getElementById("trTo").value.trim(), prefix = tx.month.replace("-", "") + "-", top = 0;
     (allTx[tx.month] || []).forEach(function (t) {
       if (t.slip && t.slip.indexOf(prefix) === 0) top = Math.max(top, parseInt(t.slip.slice(prefix.length), 10) || 0);
     });
     tx.slip = prefix + ("00" + (top + 1)).slice(-3);
+    mySlip(tx.id);
     tx.me = me; tx.by = by; tx.to = to;
     tx.time = document.getElementById("trTime").value || "";
     try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(TR_BY_KEY, by); localStorage.setItem(TR_PRINT_KEY, document.getElementById("trPrint").checked ? "1" : "0"); } catch (e) {}
@@ -4643,6 +4797,7 @@
     Object.keys(allTx).forEach(function (k) { sortTx(allTx[k]); });
     if (!allTx[month]) allTx[month] = [];
     txList = allTx[month];
+    fixSlipClash();
     renderMonths();
     if (sideView) { if (sideView === "equip" && eqTx) renderRows(); else updateCounts(); }
     else if (active === TX) renderTransactions(); else if (active === SUM) { renderSummary(); updateCounts(); } else updateCounts();
@@ -5265,15 +5420,19 @@
     var oldSide = {};
     SIDE_KEYS.forEach(function (k) { oldSide[k] = sideLists[k].map(function (r) { return r.id; }); });
     setSideFrom({ cons: snap.consumables, used: snap.usedParts, equip: snap.equipment }, true);
+    var jobs = [];
     if (!db) { saveLocal(); }
     else {
       SIDE_KEYS.forEach(function (k) { if (Array.isArray(snap[SIDE[k].store])) syncSideDocs(k, oldSide[k]); });
-      curP.forEach(function (id) { if (!keepP[id]) deleteDoc("parts", id); });
-      curT.forEach(function (id) { if (!keepT[id]) deleteDoc("transactions", id); });
-      snap.parts.forEach(function (r) { var b = Object.assign({}, r); delete b.id; saveDoc("parts", r.id, b); });
-      snap.transactions.forEach(function (t) { var b = Object.assign({}, t); delete b.id; saveDoc("transactions", t.id, b); });
+      curP.forEach(function (id) { if (!keepP[id]) jobs.push(deleteDoc("parts", id)); });
+      curT.forEach(function (id) { if (!keepT[id]) jobs.push(deleteDoc("transactions", id)); });
+      snap.parts.forEach(function (r) { var b = Object.assign({}, r); delete b.id; jobs.push(saveDoc("parts", r.id, b)); });
+      snap.transactions.forEach(function (t) { var b = Object.assign({}, t); delete b.id; jobs.push(saveDoc("transactions", t.id, b)); });
     }
     renderMonths(); renderTabs(); renderRows();
+    var done = 0;
+    jobs.forEach(function (j) { j.then(function () { done++; if (done % 100 === 0 && done < jobs.length) setStatus("Restoring\u2026 " + done + " of " + jobs.length + " saved. Keep this page open.", ""); }); });
+    return Promise.all(jobs);
   }
 
   // ---- Daily copies inside the site (last 30 days) ----
@@ -5651,11 +5810,21 @@
   function restoreFrom(snap, label, after) {
     if (!snap || !Array.isArray(snap.parts) || !Array.isArray(snap.transactions)) { setStatus("That backup can't be read.", "error"); return; }
     flushWrites();
-    takeSnapshot("pre-" + Date.now(), "pre", label).then(function () { return listSnapshots(); }).then(pruneSnapshots).catch(function () {}).then(function () {
-      applyAll(snap);
+    setStatus("Restoring\u2026 keep this page open", "");
+    // a copy of the current data first; if that fails, nothing is changed
+    takeSnapshot("pre-" + Date.now(), "pre", label).then(function (ok) {
+      if (ok === false) throw new Error("no copy");
+      return listSnapshots().then(pruneSnapshots).catch(function () {});
+    }).then(function () {
       backupDlg.hidden = true;
-      if (after) after();
-      setStatus("Restored " + label, "saved");
+      return applyAll(snap).then(function (res) {
+        if (after) after();
+        var failed = res.filter(function (r) { return r === false; }).length;
+        if (failed) setStatus("Restored " + label + ", but " + failed + " changes are still waiting to be saved. Keep this page open until it says Saved.", "error", 10000);
+        else setStatus("Restored " + label + " \u00B7 everything saved", "saved", 6000);
+      });
+    }, function () {
+      setStatus("Couldn\u2019t save a copy of the current data first, so nothing was restored. Check the connection and try again.", "error", 10000);
     });
   }
   document.getElementById("backupBtn").addEventListener("click", function () { backupDlg.hidden = false; renderBackupDlg(); });
@@ -5826,6 +5995,7 @@
       }
       db = store;
       setStatus("");
+      setTimeout(flushOutbox, 1500);
       var lost = function () { setStatus("Lost connection to saved data. Reload the page.", "error"); };
       // the daily copy waits until both lists have loaded once
       var gotParts = false, gotTx = false;
