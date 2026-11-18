@@ -1576,6 +1576,17 @@
   var CURRENT_MONTH = monthOf(null, Date.now());
   var unlocked = {};
   function isLocked() { return month < CURRENT_MONTH && !unlocked[month]; }
+  // a page left open over the 1st: move on to the new month (the old one closes like any past month)
+  function checkNewMonth() {
+    var now = monthOf(null, Date.now());
+    if (now === CURRENT_MONTH || MONTHS.indexOf(now) === -1) return;
+    var was = CURRENT_MONTH;
+    CURRENT_MONTH = now;
+    if (month === was) { selectMonth(now); setStatus("A new month started: now on " + monthLabel(now) + ".", "saved", 8000); }
+    else { renderMonths(); renderRows(); }
+  }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) checkNewMonth(); });
+  setInterval(checkNewMonth, 60000);
   function ro() { return readOnly || isLocked(); }
 
   function emptyData() {
@@ -2672,7 +2683,7 @@
   function rateLevel(t, x) {
     if (t.pUp < 0.01 && x >= 3) return 4;
     if (t.pUp < 0.05 && x >= 2) return 3;
-    if (t.pUp < 0.10 || x > 1.3 * t.mu) return 2;
+    if (t.pUp < 0.10 || (t.mu >= 1 && x - t.mu >= 1 && x > 1.3 * t.mu)) return 2;
     if (t.pLow < 0.10 && x < t.mu) return 0;
     return 1;
   }
@@ -2744,6 +2755,12 @@
         if (t.to) takers[t.to.trim()] = (takers[t.to.trim()] || 0) + q;
         if (t.line) lines[t.line] = (lines[t.line] || 0) + q;
       });
+      // the first earlier month each part was on the list or had a move: months before it are not history
+      var since = {};
+      prevKeys.forEach(function (k, i) {
+        (allParts[k] && allParts[k][m] || []).forEach(function (r) { var kk = key(r); if (since[kk] == null) since[kk] = i; });
+        outTxOf(k, m, null).forEach(function (t) { var kk = key(t); if (since[kk] == null) since[kk] = i; });
+      });
       // full earlier months, per part, for the average and next month's need
       prevKeys.forEach(function (k, i) {
         outTxOf(k, m, null).forEach(function (t) {
@@ -2755,7 +2772,11 @@
           byRef[r].hist[i] += -t.change;
         });
       });
-      var parts = Object.keys(byRef).map(function (k) { var x = byRef[k]; x.avg = prevKeys.length ? Math.round(x.prev / prevKeys.length * 10) / 10 : 0; x.diff = Math.round((x.now - x.avg * E) * 10) / 10; return x; })
+      var parts = Object.keys(byRef).map(function (k) {
+        var x = byRef[k], from = since[k] == null ? prevKeys.length : since[k];
+        x.hist = (x.hist || prevKeys.map(function () { return 0; })).slice(from);
+        x.avg = x.hist.length ? Math.round(x.prev / x.hist.length * 10) / 10 : 0;
+        x.diff = Math.round((x.now - x.avg * E) * 10) / 10; return x; })
         .filter(function (x) { return x.now > 0; }).sort(function (a, b) { return b.diff - a.diff || b.now - a.now; });
       var drivers = parts.filter(function (x) { return x.diff > 0; }).slice(0, 3);
       if (!drivers.length) drivers = parts.slice(0, 3);
@@ -2768,7 +2789,7 @@
         var stockRow = (x.ref && rows.filter(function (r) { return up(r.reference) === up(x.ref); })[0]) || (x.name && rows.filter(function (r) { return up(r.name) === up(x.name); })[0]) || null;
         var stock = stockRow && /^\d+$/.test(stockRow.quantity) ? parseInt(stockRow.quantity, 10) : null, min = stockRow && /^\d+$/.test(stockRow.min) ? parseInt(stockRow.min, 10) : 0;
         // closed months: the earlier ones, plus this one once it is over; a running month counts for the days gone by
-        var hist = (x.hist || prevKeys.map(function () { return 0; })).concat(day ? [] : [x.now]).slice(-6);
+        var hist = x.hist.concat(day ? [] : [x.now]).slice(-6);
         var f = partForecast(hist, day ? x.now : null, E), need = f.need;
         var order = stock === null ? null : Math.max(0, f.q90 + min - stock);
         var hk = allKeys.slice(-hist.length - (day ? 1 : 0));
@@ -2946,7 +2967,12 @@
     metaEl.textContent = monthLabel(month) + " · " + cur.all.n + (cur.all.n === 1 ? " transaction" : " transactions");
     box.innerHTML = "";
 
-    box.appendChild(scorecard(partial ? today : 0));
+    if (month > CURRENT_MONTH) {
+      var ns = document.createElement("div");
+      ns.className = "score sum-empty";
+      ns.textContent = monthLabel(month) + " hasn\u2019t started yet, so there is no rating. It starts on the 1st with the first parts issued.";
+      box.appendChild(ns);
+    } else box.appendChild(scorecard(partial ? today : 0));
 
     var grid = document.createElement("div");
     grid.className = "sum-grid";
@@ -5962,7 +5988,7 @@
     var savedTab = localStorage.getItem(TAB_KEY);
     if (TABS.indexOf(savedTab) !== -1) active = savedTab;
     var savedMonth = localStorage.getItem(MONTH_KEY);
-    if (MONTHS.indexOf(savedMonth) !== -1) month = savedMonth;
+    if (MONTHS.indexOf(savedMonth) !== -1 && savedMonth <= CURRENT_MONTH) month = savedMonth;
     var savedView = localStorage.getItem(VIEW_KEY);
     sideView = SIDE_KEYS.indexOf(savedView) !== -1 ? savedView : "";
     SIDE_KEYS.forEach(function (k) {
