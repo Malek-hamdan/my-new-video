@@ -2222,20 +2222,26 @@
     var src = copyBanner.getAttribute("data-src");
     if (ro() || !src || !allParts[src] || !monthIsEmpty()) return;
     flushWrites();
-    var t = Date.now();
+    var t = Date.now(), copied = [];
     MACHINES.forEach(function (m) {
       allParts[src][m].filter(hasContent).forEach(function (r) {
         // the copied quantity is this month's starting stock, so it is already "logged"
         var row = clean({ id: uid(), month: month, name: r.name, reference: r.reference, quantity: r.quantity, min: r.min, price: r.price, currency: r.currency,
           loggedQty: r.quantity, date: "", baseline: false, arrival: false, local: r.local, created: t++ }, m);
         sheet[m].push(row);
-        writeRow(row);
+        copied.push(row);
       });
     });
     openSheet();
     renderTabs();
     renderRows();
-    setStatus("Copied from " + monthLabel(src), "saved");
+    if (!db) { saveLocal(); setStatus("Copied from " + monthLabel(src), "saved"); return; }
+    setStatus("Copying " + copied.length + " parts from " + monthLabel(src) + "\u2026 keep this page open", "");
+    Promise.all(copied.map(function (r) { return saveDoc("parts", r.id, rowBody(r)); })).then(function (res) {
+      var failed = res.filter(function (x) { return x === false; }).length;
+      if (failed) setStatus("Copied, but " + failed + " parts are still waiting to be saved. Keep this page open until it says Saved.", "error", 10000);
+      else setStatus("Copied " + copied.length + " parts from " + monthLabel(src), "saved", 5000);
+    });
   });
 
   // ---- Search across every machine and month ----
@@ -2342,10 +2348,11 @@
     void tr.offsetWidth;
     tr.classList.add("flash");
   }
-  searchEl.addEventListener("input", renderSearch);
+  var searchTimer = 0;
+  searchEl.addEventListener("input", function () { clearTimeout(searchTimer); searchTimer = setTimeout(renderSearch, searchEl.value.trim().length < 2 ? 250 : 120); });
   searchEl.addEventListener("keydown", function (e) {
     if (e.key === "Escape") { searchEl.value = ""; renderSearch(); }
-    if (e.key === "Enter") { var first = resultsEl.querySelector(".result"); if (first) first.click(); }
+    if (e.key === "Enter") { clearTimeout(searchTimer); renderSearch(); var first = resultsEl.querySelector(".result"); if (first) first.click(); }
   });
 
   // Same reference used by more than one part on the open machine
@@ -2619,13 +2626,15 @@
   function monthStats(k, upTo, org) {
     var st = { all: { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0 } };
     MACHINES.forEach(function (m) { st[m] = { inQty: 0, outQty: 0, inVal: {}, outVal: {}, n: 0, used: {} }; });
+    var byId = {};
+    if (allParts[k]) MACHINES.forEach(function (m) { allParts[k][m].forEach(function (r) { byId[r.id] = r; }); });
     (allTx[k] || []).forEach(function (t) {
       if (upTo && txDate(t) > upTo) return;
       if (t.source) return;
       if (org && !!t.local !== (org === "loc")) return;
       var s = st[t.machine];
       if (!s) return;
-      var part = partIn(k, t.partId), p = part ? unitPrice(part) : null, cur = part ? part.currency : "";
+      var part = byId[t.partId] || null, p = part ? unitPrice(part) : null, cur = part ? part.currency : "";
       var q = Math.abs(t.change);
       [s, st.all].forEach(function (x) {
         x.n++;
@@ -3263,9 +3272,9 @@
     box.querySelector("b").textContent = moneyBag(bag);
     box.hidden = false;
   }
-  function updateTotal(r) {
+  function updateTotal(r, many) {
     updateLow(r);
-    updatePartsSum();
+    if (!many) updatePartsSum();
     var el = document.getElementById("t-" + r.id + "-total");
     if (!el) return;
     var t = totalOf(r);
@@ -3651,7 +3660,7 @@
       tr.appendChild(act);
 
       rowsEl.appendChild(tr);
-      updateTotal(row);
+      updateTotal(row, true);
 
       if (row.id === focusId) {
         var first = tr.querySelector(".cell");
@@ -4782,8 +4791,9 @@
             if (f === "currency") el.classList.toggle("unset", !el.value);
           }
         });
-        updateTotal(row);
+        updateTotal(row, true);
       });
+      updatePartsSum();
     }
     updateCounts();
   }
