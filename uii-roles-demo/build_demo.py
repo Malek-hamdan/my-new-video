@@ -229,6 +229,12 @@ rep('''    if (!inn && !trState.line && !trOther()) { err.textContent = "Choose 
     if (pendingIntercept()) return;
 ''')
 
+# ---------- the signed-in account records the movement; it is also the default giver of the part
+rep('''      document.getElementById("trMe").value = localStorage.getItem(TR_ME_KEY) || "";
+      document.getElementById("trBy").value = localStorage.getItem(TR_BY_KEY) || "";''', '''      document.getElementById("trMe").value = (me && (me.name || me.username)) || localStorage.getItem(TR_ME_KEY) || "";
+      document.getElementById("trMe").readOnly = !!me;
+      document.getElementById("trBy").value = localStorage.getItem(TR_BY_KEY) || (me && (me.name || me.username)) || "";''')
+
 # ---------- sign-in, permissions, Activity, Users
 GATE_OLD = s[s.index('  // ---- Password screen: asked once per browser tab ----'):s.index('  // ---- Saving a file to the viewer\'s device ----')]
 AUTH = open(os.path.join(HERE, "auth.js"), encoding="utf-8").read()

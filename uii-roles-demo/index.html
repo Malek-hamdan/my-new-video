@@ -2685,12 +2685,14 @@
         stag.textContent = t.source === "used" ? "Used" : "Equipment";
         (ncell.querySelector(".tx-text") || ncell).appendChild(stag);
       }
-      if (t.by || t.to) {
+      if (t.by || t.to || t.me) {
         var who = document.createElement("span");
         who.className = "tx-who";
         who.dir = "auto";
-        who.textContent = t.by && t.to ? t.by + " \u2192 " + t.to : t.by ? "Issued by " + t.by : "Received by " + t.to;
-        who.title = "Issued by " + (t.by || "\u2014") + " \u00B7 Received by " + (t.to || "\u2014");
+        var pair = t.by && t.to ? t.by + " \u2192 " + t.to : t.by ? "Issued by " + t.by : t.to ? "Received by " + t.to : "";
+        var rec = t.me && t.me !== t.by ? (pair ? " \u00B7 recorded by " : "Recorded by ") + t.me : "";
+        who.textContent = pair + rec;
+        who.title = "Issued by " + (t.by || "\u2014") + " \u00B7 Received by " + (t.to || "\u2014") + " \u00B7 Recorded by " + (t.me || "\u2014");
         (ncell.querySelector(".tx-text") || ncell).appendChild(who);
       }
       tr.appendChild(ncell);
@@ -3928,8 +3930,9 @@
     document.getElementById("trIcon").setAttribute("d", inn ? "M19 12H5M11 6l-6 6 6 6" : "M5 12h14M13 6l6 6-6 6");
     document.getElementById("trSave").textContent = inn ? "Save receipt" : "Save transfer";
     try {
-      document.getElementById("trMe").value = localStorage.getItem(TR_ME_KEY) || "";
-      document.getElementById("trBy").value = localStorage.getItem(TR_BY_KEY) || "";
+      document.getElementById("trMe").value = (me && (me.name || me.username)) || localStorage.getItem(TR_ME_KEY) || "";
+      document.getElementById("trMe").readOnly = !!me;
+      document.getElementById("trBy").value = localStorage.getItem(TR_BY_KEY) || (me && (me.name || me.username)) || "";
       document.getElementById("trTo").value = "";
       document.getElementById("trPrint").checked = localStorage.getItem(TR_PRINT_KEY) !== "0";
     } catch (e) {}
@@ -4040,6 +4043,7 @@
     row.quantity = String(after); row.loggedQty = row.quantity; row.baseline = false;
     var tx = cleanTx({ partId: row.id, month: row.month, machine: row.machine, name: row.name, reference: row.reference,
       change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), local: row.local }, uid());
+    stampNames(tx, inn);
     if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     writeRow(row); saveDoc("transactions", tx.id, txBody(tx));
@@ -4061,6 +4065,7 @@
     writeSide(key, row);
     var tx = cleanTx({ partId: row.id, month: month, machine: key === "equip" ? row.type : row.machine, name: row.name, reference: row.reference,
       change: inn ? qty : -qty, after: after, line: inn ? "" : trState.line, date: date, ts: Date.now(), source: key }, uid());
+    stampNames(tx, inn);
     if (!inn && !tx.local) stampSlip(tx);
     txList.unshift(tx); sortTx(txList);
     saveDoc("transactions", tx.id, txBody(tx));
@@ -4103,16 +4108,21 @@
       });
     });
   }
+  // who recorded it, who gave the part and who took it: on every movement, printed or not
+  function stampNames(tx, inn) {
+    var me = document.getElementById("trMe").value.trim(), by = document.getElementById("trBy").value.trim(), to = document.getElementById("trTo").value.trim();
+    tx.me = me;
+    if (!inn) { tx.by = by; tx.to = to; }
+    tx.time = document.getElementById("trTime").value || "";
+    try { localStorage.setItem(TR_ME_KEY, me); if (!inn) { localStorage.setItem(TR_BY_KEY, by); localStorage.setItem(TR_PRINT_KEY, document.getElementById("trPrint").checked ? "1" : "0"); } } catch (e) {}
+  }
   function stampSlip(tx) {
-    var me = document.getElementById("trMe").value.trim(), by = document.getElementById("trBy").value.trim(), to = document.getElementById("trTo").value.trim(), prefix = tx.month.replace("-", "") + "-", top = 0;
+    var prefix = tx.month.replace("-", "") + "-", top = 0;
     (allTx[tx.month] || []).forEach(function (t) {
       if (t.slip && t.slip.indexOf(prefix) === 0) top = Math.max(top, parseInt(t.slip.slice(prefix.length), 10) || 0);
     });
     tx.slip = prefix + ("00" + (top + 1)).slice(-3);
     mySlip(tx.id);
-    tx.me = me; tx.by = by; tx.to = to;
-    tx.time = document.getElementById("trTime").value || "";
-    try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(TR_BY_KEY, by); localStorage.setItem(TR_PRINT_KEY, document.getElementById("trPrint").checked ? "1" : "0"); } catch (e) {}
   }
   // Which machine the part went to: ticked on a printed slip, blank boxes on the booklet
   function slipMachHtml(m) {
