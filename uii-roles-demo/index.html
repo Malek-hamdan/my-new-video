@@ -1420,6 +1420,45 @@
   html.wheel-smooth { scroll-behavior: auto !important; }
   @media (prefers-reduced-motion: reduce) { .sum-intro .sc-kpi, .sum-intro .mc, .sum-intro .mc-bar { animation: none !important; } }
 
+  /* ===== Same family as the UII Production system: deep blue bar, light page, white cards with a coloured top edge ===== */
+  :root { --accent: #0f4c81; --accent-soft: rgba(15,76,129,0.09); --bg: #f4f6f9; --border: #dfe5ec; --border-strong: #c9d2dd; }
+  /* the blue runs the full width of the window; the Menu can still drop below the bar */
+  header { position: relative; z-index: 30; isolation: isolate; background: #0f4c81; border-bottom: 0; margin-bottom: 22px; }
+  html, body { overflow-x: clip; }
+  header::before { content: ""; position: absolute; top: 0; bottom: 0; left: -100vmax; right: -100vmax; background: #0f4c81; z-index: -1; }
+  header h1 { color: #fff; font-size: 22px; }
+  header h1::before { background: #fff; }
+  header .subtitle { color: #c3d6ea; }
+  header .btn { background: transparent; border-color: transparent; color: #fff; font-weight: 600; }
+  header .btn:hover { background: rgba(255,255,255,0.14); }
+  header .btn-export { border-color: rgba(255,255,255,0.75); border-radius: 999px; }
+  header .me-chip { background: transparent; border: 0; color: #fff; }
+  header .me-chip .role, header .me-chip .who + .role { color: #bcd3ea; }
+  header .me-chip .btn { border: 1px solid rgba(255,255,255,0.55); }
+  header .pend-btn .pend-n { background: rgba(255,255,255,0.22); color: #fff; }
+  header .pend-btn.has-wait .pend-n { background: #fbbf24; color: #1a1205; }
+  .btn-primary, .tr-chip[aria-pressed="true"], .act-filter button[aria-pressed="true"] { background: #0f4c81; border-color: #0f4c81; color: #fff; }
+  .btn-primary:hover { background: #0a3459; }
+  .tab-ink { background: #0f4c81; }
+  .month[aria-current="true"] { color: #0f4c81 !important; border-color: rgba(15,76,129,0.5) !important; }
+  .sc-kpi { border-top: 4px solid #0f4c81; }
+  thead th, .act-table th, .users-table th { background: #f0f3f7; }
+  .panel, .score, .mc { border-color: #e3e8ef; }
+  .tab[aria-selected="true"] .count { color: #0f4c81; }
+  .area-sw button.parts[aria-pressed="true"] .ic, .origin-sw button.imp[aria-pressed="true"] .ic { color: #0f4c81; }
+  .menu-btn { color: #fff; }
+  header .me-chip .av { background: #fff; color: #0f4c81; }
+  @media (max-width: 640px) {
+    header h1 { white-space: nowrap; font-size: 20px; }
+    header .subtitle { display: none; }
+  }
+  /* the phone Menu drops a white card below the blue bar: dark text inside it */
+  body.menu-open header .header-actions .btn, body.menu-open header .header-actions .me-chip { color: var(--text); }
+  body.menu-open header .header-actions .btn-export, body.menu-open header .header-actions .me-chip .btn { border-color: var(--border); }
+  body.menu-open header .header-actions .me-chip .av { background: #0f4c81; color: #fff; }
+  body.menu-open header .header-actions .me-chip .role { color: var(--muted); }
+  body.menu-open header .header-actions .pend-btn .pend-n { background: #0f4c81; color: #fff; }
+
 </style>
 </head>
 <body>
@@ -1440,7 +1479,7 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>UII</h1>
+      <h1>UII Parts</h1>
       <p class="subtitle">Machine Spare Parts Register</p>
     </div>
     <button class="btn menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="headerActions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span><b class="menu-dot" hidden></b></button>
