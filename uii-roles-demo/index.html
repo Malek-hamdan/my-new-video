@@ -721,6 +721,11 @@
   .mc-bar.mc-good { fill: #0ca30c; } .mc-bar.mc-warn { fill: #fab219; } .mc-bar.mc-serious { fill: #ec835a; } .mc-bar.mc-crit { fill: #d03b3b; }
   .mc-bar.mc-run { opacity: 0.8; }
   .mc-tick { stroke: var(--text); stroke-width: 2; }
+  .nav-back { flex: none; display: inline-flex; align-items: center; gap: 4px; align-self: center; margin-right: 8px; padding: 7px 12px 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .nav-back svg { width: 16px; height: 16px; }
+  .nav-back:hover { border-color: #0f4c81; color: #0f4c81; }
+  .nav-back[hidden] { display: none; }
+  @media (max-width: 640px) { .nav-back { align-self: flex-start; margin: 0; } }
   .mc-ly { stroke: #0f4c81; stroke-width: 2; stroke-dasharray: 2 2; }
   .mc-ly-key { display: inline-block; width: 14px; border-top: 2px dashed #0f4c81; vertical-align: middle; margin-right: 2px; }
   .sc-yy-h { padding-top: 18px; } .sc-yy-sub { padding: 0 18px 6px; font-size: 12px; color: var(--muted); }
@@ -1558,6 +1563,7 @@
   </div>
   <div class="stick-sentinel" id="stickSentinel" aria-hidden="true"></div>
   <div class="stickbar" id="stickbar">
+    <button type="button" class="nav-back" id="navBack" hidden title="Back to where you were"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg><span>Back</span></button>
     <div class="mini-month" id="miniMonth" role="group" aria-label="Month">
       <button type="button" class="mm-btn" id="mmPrev" aria-label="Previous month">&#8249;</button>
       <span id="mmLabel"></span>
@@ -2432,6 +2438,7 @@
   }
   function selectMonth(k) {
     if (k === month && !sideView) return;
+    if (k !== month) navPush();
     flushWrites();
     if (sideView) leaveConsumables();
     if (k !== month) delete unlocked[month];
@@ -2583,6 +2590,7 @@
   });
 
   function switchTo(m) {
+    if (m !== active) navPush();
     navFrom = TABS.indexOf(m) < TABS.indexOf(active) ? "left" : "";
     active = m;
     try { localStorage.setItem(TAB_KEY, m); } catch (e) {}
@@ -2590,6 +2598,40 @@
     renderRows();
     navSettle();
   }
+
+  // ---- Back: where you were before the last move (month, machine, Imported or Local) ----
+  // The on-screen Back and the phone/browser back both use it.
+  var navStack = [], navRestoring = false, navHist = false, navTick = false;
+  var navBackBtn = document.getElementById("navBack");
+  function navShow() { navBackBtn.hidden = !navStack.length; }
+  function navPush() {
+    // one jump (e.g. a search result: month and machine together) is one step back
+    if (navRestoring || navTick || area !== "parts" || sideView) return;
+    navTick = true; setTimeout(function () { navTick = false; }, 0);
+    var last = navStack[navStack.length - 1], st = { month: month, tab: active, origin: origin };
+    if (last && last.month === st.month && last.tab === st.tab && last.origin === st.origin) return;
+    navStack.push(st);
+    if (navStack.length > 40) navStack.shift();
+    try { history.pushState({ uiiNav: navStack.length }, ""); navHist = true; } catch (e) { navHist = false; }
+    navShow();
+  }
+  function navBack() {
+    var st = navStack.pop();
+    navShow();
+    if (!st) return;
+    navRestoring = true;
+    try {
+      if (area !== "parts") setArea("parts");
+      if (st.origin !== origin) setOrigin(st.origin);
+      if (st.month !== month || sideView) selectMonth(st.month);
+      if (st.tab !== active) switchTo(st.tab);
+    } finally { navRestoring = false; }
+  }
+  navBackBtn.addEventListener("click", function () {
+    if (navHist) { try { history.back(); return; } catch (e) {} }
+    navBack();
+  });
+  window.addEventListener("popstate", function () { if (navStack.length) navBack(); });
 
   function tabCount(m) {
     return m === TX ? partsTx().length : m === SUM ? "" : data[m].length;
@@ -7020,6 +7062,7 @@
   document.getElementById("areaParts").addEventListener("click", function () { if (area !== "parts") setArea("parts"); });
   function originLabel() { return origin === "loc" ? " \u00B7 Local parts" : ""; }
   function setOrigin(o, quiet) {
+    if (!quiet && (o === "loc" ? "loc" : "imp") !== origin) navPush();
     origin = o === "loc" ? "loc" : "imp";
     try { localStorage.setItem(ORIGIN_KEY, origin); } catch (e) {}
     document.body.classList.toggle("origin-loc", origin === "loc");
