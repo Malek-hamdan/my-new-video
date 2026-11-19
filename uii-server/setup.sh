@@ -94,7 +94,7 @@ systemctl enable --now fail2ban >/dev/null
 step "Daily copy of the data at night, kept 30 days in /var/backups/uii-parts"
 cat > /etc/cron.daily/uii-parts-backup <<'CRON'
 #!/bin/bash
-tar czf /var/backups/uii-parts/data-$(date +%F).tgz -C /var/lib/uii-parts c
+tar czf /var/backups/uii-parts/data-$(date +%F).tgz --exclude=./lock -C /var/lib/uii-parts .
 find /var/backups/uii-parts -name 'data-*.tgz' -mtime +30 -delete
 CRON
 chmod 755 /etc/cron.daily/uii-parts-backup
