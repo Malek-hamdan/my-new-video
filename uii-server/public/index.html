@@ -437,8 +437,8 @@
     .users-table tr { display: flex !important; flex-wrap: wrap; gap: 6px; padding: 12px 2px; border-bottom: 1px solid var(--border); }
     .users-table td { display: block !important; width: auto !important; padding: 0 !important; border: 0 !important; }
     .users-table td:nth-child(1) { font-size: 16px; }
-    .users-table td:nth-child(2) { color: var(--muted); align-self: center; flex: 1; }
-    .users-table td:nth-child(3) { flex-basis: 100%; }
+    .users-table td:nth-child(1) { flex: 1; align-self: center; }
+    .users-table td:nth-child(2) { flex-basis: 100%; }
     .users-table td.c { flex-basis: calc(50% - 3px); display: flex !important; align-items: center; gap: 8px; text-align: left; padding: 6px 8px !important; border: 1px solid var(--border) !important; border-radius: 8px; font-size: 13px; }
     .users-table td.c::after { content: attr(data-perm); }
     .users-table td:last-child { flex-basis: 100%; }
@@ -1829,7 +1829,6 @@
       <h4>New user</h4>
       <div class="nu-row">
         <input id="nuUser" placeholder="Username" autocomplete="off" autocapitalize="none" spellcheck="false">
-        <input id="nuName" placeholder="Full name" autocomplete="off">
         <input id="nuPass" placeholder="Password" autocomplete="new-password">
         <select id="nuRole"></select>
         <button class="btn btn-primary" id="nuAdd" type="button">Add user</button>
@@ -6384,7 +6383,7 @@
     var box = document.getElementById("usersList");
     var t = document.createElement("table");
     t.className = "users-table";
-    t.innerHTML = "<thead><tr><th>Username</th><th>Name</th><th>Role</th>" + PERMS.map(function (p) { return '<th class="c">' + p[1] + "</th>"; }).join("") + "<th></th></tr></thead>";
+    t.innerHTML = "<thead><tr><th>Username</th><th>Role</th>" + PERMS.map(function (p) { return '<th class="c">' + p[1] + "</th>"; }).join("") + "<th></th></tr></thead>";
     var tb = document.createElement("tbody");
     Object.keys(users).sort().forEach(function (name) {
       var u = users[name], self = me && name === me.username;
@@ -6392,7 +6391,6 @@
       if (u.active === false) tr.className = "off";
       var td = function (txt) { var c = document.createElement("td"); c.textContent = txt; tr.appendChild(c); return c; };
       td(u.username).style.fontWeight = "700";
-      td(u.name || "");
       var rc = td(""), rs = document.createElement("select");
       Object.keys(PRESETS).concat(["custom"]).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k] ? PRESETS[k].label : "Custom"; rs.appendChild(o); });
       rs.value = PRESETS[u.role] ? u.role : "custom";
@@ -6485,7 +6483,7 @@
   usersDlg.addEventListener("keydown", function (e) { if (e.key === "Escape" && e.target.tagName !== "INPUT") usersDlg.hidden = true; });
   document.getElementById("nuAdd").addEventListener("click", function () {
     var err = document.getElementById("nuErr");
-    var name = document.getElementById("nuUser").value.trim().toLowerCase(), full = document.getElementById("nuName").value.trim(),
+    var name = document.getElementById("nuUser").value.trim().toLowerCase(), full = "",
       pass = document.getElementById("nuPass").value, role = document.getElementById("nuRole").value;
     var bad = !/^[a-z0-9._-]{2,30}$/.test(name) ? "Username: 2 to 30 letters or numbers, no spaces." : users[name] ? "That username is taken." : pass.length < 4 ? "Password: at least 4 characters." : "";
     err.textContent = bad; err.hidden = !bad;
@@ -6494,7 +6492,7 @@
       return saveUser({ username: name, name: full || name, role: role, perms: presetPerms(role), hash: h, active: true, created: Date.now() });
     }).then(function () {
       logAct("Made an account", name, null, PRESETS[role].label);
-      ["nuUser", "nuName", "nuPass"].forEach(function (id) { document.getElementById(id).value = ""; });
+      ["nuUser", "nuPass"].forEach(function (id) { document.getElementById(id).value = ""; });
       renderUsers();
       setStatus("Account made for " + name, "saved");
     });

@@ -366,7 +366,7 @@
     var box = document.getElementById("usersList");
     var t = document.createElement("table");
     t.className = "users-table";
-    t.innerHTML = "<thead><tr><th>Username</th><th>Name</th><th>Role</th>" + PERMS.map(function (p) { return '<th class="c">' + p[1] + "</th>"; }).join("") + "<th></th></tr></thead>";
+    t.innerHTML = "<thead><tr><th>Username</th><th>Role</th>" + PERMS.map(function (p) { return '<th class="c">' + p[1] + "</th>"; }).join("") + "<th></th></tr></thead>";
     var tb = document.createElement("tbody");
     Object.keys(users).sort().forEach(function (name) {
       var u = users[name], self = me && name === me.username;
@@ -374,7 +374,6 @@
       if (u.active === false) tr.className = "off";
       var td = function (txt) { var c = document.createElement("td"); c.textContent = txt; tr.appendChild(c); return c; };
       td(u.username).style.fontWeight = "700";
-      td(u.name || "");
       var rc = td(""), rs = document.createElement("select");
       Object.keys(PRESETS).concat(["custom"]).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = PRESETS[k] ? PRESETS[k].label : "Custom"; rs.appendChild(o); });
       rs.value = PRESETS[u.role] ? u.role : "custom";
@@ -467,7 +466,7 @@
   usersDlg.addEventListener("keydown", function (e) { if (e.key === "Escape" && e.target.tagName !== "INPUT") usersDlg.hidden = true; });
   document.getElementById("nuAdd").addEventListener("click", function () {
     var err = document.getElementById("nuErr");
-    var name = document.getElementById("nuUser").value.trim().toLowerCase(), full = document.getElementById("nuName").value.trim(),
+    var name = document.getElementById("nuUser").value.trim().toLowerCase(), full = "",
       pass = document.getElementById("nuPass").value, role = document.getElementById("nuRole").value;
     var bad = !/^[a-z0-9._-]{2,30}$/.test(name) ? "Username: 2 to 30 letters or numbers, no spaces." : users[name] ? "That username is taken." : pass.length < 4 ? "Password: at least 4 characters." : "";
     err.textContent = bad; err.hidden = !bad;
@@ -476,7 +475,7 @@
       return saveUser({ username: name, name: full || name, role: role, perms: presetPerms(role), hash: h, active: true, created: Date.now() });
     }).then(function () {
       logAct("Made an account", name, null, PRESETS[role].label);
-      ["nuUser", "nuName", "nuPass"].forEach(function (id) { document.getElementById(id).value = ""; });
+      ["nuUser", "nuPass"].forEach(function (id) { document.getElementById(id).value = ""; });
       renderUsers();
       setStatus("Account made for " + name, "saved");
     });

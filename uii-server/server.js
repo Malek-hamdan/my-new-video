@@ -282,7 +282,7 @@ async function makeAdmin() {
   });
   const username = (process.env.ADMIN_USER || await ask("Admin username: ")).trim().toLowerCase();
   if (!/^[a-z0-9._-]{2,30}$/.test(username)) { console.error("Username: 2 to 30 small letters or numbers."); process.exit(1); }
-  const name = (process.env.ADMIN_NAME || await ask("Full name: ")).trim() || username;
+  const name = username;
   const p1 = await ask("Password (at least 8 characters): ", true);
   const p2 = await ask("Password again: ", true);
   rl.close();

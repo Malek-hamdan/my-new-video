@@ -118,8 +118,8 @@ rep('  /* Two areas: Spare Parts and Equipment */', '''  /* Accounts and permiss
     .users-table tr { display: flex !important; flex-wrap: wrap; gap: 6px; padding: 12px 2px; border-bottom: 1px solid var(--border); }
     .users-table td { display: block !important; width: auto !important; padding: 0 !important; border: 0 !important; }
     .users-table td:nth-child(1) { font-size: 16px; }
-    .users-table td:nth-child(2) { color: var(--muted); align-self: center; flex: 1; }
-    .users-table td:nth-child(3) { flex-basis: 100%; }
+    .users-table td:nth-child(1) { flex: 1; align-self: center; }
+    .users-table td:nth-child(2) { flex-basis: 100%; }
     .users-table td.c { flex-basis: calc(50% - 3px); display: flex !important; align-items: center; gap: 8px; text-align: left; padding: 6px 8px !important; border: 1px solid var(--border) !important; border-radius: 8px; font-size: 13px; }
     .users-table td.c::after { content: attr(data-perm); }
     .users-table td:last-child { flex-basis: 100%; }
@@ -176,7 +176,6 @@ rep('  <div class="confirm" id="confirm" hidden role="dialog" aria-modal="true" 
       <h4>New user</h4>
       <div class="nu-row">
         <input id="nuUser" placeholder="Username" autocomplete="off" autocapitalize="none" spellcheck="false">
-        <input id="nuName" placeholder="Full name" autocomplete="off">
         <input id="nuPass" placeholder="Password" autocomplete="new-password">
         <select id="nuRole"></select>
         <button class="btn btn-primary" id="nuAdd" type="button">Add user</button>
