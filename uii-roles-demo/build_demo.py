@@ -41,6 +41,9 @@ rep('  /* Two areas: Spare Parts and Equipment */', '''  /* Accounts and permiss
   .me-chip .av { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #06101f; display: flex; align-items: center; justify-content: center; font-weight: 800; }
   .me-chip .me-txt { display: flex; flex-direction: column; line-height: 1.15; }
   .me-chip .who { font-weight: 700; font-size: 14px; }
+  .users-table .btn.btn-danger:not(.del-user) { background: #fff; color: #b54708; border-color: #f3d19c; }
+  .users-table .btn.del-user { background: #fff; color: #b42318; border-color: #f0b4ae; }
+  .users-table .btn.del-user.sure { background: #b42318; color: #fff; border-color: #b42318; }
   .me-chip .role { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
   .me-chip .btn { padding: 5px 10px; font-size: 12px; }
   body.signed-in:not(.can-transfer) #transferBtn, body.signed-in:not(.can-transfer) #blankBtn, body.signed-in:not(.can-transfer) .tx-print,

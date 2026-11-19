@@ -25,6 +25,12 @@
       return Array.prototype.map.call(new Uint8Array(b), function (x) { return (x < 16 ? "0" : "") + x.toString(16); }).join("");
     });
   }
+  function removeUser(name) {
+    delete users[name];
+    if (db) return db.collection("users").doc(name).delete();
+    try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch (e) {}
+    return Promise.resolve();
+  }
   function saveUser(u) {
     users[u.username] = u;
     if (db) return db.collection("users").doc(u.username).set(u);
@@ -432,6 +438,23 @@
           logAct(nu.active ? "Turned on account" : "Turned off account", u.username, null, null);
         });
         ac.appendChild(off);
+        // Delete asks once more on the same button; it goes back after 4 seconds
+        var del = document.createElement("button"); del.type = "button"; del.className = "btn btn-danger del-user"; del.textContent = "Delete";
+        del.style.marginLeft = "6px";
+        del.addEventListener("click", function () {
+          if (!del.classList.contains("sure")) {
+            del.classList.add("sure"); del.textContent = "Sure? Delete " + u.username;
+            setTimeout(function () { if (del.isConnected) { del.classList.remove("sure"); del.textContent = "Delete"; } }, 4000);
+            return;
+          }
+          if (!can("users") || (me && u.username === me.username)) return;
+          removeUser(u.username).then(function () {
+            renderUsers();
+            setStatus("Account deleted: " + u.username + ". Their past entries keep their name.", "saved");
+          }, function (e) { setStatus("Account not deleted (" + ((e && e.code) || "error") + ")", "error"); });
+          logAct("Deleted account", u.username, u.name || null, null);
+        });
+        ac.appendChild(del);
       }
       tb.appendChild(tr);
     });
