@@ -1,11 +1,11 @@
 #!/bin/bash
 # UII Parts: update the page and server to a fixed, checked version. The data is not touched.
 set -euo pipefail
-REV="4227f23d5254d158841fcd750cb8faa4fd30914c"
+REV="ccd807b0e571f2b47c47d6b9933c108b7f4fb264"
 RAW="https://raw.githubusercontent.com/Malek-hamdan/my-new-video/$REV/uii-server"
 curl -fsSL "$RAW/server.js" -o /tmp/uii-server.js
 curl -fsSL "$RAW/public/index.html" -o /tmp/uii-index.html
-echo "84cc157529865a22a31e25ee8d88fe6bc111ba3b344b4e6d03d4dd7f97b6a7a8  /tmp/uii-server.js" | sha256sum -c --quiet
+echo "761588dd7c9c554443a0ff3f2dfc70d73154e0c6daa988a1d9f3fa4cd959845b  /tmp/uii-server.js" | sha256sum -c --quiet
 echo "62dc988850e966733a46365440db71f972930baa3bafcdc98e723bcb7d9a89f1  /tmp/uii-index.html" | sha256sum -c --quiet
 tar czf /var/backups/uii-parts/before-update-$(date +%F-%H%M).tgz -C /var/lib/uii-parts c
 install -m 644 /tmp/uii-server.js /opt/uii-parts/server.js
