@@ -624,6 +624,10 @@
   .mc-bar.mc-good { fill: #0ca30c; } .mc-bar.mc-warn { fill: #fab219; } .mc-bar.mc-serious { fill: #ec835a; } .mc-bar.mc-crit { fill: #d03b3b; }
   .mc-bar.mc-run { opacity: 0.8; }
   .mc-tick { stroke: var(--text); stroke-width: 2; }
+  .mc-ly { stroke: #0f4c81; stroke-width: 2; stroke-dasharray: 2 2; }
+  .mc-ly-key { display: inline-block; width: 14px; border-top: 2px dashed #0f4c81; vertical-align: middle; margin-right: 2px; }
+  .sc-yy-h { padding-top: 18px; } .sc-yy-sub { padding: 0 18px 6px; font-size: 12px; color: var(--muted); }
+  .sc-yy-none { padding: 4px 18px 14px; font-size: 13px; color: var(--muted); }
   .mc-val { fill: var(--text); font-size: 12px; font-weight: 700; text-anchor: middle; }
   .mc-lab { fill: var(--muted); font-size: 11px; text-anchor: middle; }
   .mc-lab-open { fill: var(--text); font-weight: 700; }
@@ -3153,11 +3157,13 @@
   // One small bar chart per machine: parts issued per month, the average as a dashed line,
   // the open month coloured by its rating. A month still running is drawn light, with a tick
   // where the average stands for the days gone by. Click a bar to open that month.
-  function monthCharts(list, stats, info, lab, running, td) {
+  function monthCharts(list, stats, info, lab, running, td, lyStats) {
     var W = 260, H = 132, top = 20, bot = 22, side = 8, ph = H - top - bot, pw = W - side * 2;
+    lyStats = lyStats || [];
     return '<div class="mc-grid">' + MACHINES.map(function (m) {
       var inf = info[m] || {}, vals = stats.map(function (st) { return st[m].outQty; });
-      var max = Math.max.apply(null, vals.concat([inf.avg || 0, 1])) * 1.12, slot = pw / list.length, bw = Math.min(34, slot * 0.58);
+      var lyVals = list.map(function (k, i) { return lyStats[i] ? lyStats[i][m].outQty : null; });
+      var max = Math.max.apply(null, vals.concat(lyVals.filter(function (v) { return v !== null; }), [inf.avg || 0, 1])) * 1.12, slot = pw / list.length, bw = Math.min(34, slot * 0.58);
       var Y = function (v) { return top + ph - v / max * ph; };
       var g = list.map(function (k, i) {
         var v = vals[i], cx = side + slot * (i + 0.5), x = cx - bw / 2, y = Y(v), h = top + ph - y, rr = Math.min(4, h, bw / 2);
@@ -3166,23 +3172,28 @@
         var bar = v > 0 ? '<path class="' + cls + '" d="M' + x + " " + (top + ph) + "V" + (y + rr) + "Q" + x + " " + y + " " + (x + rr) + " " + y + "H" + (x + bw - rr) + "Q" + (x + bw) + " " + y + " " + (x + bw) + " " + (y + rr) + "V" + (top + ph) + 'Z"/>' : "";
         var tick = open && run && inf.avgNow !== null ? '<line class="mc-tick" x1="' + (x - 4) + '" x2="' + (x + bw + 4) + '" y1="' + Y(inf.avgNow) + '" y2="' + Y(inf.avgNow) + '"/>' : "";
         var val = open ? '<text class="mc-val" x="' + cx + '" y="' + (y - 6) + '">' + v + "</text>" : "";
-        var tip = lab(k) + (run ? " (to day " + td + ")" : "") + ": " + v + " pcs" + (open && run && inf.avgNow !== null ? " \u00B7 average by day " + td + ": " + (Math.round(inf.avgNow * 10) / 10) : "");
-        return '<g class="mc-col" data-goto="' + k + '"><title>' + tip + '</title><rect class="mc-hit" x="' + (cx - slot / 2) + '" y="0" width="' + slot + '" height="' + H + '"/>' + bar + tick + val +
+        var ly = lyVals[i];
+        var lyMark = ly !== null ? '<line class="mc-ly" x1="' + (x - 3) + '" x2="' + (x + bw + 3) + '" y1="' + Y(ly) + '" y2="' + Y(ly) + '"/>' : "";
+        var tip = lab(k) + (run ? " (to day " + td + ")" : "") + ": " + v + " pcs" + (open && run && inf.avgNow !== null ? " \u00B7 average by day " + td + ": " + (Math.round(inf.avgNow * 10) / 10) : "") +
+          (ly !== null ? " \u00B7 same month last year: " + ly : "");
+        return '<g class="mc-col" data-goto="' + k + '"><title>' + tip + '</title><rect class="mc-hit" x="' + (cx - slot / 2) + '" y="0" width="' + slot + '" height="' + H + '"/>' + bar + tick + lyMark + val +
           '<text class="mc-lab' + (open ? " mc-lab-open" : "") + '" x="' + cx + '" y="' + (H - 6) + '">' + lab(k) + (run ? "*" : "") + "</text></g>";
       }).join("");
       var avgLine = inf.avg !== null && inf.avg !== undefined ? '<line class="mc-avg" x1="' + side + '" x2="' + (W - side) + '" y1="' + Y(inf.avg) + '" y2="' + Y(inf.avg) + '"/>' : "";
       return '<div class="mc"><div class="mc-h"><b>' + m + '</b><span class="mc-st' + (inf.st ? " mc-t-" + inf.st : "") + '">' + (inf.label || "") + "</span></div>" +
         '<div class="mc-sub">' + (inf.avg !== null && inf.avg !== undefined ? "avg " + (Math.round(inf.avg * 10) / 10) + " / month" : "no earlier month") + "</div>" +
         '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + m + ' parts issued per month">' + '<line class="mc-base" x1="' + side + '" x2="' + (W - side) + '" y1="' + (top + ph) + '" y2="' + (top + ph) + '"/>' + avgLine + g + "</svg></div>";
-    }).join("") + "</div>" + (list.some(running) ? '<div class="mc-foot">* to day ' + td + ' \u00B7 the line on that bar is the average for the days gone by \u00B7 dashed line: average of the earlier months</div>' : '<div class="mc-foot">Dashed line: average of the earlier months</div>');
+    }).join("") + "</div>" + '<div class="mc-foot">' + (list.some(running) ? "* to day " + td + " \u00B7 the line on that bar is the average for the days gone by \u00B7 " : "") +
+      "dashed line: average of the earlier months" + (lyStats.some(Boolean) ? ' \u00B7 <span class="mc-ly-key"></span> same month last year' : "") + "</div>";
   }
   function monthByMonth(info) {
-    var list = MONTHS.filter(function (k) { return k === month || (k <= CURRENT_MONTH && monthHasData(k)); });
-    var at = list.indexOf(month), start = Math.max(0, Math.min(at - 3, list.length - 7));
-    list = list.slice(start, start + 7);
-    if (list.length < 2) return "";
+    // the year of the open month, January to now; each month also set against the same month a year before
+    var yr = month.slice(0, 4);
+    var list = MONTHS.filter(function (k) { return k.slice(0, 4) === yr && (k === month || (k <= CURRENT_MONTH && monthHasData(k))); });
+    if (list.length < 2 && +yr === FIRST_YEAR) return "";
     var stats = list.map(function (k) { return monthStats(k, null, null); });
-    var lab = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3) + (k.slice(0, 4) !== month.slice(0, 4) ? " " + k.slice(2, 4) : ""); };
+    var lyStats = list.map(function (k) { var l = lastYearOf(k); return monthHasData(l) ? monthStats(l, null, null) : null; });
+    var lab = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
     var td = new Date().getDate(), tdIn = new Date(+CURRENT_MONTH.slice(0, 4), +CURRENT_MONTH.slice(5), 0).getDate();
     var running = function (k) { return k === CURRENT_MONTH && td < tdIn; };
     var row = function (name, get, cls) {
@@ -3192,13 +3203,38 @@
         return '<td data-l="' + lab(k) + (running(k) ? " (to day " + td + ")" : "") + '"' + (k === month ? ' class="sc-cur"' : "") + ">" + (k === month ? "<b>" + v + "</b>" : v) + ar + "</td>";
       }).join("") + "</tr>";
     };
-    return '<div class="sc-mm"><div class="sc-mm-h">Month by month \u2014 parts issued <span class="sc-muted">\u00B7 click a month to open it</span></div>' +
-      monthCharts(list, stats, info || {}, lab, running, td) +
+    return '<div class="sc-mm"><div class="sc-mm-h">' + yr + ' month by month \u2014 parts issued <span class="sc-muted">\u00B7 click a month to open it</span></div>' +
+      monthCharts(list, stats, info || {}, lab, running, td, lyStats) +
       '<table class="sc-table"><thead><tr><th>Machine</th>' + list.map(function (k) {
         return "<th" + (k === month ? ' class="sc-cur"' : "") + '><button type="button" class="sc-go" data-goto="' + k + '">' + lab(k) + (running(k) ? " \u00B7 to day " + td : "") + "</button></th>";
       }).join("") + "</tr></thead><tbody>" +
       MACHINES.map(function (m) { return row(m, function (st) { return st[m].outQty; }); }).join("") +
-      row("Total", function (st) { return MACHINES.reduce(function (a, m) { return a + st[m].outQty; }, 0); }, "sc-tot") + "</tbody></table></div>";
+      row("Total", function (st) { return MACHINES.reduce(function (a, m) { return a + st[m].outQty; }, 0); }, "sc-tot") + "</tbody></table>" +
+      yearVsYear(yr, list, stats, lyStats, running, td) + "</div>";
+  }
+  function lastYearOf(k) { return (+k.slice(0, 4) - 1) + k.slice(4); }
+  // This year against last year, on the months both years have (a running month counts to the same day)
+  function yearVsYear(yr, list, stats, lyStats, running, td) {
+    var py = String(+yr - 1), both = [];
+    list.forEach(function (k, i) { if (lyStats[i]) both.push(i); });
+    var head = '<div class="sc-mm-h sc-yy-h">' + yr + " against " + py + " \u2014 same months</div>";
+    if (!both.length) {
+      return +py < FIRST_YEAR ? "" : head + '<div class="sc-yy-none">No month of ' + py + " to set against yet: records start in " + monthLabel(MONTHS[0]) +
+        ". From " + MONTH_NAMES[+MONTHS[0].slice(5) - 1] + " " + yr + " each month is compared with the same month of " + py + ".</div>";
+    }
+    // a month still running is compared with the same days of last year's month
+    var lyRun = {};
+    both.forEach(function (i) { if (running(list[i])) lyRun[i] = monthStats(lastYearOf(list[i]), lastYearOf(list[i]) + "-" + (td < 10 ? "0" : "") + td, null); });
+    var names = both.map(function (i) { return monthLabel(list[i]).split(" ")[0].slice(0, 3) + (running(list[i]) ? " (to day " + td + ")" : ""); });
+    var sum = function (src, m) { return both.reduce(function (a, i) { var st = src === "ly" ? (lyRun[i] || lyStats[i]) : stats[i]; return a + (m ? st[m].outQty : MACHINES.reduce(function (b, x) { return b + st[x].outQty; }, 0)); }, 0); };
+    var row = function (name, m, cls) {
+      var now = sum("now", m), was = sum("ly", m), d = now - was;
+      var ch = was ? (d > 0 ? '<span class="sc-up">\u25B2</span> +' : d < 0 ? '<span class="sc-down">\u25BC</span> ' : "") + pct(now, was) + "%" : (now ? "new" : "\u2014");
+      return "<tr" + (cls ? ' class="' + cls + '"' : "") + '><td class="sc-m" data-l="Machine">' + name + '</td><td data-l="' + yr + '">' + now + '</td><td data-l="' + py + '">' + was + '</td><td data-l="Change">' + ch + "</td></tr>";
+    };
+    return head + '<div class="sc-yy-sub">' + names.join(", ") + "</div>" +
+      '<table class="sc-table sc-yy"><thead><tr><th>Machine</th><th>' + yr + "</th><th>" + py + "</th><th>Change</th></tr></thead><tbody>" +
+      MACHINES.map(function (m) { return row(m, m); }).join("") + row("Total", null, "sc-tot") + "</tbody></table>";
   }
 
   function renderSummary() {
