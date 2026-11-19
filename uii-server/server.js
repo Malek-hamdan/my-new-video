@@ -16,33 +16,100 @@ const WRITE_PERMS = ["receive", "transfer", "edit", "editRef", "delete", "approv
 
 fs.mkdirSync(path.join(DATA, "c"), { recursive: true });
 
-// ---------- storage: one JSON file per collection, written whole and swapped in ----------
-const colls = new Map(), dirty = new Set();
-let flushTimer = null;
+// ---------- storage ----------
+// Every change is first added to a log file on disk (journal.log, fsync) and only then answered "saved".
+// Every second the changed collections are written whole (one JSON file each, swapped in), the old file is
+// kept as <name>.json.prev, and the log is emptied. After a crash the log is played again on start.
+// A file that cannot be read is never treated as empty: the previous copy is used, or that collection
+// is closed (reads and writes answer "unavailable") until someone looks at it. The bad file is kept.
+const CDIR = path.join(DATA, "c"), JOURNAL = path.join(DATA, "journal.log");
+const colls = new Map(), dirty = new Set(), broken = new Set();
+let compactTimer = null, jfd = null;
+function writeAll(fd, buf) {
+  let off = 0;
+  while (off < buf.length) off += fs.writeSync(fd, buf, off, buf.length - off);
+}
+function syncDir(dir) { const d = fs.openSync(dir, "r"); try { fs.fsyncSync(d); } finally { fs.closeSync(d); } }
+function readObj(file) {
+  const o = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (!o || typeof o !== "object" || Array.isArray(o)) throw new Error("not a JSON object");
+  return o;
+}
 function load(name) {
   if (colls.has(name)) return colls.get(name);
-  let m = new Map();
-  try { const o = JSON.parse(fs.readFileSync(path.join(DATA, "c", name + ".json"), "utf8")); m = new Map(Object.entries(o)); } catch (e) {}
+  const file = path.join(CDIR, name + ".json"), prev = file + ".prev";
+  let m;
+  try { m = new Map(Object.entries(readObj(file))); }
+  catch (e) {
+    if (e.code === "ENOENT" && !fs.existsSync(prev)) m = new Map();
+    else {
+      try {
+        m = new Map(Object.entries(readObj(prev)));
+        if (e.code !== "ENOENT") fs.copyFileSync(file, file + ".bad-" + Date.now());
+        console.error("[storage] " + name + ".json could not be read (" + e.message + "); using the previous copy. The bad file is kept.");
+        dirty.add(name); scheduleCompact();
+      } catch (e2) {
+        broken.add(name); m = new Map();
+        console.error("[storage] " + name + " CLOSED: its file and its previous copy cannot be read (" + e.message + "). Nothing in it is changed. Restore a copy from /var/backups/uii-parts.");
+      }
+    }
+  }
   colls.set(name, m);
   return m;
 }
-function writeFileSafe(file, text) {
-  const tmp = file + ".tmp";
+function isBroken(name) { load(name); return broken.has(name); }
+function unavailable() { return Object.assign(new Error("storage unavailable"), { code: 503 }); }
+function journalFd() { if (jfd === null) jfd = fs.openSync(JOURNAL, "a"); return jfd; }
+// one change: logged durably first, then made in memory
+function commit(coll, id, value) {
+  const m = load(coll);
+  if (broken.has(coll)) throw unavailable();
+  const line = "\n" + JSON.stringify(value === undefined ? { c: coll, id, del: 1 } : { c: coll, id, d: value }) + "\n";
+  try { const fd = journalFd(); writeAll(fd, Buffer.from(line)); fs.fsyncSync(fd); }
+  catch (e) { console.error("[storage] could not save a change to " + coll + ": " + e.message); throw unavailable(); }
+  if (value === undefined) m.delete(id); else m.set(id, value);
+  dirty.add(coll); scheduleCompact();
+}
+function writeColl(name) {
+  const file = path.join(CDIR, name + ".json"), tmp = file + ".tmp";
   const fd = fs.openSync(tmp, "w");
-  fs.writeSync(fd, text); fs.fsyncSync(fd); fs.closeSync(fd);
+  try { writeAll(fd, Buffer.from(JSON.stringify(Object.fromEntries(load(name))))); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  if (fs.existsSync(file)) fs.copyFileSync(file, file + ".prev");
   fs.renameSync(tmp, file);
+  syncDir(CDIR);
 }
-function flush() {
-  flushTimer = null;
-  for (const name of dirty) {
-    try { writeFileSafe(path.join(DATA, "c", name + ".json"), JSON.stringify(Object.fromEntries(load(name)))); }
-    catch (e) { console.error("write failed", name, e.message); }
+function compact() {
+  compactTimer = null;
+  for (const name of Array.from(dirty)) {
+    if (broken.has(name)) continue;                 // its changes stay in the log
+    try { writeColl(name); dirty.delete(name); }
+    catch (e) { console.error("[storage] could not write " + name + ": " + e.message + " (kept in the log, will try again)"); }
   }
-  dirty.clear();
+  if (dirty.size) { scheduleCompact(5000); return; }
+  try { const fd = journalFd(); fs.ftruncateSync(fd, 0); fs.fsyncSync(fd); }
+  catch (e) { console.error("[storage] could not empty the log: " + e.message); }
 }
-function touch(name) { dirty.add(name); if (!flushTimer) flushTimer = setTimeout(flush, 150); }
-process.on("SIGTERM", () => { flush(); process.exit(0); });
-process.on("SIGINT", () => { flush(); process.exit(0); });
+function scheduleCompact(ms) { if (!compactTimer) compactTimer = setTimeout(compact, ms || 1000); }
+// on start: play back what the log holds (changes not yet in the files)
+function openStore() {
+  fs.mkdirSync(CDIR, { recursive: true });
+  let text = "";
+  try { text = fs.readFileSync(JOURNAL, "utf8"); } catch (e) { if (e.code !== "ENOENT") throw e; }
+  let n = 0, bad = 0;
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let ev; try { ev = JSON.parse(line); } catch (e) { bad++; continue; }
+    if (!ev || typeof ev.c !== "string" || typeof ev.id !== "string") { bad++; continue; }
+    const m = load(ev.c);
+    if (ev.del) m.delete(ev.id); else m.set(ev.id, ev.d);
+    dirty.add(ev.c); n++;
+  }
+  if (n || bad) console.log("[storage] played back " + n + " change(s) from the log" + (bad ? ", skipped " + bad + " unreadable line(s)" : ""));
+  if (dirty.size) compact();
+}
+function closeStore() { if (compactTimer) clearTimeout(compactTimer); compact(); }
+process.on("SIGTERM", () => { closeStore(); process.exit(0); });
+process.on("SIGINT", () => { closeStore(); process.exit(0); });
 
 // ---------- passwords: scrypt with a salt per account ----------
 // The page sends a SHA-256 of the password (never the password itself); that is hashed again here.
@@ -63,8 +130,7 @@ function sessions() { return load("_sessions"); }
 function tokenKey(t) { return crypto.createHash("sha256").update(t).digest("hex"); }
 function newSession(user) {
   const t = crypto.randomBytes(32).toString("base64url");
-  sessions().set(tokenKey(t), { user, exp: Date.now() + DAYS * 864e5 });
-  touch("_sessions");
+  commit("_sessions", tokenKey(t), { user, exp: Date.now() + DAYS * 864e5 });
   return t;
 }
 function cookieOf(req) {
@@ -75,20 +141,17 @@ function whoIs(req) {
   const t = cookieOf(req);
   if (!t) return null;
   const k = tokenKey(t), s = sessions().get(k);
-  if (!s || s.exp < Date.now()) { if (s) { sessions().delete(k); touch("_sessions"); } return null; }
+  if (!s || s.exp < Date.now()) { if (s) { try { commit("_sessions", k); } catch (e) {} } return null; }
   const u = load("users").get(s.user);
   if (!u || u.active === false) return null;
   return { key: k, user: u };
 }
 function dropSessionsOf(username) {
-  let n = 0;
-  for (const [k, s] of sessions()) if (s.user === username) { sessions().delete(k); n++; }
-  if (n) touch("_sessions");
+  for (const [k, s] of Array.from(sessions())) if (s.user === username) commit("_sessions", k);
 }
 setInterval(() => { // clear old sessions once an hour
-  let n = 0; const now = Date.now();
-  for (const [k, s] of sessions()) if (s.exp < now) { sessions().delete(k); n++; }
-  if (n) touch("_sessions");
+  const now = Date.now();
+  try { for (const [k, s] of Array.from(sessions())) if (s.exp < now) commit("_sessions", k); } catch (e) {}
 }, 3600e3).unref();
 
 // ---------- sign-in limits: 8 wrong tries per address per 15 minutes ----------
@@ -115,7 +178,7 @@ function adminsLeft(users) { let n = 0; for (const [, u] of users) if (u.active 
 function actlogAdd(u, what, part) {
   const id = "srv" + Date.now().toString(36) + crypto.randomBytes(3).toString("hex"), now = Date.now();
   const d = { ts: now, seq: now, user: u.username, name: u.name || u.username, via: "", what, part: part || "", from: "", to: "" };
-  load("actlog").set(id, d); touch("actlog"); broadcast("actlog", id, d);
+  commit("actlog", id, d); broadcast("actlog", id, d);
 }
 
 // ---------- the rules for each write ----------
@@ -148,7 +211,7 @@ function applyWrite(me, coll, id, body, del) {
   const m = load(coll);
   if (del) {
     if (!m.has(id)) return;
-    m.delete(id); touch(coll);
+    commit(coll, id);
     if (coll === "users") dropSessionsOf(id);
     broadcast(coll, id, undefined);
     return;
@@ -162,7 +225,7 @@ function applyWrite(me, coll, id, body, del) {
     if (body.hash && cur.pw) dropSessionsOf(id);          // a new password signs that person out everywhere
     if (d.active === false) dropSessionsOf(id);
   }
-  m.set(id, d); touch(coll);
+  commit(coll, id, d);
   broadcast(coll, id, d);
 }
 
@@ -199,6 +262,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "HEAD" && (p === "/" || p === "/index.html")) { res.writeHead(200, { "Cache-Control": "no-store" }); return res.end(); }
     if (!p.startsWith("/api/")) return send(res, 404, "not found");
+    if (isBroken("users") || isBroken("_sessions")) return send(res, 503, { code: "unavailable" });
     // writes must come from the page itself (a cross-site form cannot set this header)
     if (req.method !== "GET" && req.headers["x-uii"] !== "1") return send(res, 403, { code: "not_granted" });
 
@@ -211,12 +275,12 @@ const server = http.createServer(async (req, res) => {
       if (u.active === false) return send(res, 403, { code: "off" });
       tries.delete(ip);
       const t = newSession(name);
-      actlogAdd(u, "Signed in", "");
+      try { actlogAdd(u, "Signed in", ""); } catch (e) {}
       return send(res, 200, { username: name }, { "Set-Cookie": COOKIE + "=" + t + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + DAYS * 86400 });
     }
     if (p === "/api/logout" && req.method === "POST") {
       const w = whoIs(req);
-      if (w) { sessions().delete(w.key); touch("_sessions"); }
+      if (w) { try { commit("_sessions", w.key); } catch (e) {} }
       return send(res, 200, { ok: true }, { "Set-Cookie": COOKIE + "=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0" });
     }
 
@@ -241,6 +305,7 @@ const server = http.createServer(async (req, res) => {
     const coll = decodeURIComponent(m[1]), id = m[2] ? decodeURIComponent(m[2]) : null;
     if (!COLL_RE.test(coll) || coll.startsWith("_") || (id !== null && !ID_RE.test(id))) return send(res, 400, { code: "invalid_argument" });
 
+    if (req.method === "GET" && isBroken(coll)) return send(res, 503, { code: "unavailable" });
     if (req.method === "GET" && id === null) {
       const out = [];
       for (const [k, d] of load(coll)) out.push([k, publicDoc(coll, d)]);
@@ -261,7 +326,8 @@ const server = http.createServer(async (req, res) => {
     }
     return send(res, 405, { code: "invalid_argument" });
   } catch (e) {
-    if (!res.headersSent) send(res, e.code === 413 ? 413 : e.code === 400 ? 400 : 500, { code: e.code === 413 ? "too_big" : e.code === 400 ? "invalid_argument" : "internal" });
+    const st = e.code === 413 ? 413 : e.code === 400 ? 400 : e.code === 503 ? 503 : 500;
+    if (!res.headersSent) send(res, st, { code: st === 413 ? "too_big" : st === 400 ? "invalid_argument" : st === 503 ? "unavailable" : "internal" });
     if (!e.code) console.error(e);
   }
 });
@@ -289,11 +355,13 @@ async function makeAdmin() {
   if (p1.length < 8) { console.error("Too short."); process.exit(1); }
   if (p1 !== p2) { console.error("The two passwords are not the same."); process.exit(1); }
   const perms = { receive: 1, transfer: 1, edit: 1, editRef: 1, "delete": 1, order: 1, "export": 1, backup: 1, activity: 1, users: 1, approve: 1 };
-  const users = load("users"), cur = users.get(username) || {};
-  users.set(username, Object.assign({}, cur, { username, name, role: "admin", perms, active: true, created: cur.created || Date.now(), pw: pwMake(clientHash(username, p1)) }));
-  touch("users"); flush();
+  openStore();
+  if (isBroken("users")) { console.error("The accounts file cannot be read. Nothing was changed."); process.exit(1); }
+  const cur = load("users").get(username) || {};
+  commit("users", username, Object.assign({}, cur, { username, name, role: "admin", perms, active: true, created: cur.created || Date.now(), pw: pwMake(clientHash(username, p1)) }));
+  closeStore();
   console.log("Admin ready: " + username);
 }
 
 if (process.argv[2] === "make-admin") makeAdmin();
-else server.listen(PORT, "127.0.0.1", () => console.log("UII Parts on 127.0.0.1:" + PORT + ", data in " + DATA));
+else { openStore(); server.listen(PORT, "127.0.0.1", () => console.log("UII Parts on 127.0.0.1:" + PORT + ", data in " + DATA)); }
