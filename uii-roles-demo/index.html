@@ -5572,67 +5572,8 @@
       }) };
     }
 
-    // First sheet: the month at a glance, the same rating as the Summary page
-    function summarySheet() {
-      var today = new Date().getDate(), daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate();
-      var day = month === CURRENT_MONTH && today < daysIn ? today : 0;
-      var rs = rateSetup(day), cur = rs.cur, r1 = function (v) { return Math.round(v * 10) / 10; };
-      var allBag = {};
-      MACHINES.forEach(function (m) { Object.keys(cur[m].outVal).forEach(function (c) { addMoney(allBag, c, cur[m].outVal[c]); }); });
-      var cu = one(allBag);
-      var cols = [{ name: "Machine", width: 13 }, { name: "Rating", width: 38 }, { name: "Parts issued", width: 13 },
-        { name: day ? "Expected by day " + day : "Average / month", width: 15 }, { name: "vs average", width: 16 },
-        { name: "Value issued" + (cu ? " (" + cu + ")" : ""), width: 16 }, { name: "Parts received", width: 14 }, { name: "Movements", width: 12 },
-        { name: "At 0 or below Min", width: 16 }];
-      var rows = MACHINES.map(function (m, i) {
-        var ro = rateOne(m, rs), d = ro.t ? r1(ro.now - ro.avgNow) : null, pc = ro.t && ro.avgNow >= 0.5 ? Math.round((ro.now - ro.avgNow) / ro.avgNow * 100) : null;
-        var low = sheet[m].filter(function (r) { return hasContent(r) && (isLow(r) || String(r.quantity).trim() === "0"); }).length;
-        var hot = ro.lv >= 3 || ro.sig;
-        return [{ v: m, s: z("bold", i) }, { v: ro.sub.indexOf("early signal: ") === 0 ? "Early signal: " + ro.sub.slice(14) : ro.label + (ro.sub ? " · " + ro.sub : ""), s: hot ? "typeOut" : z("text", i) },
-          { v: ro.now, s: z("bold", i) }, { v: ro.n ? r1(ro.avgNow) : "", s: z("center", i) },
-          { v: d === null ? "" : (d > 0 ? "+" : "") + d + (pc === null ? "" : " (" + (pc > 0 ? "+" : "") + pc + "%)"), s: d > 0 ? z("qtyNeg", i) : d < 0 ? z("qtyPos", i) : z("center", i) },
-          cu ? { v: Math.round((cur[m].outVal[cu] || 0) * 100) / 100, s: z("money", i) } : { v: bagText(cur[m].outVal), s: z("center", i) },
-          { v: cur[m].inQty, s: z("center", i) }, { v: cur[m].n, s: z("center", i) }, { v: low, s: low ? z("qtyNeg", i) : z("center", i) }];
-      });
-      var n = MACHINES.length, T = function (v) { return { v: v, s: "totN_UII" }; };
-      var sum = function (c, v, st) { return { f: "SUM(" + rng(c, n) + ")", v: v, s: st || "totN_UII" }; };
-      var lows = MACHINES.reduce(function (a, m) { return a + sheet[m].filter(function (r) { return hasContent(r) && (isLow(r) || String(r.quantity).trim() === "0"); }).length; }, 0);
-      var totals = [[{ v: "Total", s: "totL_UII" }, T(""), sum("C", cur.all.outQty), T(""), T(""),
-        cu ? sum("F", Math.round((allBag[cu] || 0) * 100) / 100, "totM_UII") : T(bagText(allBag)), sum("G", cur.all.inQty), sum("H", cur.all.n), sum("I", lows)]];
-      var basis = !rs.prevKeys.length ? "no earlier month to compare yet" : "compared with " + rs.span + " (" + plural(rs.prevKeys.length, "month", "months") + ")" + (rs.early ? ", full rating from " + RATE_MIN_MONTHS + " months" : "");
-      return { name: "Summary", xml: sheetXml({
-        title: "UII — Summary · " + label, theme: "UII", rows: rows, totals: totals, columns: cols,
-        subtitle: "Parts issued per machine" + (day ? " to day " + day + " of " + daysIn : "") + " · " + basis + " · " + stamp
-      }) };
-    }
-
-    // Second sheet: every part at 0 or below its Min, with what brings it back to Min
-    function orderSheet() {
-      var list = [];
-      MACHINES.forEach(function (m) { sheet[m].forEach(function (r) { if (hasContent(r) && (isLow(r) || String(r.quantity).trim() === "0")) list.push(r); }); });
-      var bag = {};
-      var rows = list.map(function (r, i) {
-        var q = /^\d+$/.test(r.quantity) ? parseInt(r.quantity, 10) : null, mn = /^\d+$/.test(r.min) ? parseInt(r.min, 10) : null;
-        var need = q !== null && mn !== null ? Math.max(0, mn - q) : "", p = unitPrice(r), cost = need !== "" && p !== null ? Math.round(need * p * 100) / 100 : "";
-        if (cost !== "") addMoney(bag, r.currency || lastCurrency(), cost);
-        return [{ v: r.machine, s: z("center", i) }, { v: r.local ? "Local" : "Imported", s: z("center", i) }, { v: r.name, s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: q === 0 ? "qtyZero" : z("qtyNeg", i) }, { v: mn === null ? "" : mn, s: z("center", i) },
-          { v: need, s: z("bold", i) }, { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) }, { v: cost, s: z("moneyBold", i) }];
-      });
-      var n = list.length, cu = one(bag), T = function (v) { return { v: v, s: "totN_ALL" }; };
-      var totals = n ? [[{ v: "Total · " + plural(n, "part", "parts"), s: "totL_ALL" }, T(""), T(""), T(""), T(""), T(""),
-        { f: "SUM(" + rng("G", n) + ")", v: rows.reduce(function (a, r) { return a + (r[6].v || 0); }, 0), s: "totN_ALL" }, T(""), T(cu || ""),
-        cu ? { f: "SUM(" + rng("J", n) + ")", v: Math.round(bag[cu] * 100) / 100, s: "totM_ALL" } : T(cu === "" ? "" : bagText(bag))]] : [];
-      return { name: "To order", xml: sheetXml({
-        title: "UII — To order · " + label, theme: "ALL", rows: rows, totals: totals,
-        subtitle: (n ? plural(n, "part", "parts") + " at 0 or below Min · To order = Min − stock (a part with no Min shows no number)" : "Nothing at 0 or below Min") + " · " + stamp,
-        columns: [{ name: "Machine", width: 11 }, { name: "Origin", width: 11 }, { name: "Name", width: 36 }, { name: "Reference", width: 20 }, { name: "In stock", width: 10 },
-          { name: "Min", width: 8 }, { name: "To order", width: 10 }, { name: "Unit price", width: 12 }, { name: "Currency", width: 10 }, { name: "Cost", width: 13 }]
-      }) };
-    }
-
     // Each machine gets its parts sheet followed by its own transaction sheet
-    var sheets = [summarySheet(), orderSheet()];
+    var sheets = [];
     MACHINES.forEach(function (m) {
       sheets.push(partsSheet(m, false));
       sheets.push(txSheet(m + " " + TX, "UII — " + m + " " + TX, txList.filter(function (t) { return t.machine === m && !t.local; }), false, m));
