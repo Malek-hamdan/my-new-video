@@ -1,12 +1,12 @@
 #!/bin/bash
 # UII Parts: update the page and server to a fixed, checked version. The data is not touched.
 set -euo pipefail
-REV="f0288e5ad45f6091082074e0daddf3ba0c93cac4"
+REV="3511eb9f645b2b767fbba8f9eb7fd59108762613"
 RAW="https://raw.githubusercontent.com/Malek-hamdan/my-new-video/$REV/uii-server"
 curl -fsSL "$RAW/server.js" -o /tmp/uii-server.js
 curl -fsSL "$RAW/public/index.html" -o /tmp/uii-index.html
 echo "f783cbb8cb56e8e079792c8d42539190439672166efa6999e515b662e02a1609  /tmp/uii-server.js" | sha256sum -c --quiet
-echo "bcb7dccc44216665b9f45156d306d4907f2a53afd7f87af4a1447e2ea8f7d3ba  /tmp/uii-index.html" | sha256sum -c --quiet
+echo "439eb25802fb26f94d6b129b6458df1a7a23b2cf837ebb25346e78d3834f9256  /tmp/uii-index.html" | sha256sum -c --quiet
 tar czf /var/backups/uii-parts/before-update-$(date +%F-%H%M).tgz --exclude=./lock -C /var/lib/uii-parts .
 # the nightly copy also takes the change log and the list of collections, not only c/
 cat > /etc/cron.daily/uii-parts-backup <<'CRON'
