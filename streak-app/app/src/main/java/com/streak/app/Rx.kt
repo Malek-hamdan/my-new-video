@@ -13,6 +13,38 @@ import java.util.Calendar
 class Rx : BroadcastReceiver() {
     companion object {
         const val DAILY = "com.streak.app.DAILY"
+        const val ISTI = "com.streak.app.ISTI"
+        const val ISTI_DONE = "com.streak.app.ISTI_DONE"
+
+        fun scheduleIsti(c: Context) {
+            val pi = PendingIntent.getBroadcast(c, 1, Intent(c, Rx::class.java).setAction(ISTI),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val am = c.getSystemService(AlarmManager::class.java)
+            if (!Istighfar.on(c)) { am.cancel(pi); return }
+            val now = System.currentTimeMillis(); var best = Long.MAX_VALUE
+            for (off in 0..1) for (h in Istighfar.hours(c)) {
+                val t = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, off); set(Calendar.HOUR_OF_DAY, h)
+                    set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+                if (t > now + 30_000 && t < best) best = t
+            }
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, best, pi)
+        }
+
+        fun sendIsti(c: Context) {
+            val k = Istighfar.nextLine(c)
+            val nm = c.getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(NotificationChannel("isti", "Istighfar", NotificationManager.IMPORTANCE_HIGH))
+            val open = PendingIntent.getActivity(c, 200, Intent(c, IstighfarActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+            val doneI = PendingIntent.getBroadcast(c, 300 + k, Intent(c, Rx::class.java).setAction(ISTI_DONE).putExtra("k", k),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val line = Istighfar.LINES[k]
+            val n = Notification.Builder(c, "isti").setSmallIcon(R.drawable.ic_stat).setColor(C.G)
+                .setContentTitle("🤲 Istighfar • ${k + 1}/${Istighfar.LINES.size}").setContentText(line)
+                .setStyle(Notification.BigTextStyle().bigText(line)).setContentIntent(open).setAutoCancel(true)
+                .addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, "✓ Said it", doneI).build())
+                .build()
+            try { nm.notify(2, n) } catch (_: SecurityException) {}
+        }
         private val MILES = intArrayOf(7, 30, 100, 365)
 
         fun schedule(c: Context) {
@@ -55,7 +87,11 @@ class Rx : BroadcastReceiver() {
     }
 
     override fun onReceive(c: Context, i: Intent) {
-        if (i.action == DAILY) daily(c)
-        schedule(c)
+        when (i.action) {
+            DAILY -> { daily(c); schedule(c) }
+            ISTI -> { sendIsti(c); scheduleIsti(c) }
+            ISTI_DONE -> { Istighfar.mark(c, i.getIntExtra("k", 0)); c.getSystemService(NotificationManager::class.java).cancel(2) }
+            else -> { schedule(c); scheduleIsti(c) }
+        }
     }
 }

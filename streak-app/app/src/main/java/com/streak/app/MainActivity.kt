@@ -25,7 +25,7 @@ class MainActivity : Activity() {
     override fun onCreate(s: Bundle?) {
         super.onCreate(s)
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-        Rx.schedule(this)
+        Rx.schedule(this); Rx.scheduleIsti(this)
         val root = FrameLayout(this)
         body = vbox().apply { setPadding(dp(18), dp(24), dp(18), dp(120)) }
         root.addView(ScrollView(this).apply { addView(body); isVerticalScrollBarEnabled = false; overScrollMode = View.OVER_SCROLL_NEVER })

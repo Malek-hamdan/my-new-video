@@ -77,6 +77,21 @@ class SettingsActivity : Activity() {
             val i = Store.duaIndex(this).coerceAtLeast(0); val (t, r) = Store.dua(this, i)
             Rx.notify(this, 1, "🤲 Verse of the day • ${i + 1}/365", "﴿ $t ﴾\n$r")
         }, lp(t = 10))
+        root.addView(tv("🤲 Istighfar reminders", 18f, C.G, true), lp(t = 28, b = 8))
+        val isw = android.widget.Switch(this).apply {
+            text = "Send istighfar notifications"; textSize = 17f; setTextColor(C.TXT); isChecked = Istighfar.on(this@SettingsActivity)
+            setPadding(dp(14), dp(14), dp(14), dp(14)); background = shape(C.CARD, dp(14).toFloat())
+        }
+        root.addView(isw)
+        root.addView(tv("Times (hours, comma separated) — one istighfar per notification", 13f, C.DIM), lp(t = 10, b = 6))
+        val ih = input("10,15,21").apply { setText(Istighfar.hours(this@SettingsActivity).joinToString(",")) }
+        root.addView(ih)
+        root.addView(btn("Save istighfar settings", C.G, 0xFF04130D.toInt()) {
+            Istighfar.setNotif(this, isw.isChecked, ih.text.toString()); Rx.scheduleIsti(this)
+            Toast.makeText(this, "Saved ✓", Toast.LENGTH_SHORT).show()
+        }, lp(t = 10))
+        root.addView(btn("🔔 Test istighfar notification", C.CARD, C.TXT) { Rx.sendIsti(this) }, lp(t = 10))
+
         root.addView(tv("💾 Backup code", 18f, C.G, true), lp(t = 28, b = 4))
         root.addView(tv("Create a code and keep it somewhere safe (WhatsApp, Notes, email). If you delete the app or change phones, paste it here to get everything back.", 13f, C.DIM), lp(b = 10))
         root.addView(btn("📤 Create code", C.CARD, C.TXT) { showCode() })

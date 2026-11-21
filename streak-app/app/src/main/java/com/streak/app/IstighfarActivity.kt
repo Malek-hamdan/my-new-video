@@ -35,6 +35,13 @@ object Istighfar {
     fun done(c: Context): Int = if (p(c).getString("day", "") == today()) p(c).getInt("mask", 0) else 0
     fun set(c: Context, mask: Int) { p(c).edit().putString("day", today()).putInt("mask", mask).commit() }
     fun count(c: Context) = Integer.bitCount(done(c))
+    fun on(c: Context) = p(c).getBoolean("notif", true)
+    fun hours(c: Context): List<Int> = (p(c).getString("hours", "10,15,21") ?: "10,15,21").split(",")
+        .mapNotNull { it.trim().toIntOrNull() }.filter { it in 0..23 }.distinct().sorted().ifEmpty { listOf(10, 15, 21) }
+    fun setNotif(c: Context, on: Boolean, hours: String) { p(c).edit().putBoolean("notif", on).putString("hours", hours).commit() }
+    /** next line to send (rotates through all 17), then advances */
+    fun nextLine(c: Context): Int { val i = p(c).getInt("next", 0) % LINES.size; p(c).edit().putInt("next", i + 1).commit(); return i }
+    fun mark(c: Context, k: Int) = set(c, done(c) or (1 shl k))
 }
 
 class IstighfarActivity : Activity() {
