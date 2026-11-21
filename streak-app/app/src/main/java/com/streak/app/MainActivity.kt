@@ -84,6 +84,22 @@ class MainActivity : Activity() {
             add(card, lp(b = 16))
         }
 
+        run {
+            val n = Istighfar.count(this); val total = Istighfar.LINES.size
+            val card = vbox().apply { background = shape(C.CARD, dp(18).toFloat()); setPadding(dp(16), dp(14), dp(16), dp(14)) }
+            val r = hbox().apply { gravity = Gravity.CENTER_VERTICAL }
+            r.addView(tv("🤲  Istighfar", 16f, C.TXT, true), lp(0, -2, 1f))
+            r.addView(tv(if (n == total) "Done today ✓" else "$n / $total", 13f, if (n == total) C.G else C.DIM, true))
+            card.addView(r)
+            val bar = Bar(this).apply { color = C.G }; card.addView(bar, lp(-1, dp(6), t = 10))
+            bar.animateTo(n / total.toFloat(), if (animate) 200 else 0)
+            card.pressable {
+                startActivity(Intent(this, IstighfarActivity::class.java))
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            }
+            add(card, lp(b = 16))
+        }
+
         for (s in list) {
             val d = s.days(); val nm = nextMile(d); val pm = prevMile(d)
             val card = vbox().apply { background = shape(C.CARD, dp(22).toFloat()); setPadding(dp(16), dp(16), dp(16), dp(16)) }

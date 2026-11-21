@@ -9,7 +9,7 @@ android {
         applicationId = "com.streak.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
+        versionCode = 7
         versionName = "1.0"
     }
     signingConfigs {

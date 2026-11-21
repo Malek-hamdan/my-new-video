@@ -12,6 +12,7 @@
         </activity>
         <activity android:name=".DetailActivity" />
         <activity android:name=".SettingsActivity" />
+        <activity android:name=".IstighfarActivity" />
         <receiver android:name=".Rx" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
