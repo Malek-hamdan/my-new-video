@@ -1070,7 +1070,7 @@
     min-height: 18px;
     transition: color 0.3s ease;
   }
-  .status.saved { color: #7fd6a4; }
+  .status.saved, .ok-txt { color: #7fd6a4; }
   .status.error { color: var(--danger); }
 
   /* Mobile: rows become cards */
@@ -1374,6 +1374,25 @@
   body.menu-open header .header-actions .me-chip .av { background: #0f4c81; color: #fff; }
   body.menu-open header .header-actions .me-chip .role { color: var(--muted); }
   body.menu-open header .header-actions .pend-btn .pend-n { background: #0f4c81; color: #fff; }
+
+  /* ===== White screen: green and red strong enough to read on white =====
+     These labels were made for the old dark look; on white they came out pale. Same colours, darker.
+     (The black screen keeps the light versions, which read well there.) */
+  html:not([data-theme="dark"]) { --danger: #c62828; --danger-soft: rgba(198,40,40,0.09); }
+  html:not([data-theme="dark"]) .tx-text.pos { color: #15803d; }
+  html:not([data-theme="dark"]) .tx-text.neg { color: #c62828; }
+  html:not([data-theme="dark"]) .chip.chip-in { background: #e8f6ee; border-color: #9fd6b5; color: #15803d; }
+  html:not([data-theme="dark"]) .chip.chip-out { background: #fdecea; border-color: #f2b0a8; color: #c62828; }
+  html:not([data-theme="dark"]) .chip.chip-now { background: #e8f6ee; border-color: #9fd6b5; color: #15803d; }
+  html:not([data-theme="dark"]) .chip.chip-local { background: #fff4dc; border-color: #e0a030; color: #8a5a00; }
+  html:not([data-theme="dark"]) .chip.src-used { background: #fff1e0; border-color: #efc98f; color: #9a5a0b; }
+  html:not([data-theme="dark"]) .chip.src-equip { background: #e6f6f3; border-color: #8fd3c6; color: #0f766e; }
+  html:not([data-theme="dark"]) .line-sel.need { color: #c62828; }
+  html:not([data-theme="dark"]) .order-tag { border-color: #f2b0a8; color: #c62828; }
+  html:not([data-theme="dark"]) tr.low .cell.qty[data-field="quantity"] { border-color: #e57373; color: #c62828; }
+  html:not([data-theme="dark"]) .status.saved, html:not([data-theme="dark"]) .ok-txt, html:not([data-theme="dark"]) .sum-line .v.in { color: #15803d; }
+  html:not([data-theme="dark"]) tbody tr.arrival td:first-child { color: #15803d; }
+  html:not([data-theme="dark"]) .side-sel[data-state="warn"] { color: #8a5a00; }
 
   /* ===== Black screen: chosen with the button at the top, kept on this device; printing stays white =====
      Only the neutral colours change: page, cards, lines and text. The colours that mean something stay:
@@ -6189,7 +6208,7 @@
       setStatus(done, "saved", 8000);
       // the Backups window covers the status line, so say it there too
       var info = document.getElementById("archInfo");
-      info.innerHTML = '<b style="color:#7fd6a4">\u2713 ' + done + "</b><br>" + info.textContent;
+      info.innerHTML = '<b class="ok-txt">\u2713 ' + done + "</b><br>" + info.textContent;
     });
   }
   // One page for the file: what each machine used and received in the year
