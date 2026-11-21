@@ -265,7 +265,9 @@ const ramp = (z, a, b) => clamp((z - a) / (b - a), 0, 1);
 const CITY_Z = 6000;
 const inCity = z => S.wid === 'golden' && z >= CITY_Z - 60;
 const flat = z => S.wid === 'golden' ? 1 - ramp(z, CITY_Z - 400, CITY_Z - 100) : 1;
-const elev = z => flat(z) * ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3)) - (S.wid === 'golden' ? Math.min(z, CITY_Z) * 0.1 : 0);
+const elev = z => flat(z) * ramp(z, 60, 180) * (2.2 * Math.sin(z * 0.021) + 1.1 * Math.sin(z * 0.057 + 1.3)) - (S.wid === 'golden' ? Math.min(z, CITY_Z) * 0.1 : 0) - dips(z);
+// past the end of the track, the Rhythm World lies far below: everything from there on sits that much lower
+const dips = z => { let d = 0; for (const p of S.dips) { const u = clamp((z - p.z0) / (p.z1 - p.z0), 0, 1); d += p.d * u * u * (3 - 2 * u); } return d; };
 const bend = z => flat(z) * ramp(z, 120, 280) * (9 * Math.sin(z * 0.0105) + 3 * Math.sin(z * 0.027 + 2));
 const CITY_Y = -CITY_Z * 0.1;   // the road's height in the city
 let cars = [];   // oncoming traffic in the city
@@ -370,7 +372,7 @@ const buzz = p => { if (vibeOff) return; try { navigator.vibrate && navigator.vi
 const S = { phase: 'loading', gems: 0, best: +(load('rb_best') || 0), bestMighty: +(load('rb_best_mighty') || 0), mightyOpen: load('rb_mighty') === '1',
   mighty: false, level: 1, levelZ: 0, startZ: 0, savedLevel: Math.max(1, +(load('rb_level') || 1)), shake: 0, combo: 0,
   bank: +(load('rb_bank') || 0), banked: 0, wid: null, wOwned: loadJSON('rb_wown', []), wDone: loadJSON('rb_wdone', []),
-  balls: loadJSON('rb_balls', ['classic']), skin: load('rb_skin') || 'classic', trails: loadJSON('rb_trails', ['none']), trail: load('rb_trail') || 'none', up: loadJSON('rb_up', {}), continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0, world: 'run', wt: 0, pulse: 0, rpts: 0 };
+  balls: loadJSON('rb_balls', ['classic']), skin: load('rb_skin') || 'classic', trails: loadJSON('rb_trails', ['none']), trail: load('rb_trail') || 'none', up: loadJSON('rb_up', {}), continues: 0, msgT: 0, endT: 0, endFell: false, dark: 0, hard: 0, turbo: 0, world: 'run', wt: 0, pulse: 0, rpts: 0, dips: [] };
 let ball, rows, camX, parts, gen, cam, pulled, time = 0;
 
 function newRow() { return { cells: new Array(COLS).fill(FLOOR), gems: [], power: null, movers: [], tunnel: false, group: null, dirty: false }; }
@@ -385,6 +387,7 @@ function makeRow(i) {
     const E = Math.round(e / ROW);
     row.cells.fill(i < E ? FLOOR : i === E ? PAD : HOLE); row.hard = S.hard > 0;
     row.portal = i === E + 3;   // a big glowing ring just past the ramp, to fly through
+    row.past = i > E;   // beyond the end: open air, no scenery
     return row;
   }
   if (gen.tunnelLeft > 0 && !inCity(i * ROW)) { row.tunnel = true; gen.tunnelLeft--; }
@@ -480,7 +483,7 @@ function reset() {
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 }; camX = 0; pulled = [];
   for (const p of parts || []) p.mesh.visible = false;
   parts = [];
-  S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0; S.world = 'run'; S.rpts = 0; S.edgeSaid = null;
+  S.gems = 0; S.banked = 0; S.continues = 0; S.combo = 0; S.world = 'run'; S.rpts = 0; S.edgeSaid = null; S.dips = [];
   if (typeof hopClear === 'function') hopClear();
   const w = curW();
   S.turbo = !w && S.startZ >= TURBO_AT ? 1 : 0;
@@ -1789,7 +1792,7 @@ function buildRow(i) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(rail, 3));
     grp.add(new THREE.Mesh(g, city ? MAT.cityLine : red ? MAT.railHard : MAT.rail));
   }
-  if (city && i % 2 === 0) {   // dashed lane lines
+  if (city && i % 2 === 0 && !row.past) {   // dashed lane lines
     const d = [];
     for (const x of [-1.5, -0.5, 0.5, 1.5]) for (const p of [P(x - 0.04, 0.012, z0 + 0.2), P(x + 0.04, 0.012, z0 + 0.2), P(x + 0.04, 0.012, z0 + 1.6), P(x - 0.04, 0.012, z0 + 0.2), P(x + 0.04, 0.012, z0 + 1.6), P(x - 0.04, 0.012, z0 + 1.6)]) d.push(p.x, p.y, p.z);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(d, 3)); grp.add(new THREE.Mesh(g, MAT.cityLine));
@@ -1838,7 +1841,7 @@ function buildRow(i) {
     else { m = new THREE.Mesh(GEO.box, MAT.mover); m.castShadow = true; m.add(new THREE.LineSegments(GEO.boxEdges, MAT.moverEdge)); }
     grp.add(m); row.moverMeshes.push([mv, m]);
   }
-  row.walkers = city ? cityDecor(grp, i, zc) : null;
+  row.walkers = city && !row.past ? cityDecor(grp, i, zc) : null;
   if (row.portal) {   // the gate into the Rhythm World, bright through the haze, square to the track
     const ring = new THREE.Mesh(GEO.portal, MAT.portal), disc = new THREE.Mesh(GEO.portalDisc, MAT.portalDisc);
     const a = Wp(0, 0, zc - 2), c = Wp(0, 0, zc + 2);
@@ -1862,7 +1865,7 @@ function buildRow(i) {
     const c = new THREE.Mesh(GEO.jetCore, MAT.jetCore); c.position.copy(f.position); grp.add(c);
     row.jetMeshes.push([jt, f, c]);
   }
-  if (TH.decor && i % 3 === 0 && !city) addDecor(grp, i, zc);
+  if (TH.decor && i % 3 === 0 && !city && !row.past) addDecor(grp, i, zc);
   if (row.tunnel) {
     const a = new THREE.Mesh(GEO.arch, row.hard ? (i % 2 ? MAT.archHardA : MAT.archHardB) : (i % 2 ? MAT.archA : MAT.archB));
     Wp(0, -0.6, zc, a.position); grp.add(a);
@@ -1889,7 +1892,7 @@ function render() {
   const first = Math.max(0, Math.floor((b.z - 10) / ROW)), last = rhythm ? first - 1 : Math.floor((b.z + viewDist()) / ROW);
   for (const r of rows) if (r.group && (rhythm || r.index < first || r.index > last || r.dirty)) dropRow(r);
   for (let i = first; i <= last; i++) { const r = rowAt(i); if (!r.group) buildRow(i); }
-  if (rhythm) renderHop();
+  if (rhythm || (S.world === 'drop' && S.launched)) renderHop();
   // animate pickups and sliding walls in view
   for (let i = first; i <= last; i++) {
     const r = rows[i];
@@ -1915,7 +1918,7 @@ function render() {
     if (r.dropMeshes) { const y = clamp((i * ROW - b.z - 24) * 0.55, 0, 10); for (const [m, x] of r.dropMeshes) Wp(x, BLOCK_H / 2 - 0.04 + y, i * ROW + 1, m.position); }
     for (const [jt, f, c] of r.jetMeshes) { const lit = jetLit(jt), k = lit ? 1 + 0.12 * Math.sin(time * 37 + i) : 0.04; f.scale.set(k, k, k); c.scale.set(1, lit ? 1 : 0.02, 1); }
   }
-  ground.visible = ground.userData.on && !rhythm;   // the Rhythm World floats in open sky
+  ground.visible = ground.userData.on && !rhythm && !(S.world === 'drop' && S.launched);   // the Rhythm World floats in open sky
   if (ground.visible) {
     ground.position.set(camera.position.x, elev(b.z) - (TH.decor === 'golden' ? 7 : TH.decor === 'neon' ? 3 : 5), camera.position.z - 200);
     if (ground.material.map) ground.material.map.offset.set(time * 0.02, time * 0.013);
@@ -1959,7 +1962,13 @@ function render() {
   if (S.shake > 0) camPos.add(new THREE.Vector3(rand(-1, 1), rand(-1, 1), 0).multiplyScalar(S.shake * 0.5));
   camPos.y += cam.jolt;
   camera.position.copy(camPos);
-  const look = b.fall ? ballGroup.position.clone() : Wp(camX * 0.5 + b.x * 0.25, 0.2 + cam.jolt * 0.6, b.z + 9);
+  let look = b.fall ? ballGroup.position.clone() : Wp(camX * 0.5 + b.x * 0.25, 0.2 + cam.jolt * 0.6, b.z + 9);
+  if (S.world === 'drop' && S.launched) {
+    // in the air: ride along just above and behind the ball, looking down toward where it will land
+    const by = ballGroup.position.y, gy = Wp(0, 0, S.landZ).y, k = clamp((by - gy) / 12, 0, 1);
+    camera.position.y = by + cam.h + 2.5 * k + cam.jolt;
+    look.y = by + (gy - by) * 0.35 * k + 0.2;
+  }
   camera.up.set(Math.sin(cam.roll), Math.cos(cam.roll), 0);
   camera.lookAt(look);
   starGroup.position.copy(camera.position);
@@ -2002,7 +2011,7 @@ function render() {
     seaMesh.visible = mountains.visible = cityView;
     if (cityView) {
       const cp = camera.position;
-      seaMesh.position.set(-1507.9, (S.world === 'run' ? CITY_Y : CITY_Y - 30) - 0.9, cp.z - 2000);
+      seaMesh.position.set(S.world === 'run' ? -1507.9 : cp.x, (S.world === 'run' ? CITY_Y : CITY_Y - 30) - dips(b.z) - 0.9, cp.z - 2000);   // open sea all round once off the end of the road
       mountains.position.set(cp.x, CITY_Y + 128, cp.z);
       if (es.street) { scene.fog.color.set(0xc9d9ec); scene.fog.near = 160; scene.fog.far = 1800; hemi.color.set(0xe6efff); hemi.groundColor.set(0x8a8478); }   // plain daylight in the city
     }
@@ -2121,7 +2130,8 @@ const HOP = { tiles: [], live: [], k: 0, lv: null, perfect: 0 };
 const flash = (on) => $('flash').classList.toggle('on', on);
 
 // where the track ends before the next Rhythm World, while that end is still ahead on the track
-const DROP_RUN = 50, DROP_CLEAR = 45;   // the finale starts 50 m before the edge; the last 90 m are clear
+const DROP_RUN = 120, DROP_CLEAR = 70;   // the finale starts 120 m before the edge, to ease off the speed; the last 140 m are clear
+const DROP_D = 32, DROP_VY = 9, DROP_G = 13;   // the Rhythm World is 32 m below the edge; the leap off the ramp
 function dropEdge() {
   if (S.world !== 'run' || S.mighty) return null;
   const w = curW();
@@ -2139,7 +2149,7 @@ function startDrop() {
   for (let j = laid ? edge + 1 : i - 2; j < edge + 80; j++) {
     const r = rowAt(j), c = j < edge ? FLOOR : j === edge ? PAD : HOLE;
     if (laid && r.cells.every(x => x === c) && !r.movers.length && !r.laser) continue;
-    Object.assign(r, { cells: r.cells.fill(c), movers: [], laser: null, power: null, gems: [], tunnel: false, dirty: true });
+    Object.assign(r, { cells: r.cells.fill(c), movers: [], laser: null, power: null, gems: [], tunnel: false, dirty: true, past: j > edge });
   }
   S.edgeZ = edge * ROW + 0.6;
   const w = curW();
@@ -2149,20 +2159,32 @@ function worldStep(dt) {
   const b = ball;
   if (S.world === 'drop') {
     // roll to the end of the track, launch off the ramp, then fall away into the Rhythm World
-    b.speed += (Math.min(b.speed, 26) - b.speed) * Math.min(1, dt * 2);
+    if (S.launched) b.speed = S.flyV;   // no grip in the air: the speed off the ramp carries it
+    else b.speed += (Math.min(b.speed, 26) - b.speed) * Math.min(1, dt * 2);
     b.z += b.speed * dt; b.rot += b.speed * dt / R;
     if (keys.ArrowLeft) b.x -= 6 * dt;
     if (keys.ArrowRight) b.x += 6 * dt;
     b.x = clamp(b.x, -HALF + R, HALF - R);
     if (!S.launched && b.z >= S.edgeZ) {
-      S.launched = time; b.air = true; b.vy = 10; b.y = Math.max(b.y, 0.2);
+      // off the ramp and down: a long arc onto the Rhythm World's first tile, which is laid out (with
+      // the rest of the tiles) right away, far below, so the ball is seen falling all the way to it
+      S.launched = time; b.air = true; b.vy = DROP_VY; S.fy = b.y = Math.max(b.y, 0.2); S.flyV = Math.min(b.speed, 28);
+      const t = (DROP_VY + Math.sqrt(DROP_VY * DROP_VY + 2 * DROP_G * (DROP_D + S.fy))) / DROP_G;   // time to fall DROP_D below the edge
+      S.landZ = b.z + S.flyV * t;
+      S.dips.push({ z0: S.edgeZ + 8, z1: S.landZ - 6, d: DROP_D });
+      buildHop(S.landZ);
       sfx.boost(); buzz([40, 40, 120]); cam.joltV -= 0.6;
     }
     if (S.launched) {
-      b.vy -= 16 * dt; b.y += b.vy * dt;
-      if (b.y < -1.5 && !b.fall) { b.fall = true; b.air = false; sfx.fall(); }
-      if (time - S.launched > 2.2) flash(true);
-      if (time - S.launched > 2.7) enterRhythm();
+      b.z = Math.min(b.z, S.landZ);
+      b.vy -= DROP_G * dt; S.fy = Math.max(-DROP_D, S.fy + b.vy * dt);
+      b.y = S.fy + dips(b.z) - dips(S.edgeZ);   // height above the (lowered) ground below
+      b.x += (0 - b.x) * Math.min(1, dt * 1.2);   // drift over the landing tile
+      if (b.z >= S.landZ) {   // touchdown
+        b.y = 0; S.shake = 0.25; cam.joltV -= 0.9; buzz([60, 30, 30]); sfx.power();
+        burst(0, 0.1, b.z, [RHYTHM_THEME.rail, 0xffffff], 22, 3);
+        enterRhythm();
+      }
     } else b.y = 0;
     return;
   }
@@ -2170,22 +2192,29 @@ function worldStep(dt) {
   hud();
 }
 function enterRhythm() {
-  const b = ball;
+  const b = ball, w = curW();
   S.world = 'rhythm';
   // power-ups do nothing among the tiles, so they end here rather than sit frozen on screen
   Object.assign(b, { x: 0, y: 0, vy: 0, fall: false, air: true, hole: null, shield: 0, magnet: 0, slow: 0, double: 0, five: 0 });
   cam = { back: CAM_BACK, h: CAM_H, roll: 0, jolt: 0, joltV: 0 };
+  if (!HOP.tiles.length) buildHop(b.z);
+  musicStart(0);
+  setTimeout(() => flash(false), 50);
+  say(w ? `${w.icon} ${w.n.toUpperCase()} 🎵` : 'RHYTHM WORLD 🎵', w ? TH.msg : '#c8b6ff');
+}
+// lay out the Rhythm World's tiles from z0 on, one per hop of the song
+function buildHop(z0) {
   const song = curSong(), w = curW();
   // without the song file, fall back to a steady 82 BPM for 55 s
   const beats = song ? song.beats : Array.from({ length: 75 }, (_, k) => 0.4 + k * 0.73);
-  HOP.lv = { z0: b.z, speed: w ? w.hop : 7,   // a gentle forward pace: the music sets the hops, not the speed
+  HOP.lv = { z0, speed: w ? w.hop : 7,   // a gentle forward pace: the music sets the hops, not the speed
     end: song ? song.end : 55, beats, bi: 0,
     strength: song ? song.strength : beats.map((_, k) => k % 4 ? 0.2 : 1) };
   // the rhythm chosen by ear for this song (song1.js "hops", timed to the millisecond on the
   // song's own beat grid); without it, the beat. Hops under a quarter second apart are quick ones.
   const times = (song && song.hops || beats).map(t => ({ t, s: 0 }));
   beats.forEach((t, k) => { const h = times.find(x => Math.abs(x.t - t) < 0.12); if (h) h.s = HOP.lv.strength[k]; });   // strong beats carry gems
-  HOP.tiles = [{ t: 0, z: b.z, x: 0, w: 2.4, start: true, hit: true, dip: 0, dipV: 0, flash: 0, mesh: null }];
+  HOP.tiles = [{ t: 0, z: z0, x: 0, w: 2.4, start: true, hit: true, dip: 0, dipV: 0, flash: 0, mesh: null }];
   HOP.k = 0; HOP.perfect = 0;
   // one tile per hop; quick hops land on small tiles drifting with some momentum so the trail
   // snakes, and only shift a little sideways
@@ -2205,9 +2234,6 @@ function enterRhythm() {
     if (prev.sway) prev.x0 = prev.x = clamp(x, -1.6, 1.6);
     HOP.tiles.push(prev);
   }
-  musicStart(0);
-  setTimeout(() => flash(false), 50);
-  say(w ? `${w.icon} ${w.n.toUpperCase()} 🎵` : 'RHYTHM WORLD 🎵', w ? TH.msg : '#c8b6ff');
 }
 function exitRhythm() {
   const b = ball;
