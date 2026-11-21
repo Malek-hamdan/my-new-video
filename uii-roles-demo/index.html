@@ -303,6 +303,10 @@
   .slip .s-lnspace { display: inline-block; width: 14mm; }
   .slip .s-blank.big { min-height: 11mm; }
   .slip .s-wline { display: inline-block; width: 36mm; border-bottom: 1px solid #333; height: 15px; vertical-align: bottom; }
+  /* blank slip date: the day is written on the short line, month and year are printed (__/11/26) */
+  .slip .s-dwrap { display: inline-flex; align-items: flex-end; width: 36mm; height: 15px; vertical-align: bottom; }
+  .slip .s-dwrap .s-wline.s-dd { width: auto; flex: 1; min-width: 7mm; }
+  .slip .s-dfix { font-size: 15px; color: #111; letter-spacing: 0.5px; margin: 0 1px; }
   .bpage { height: 277mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; break-after: page; }
   .bpage:last-child { page-break-after: auto; break-after: auto; }
   .slip-cut { width: 190mm; margin-top: 5mm; text-align: center; font: 11px Arial, sans-serif; color: #777; border-top: 1.5px dashed #999; padding-top: 1.5mm; }
@@ -4777,14 +4781,27 @@
   var DAY3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   function utcYmd(d) { return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()); }
   function blankManualOn() { return document.getElementById("blankManual").getAttribute("aria-pressed") === "true"; }
-  function weekRange(w) {
+  // first and last day the booklet covers: From - To when chosen, otherwise the week's Monday to Sunday
+  function weekDates(w) {
     var a, z;
     if (blankManualOn()) {
       var f = document.getElementById("blankFrom").value, t = document.getElementById("blankTo").value;
       if (/^\d{4}-\d{2}-\d{2}$/.test(f) && /^\d{4}-\d{2}-\d{2}$/.test(t)) { a = new Date(f + "T00:00:00Z"); z = new Date(t + "T00:00:00Z"); }
     }
-    if (!a) { a = weekMonday(blankYear, w); z = new Date(a.getTime() + 6 * 864e5); }
+    if (!a) { if (!w) return null; a = weekMonday(blankYear, w); z = new Date(a.getTime() + 6 * 864e5); }
+    return [a, z];
+  }
+  function weekRange(w) {
+    var d = weekDates(w) || [weekMonday(blankYear, w), new Date(weekMonday(blankYear, w).getTime() + 6 * 864e5)], a = d[0], z = d[1];
     return DAY3[a.getUTCDay()] + " " + dmy(a) + "  \u2192  " + DAY3[z.getUTCDay()] + " " + dmy(z);
+  }
+  // The date already printed on a blank slip: month and year, so only the day is written by hand (__/11/26).
+  // A week that runs into the next month (or year) leaves that part to be written too.
+  function slipDatePre() {
+    var d = weekDates(blankWeek());
+    if (!d) return null;
+    var a = d[0], z = d[1], sameY = a.getUTCFullYear() === z.getUTCFullYear();
+    return { m: sameY && a.getUTCMonth() === z.getUTCMonth() ? pad(a.getUTCMonth() + 1) : "", y: sameY ? String(a.getUTCFullYear()).slice(2) : "" };
   }
   function blankSetMode(manual) {
     document.getElementById("blankAuto").setAttribute("aria-pressed", manual ? "false" : "true");
@@ -4809,10 +4826,12 @@
       '<div class="c-line">Entered in the system<span class="c-tick"></span><span style="flex:1"></span></div>' +
       '<div class="c-line">Reviewed by <span class="w"></span> Signature <span class="w"></span></div></div></div>';
   }
-  function blankSlipHtml(me, place, no) {
+  function blankSlipHtml(me, place, no, dp) {
+    var dd = '<span class="s-wline s-dd"></span>';
+    var dateHtml = dp ? '<span class="s-dwrap">' + dd + '<b class="s-dfix">/' + (dp.m || "</b>" + dd + '<b class="s-dfix">') + "/" + (dp.y || "</b>" + dd + '<b class="s-dfix">') + "</b></span>" : '<span class="s-wline"></span>';
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     return '<div class="slip"><div class="s-head"><div><div class="s-title">UII \u2014 Spare Part Issue Slip</div><div class="s-sub">' + e(place || "Store room") + "</div></div>" +
-      '<div class="s-no"><div class="s-serial">No. <b>' + slipNo(no) + '</b></div><span class="s-k">Date</span> <span class="s-wline"></span><br><span class="s-k">Time</span> <span class="s-wline"></span></div></div>' +
+      '<div class="s-no"><div class="s-serial">No. <b>' + slipNo(no) + '</b></div><span class="s-k">Date</span> ' + dateHtml + '<br><span class="s-k">Time</span> <span class="s-wline"></span></div></div>' +
       '<div class="s-grid">' +
       '<div class="s-cell wide"><div class="s-lab">Part name</div><div class="s-blank"></div></div>' +
       '<div class="s-cell s-linebox">LINE<span class="s-lnspace"></span></div>' +
@@ -4828,7 +4847,7 @@
   function renderBlank() {
     var me = document.getElementById("blankMe").value.trim(), place = document.getElementById("blankPlace").value.trim(), n = blankCount();
     var st = blankStart();
-    document.getElementById("blankPreview").innerHTML = blankSlipHtml(me, place, st);
+    document.getElementById("blankPreview").innerHTML = blankSlipHtml(me, place, st, slipDatePre());
     var pages = Math.ceil(n / 2);
     document.getElementById("blankPages").textContent = n + (n === 1 ? " slip" : " slips") + " \u00B7 " + pages + (pages === 1 ? " A4 page" : " A4 pages") + " \u00B7 No. " + slipNo(st) + (n > 1 ? " to " + slipNo(st + n - 1) : "") + (blankWeek() ? " \u00B7 Week " + blankWeek() + ": " + weekRange(blankWeek()).replace(/  /g, " ") : "") + (document.getElementById("blankCover").checked ? " \u00B7 + cover page" : "");
   }
@@ -4869,7 +4888,8 @@
     if (document.getElementById("blankCover").checked && blankWeek()) html += '<div class="bpage">' + coverHtml(me, place, blankWeek(), st, st + n - 1) + "</div>";
     // a stapled booklet keeps both slips on the page, so no cut line then
     var cut = document.getElementById("blankCover").checked ? "" : '<div class="slip-cut">\u2702 cut here</div>';
-    for (var i = 0; i < n; i += 2) html += '<div class="bpage">' + blankSlipHtml(me, place, st + i) + (i + 1 < n ? cut + blankSlipHtml(me, place, st + i + 1) : "") + "</div>";
+    var dp = slipDatePre();
+    for (var i = 0; i < n; i += 2) html += '<div class="bpage">' + blankSlipHtml(me, place, st + i, dp) + (i + 1 < n ? cut + blankSlipHtml(me, place, st + i + 1, dp) : "") + "</div>";
     blankDlg.hidden = true;
     printHtml(html);
   });
