@@ -1219,6 +1219,7 @@
   .cell { color: var(--text); }
   .del:hover { background: #fdecec; }
   .sc-rs { color: var(--muted); }
+  .sc-why { margin-top: 3px; font-size: 12px; color: var(--muted); line-height: 1.35; max-width: 340px; }
   .sc-up { color: #c2410c; } .sc-down { color: #15803d; }
   .chip { background: #f1f3f6; color: #1c2430; border-color: #d9dde3; }
   .sum-tabs button[aria-selected="true"] { background: #e8effd; color: #1c2430; }
@@ -3067,7 +3068,7 @@
   // Gamma-Poisson test: how likely is this many parts, given the earlier months and the days gone by.
   // Imported and Local together. Up to 6 earlier months with data; 3 needed for a full rating.
   var RATE = [["Excellent", "good", "clearly below normal"], ["Good", "good", "normal for this machine"], ["Watch", "warn", "a little above normal"],
-    ["High", "serious", "clearly above normal (under 5% chance)"], ["Very high", "crit", "far above normal (under 1% chance)"]];
+    ["High", "serious", "clearly above normal"], ["Very high", "crit", "far above normal"]];
   var RATE_MIN_MONTHS = 3, RATE_MAX_MONTHS = 6;
   // S parts over n earlier months, x parts now, E = share of the month gone by (1 for a full month)
   function rateTest(S, n, x, E) {
@@ -3232,31 +3233,134 @@
     return box;
   }
   var scoreEarly = false;
+  // ---- Rating (second version, from the statistics review) ----
+  // A. Pieces issued by the machine, against its own earlier months. The test allows for parts leaving in
+  //    batches (one movement of 5 pieces is one job, not 5 independent events) and starts from the machine's
+  //    own rate, not from a fixed number.
+  // B. Each part against its own usual withdrawal: a part taken in far more than usual raises the level a
+  //    step or adds a note. B never lowers A.
+  // Days weigh by how much usually goes out on them: Monday (maintenance) can weigh more than other days.
+  function outKey(t) { var r = String(t.reference || "").trim().toUpperCase(), n = String(t.name || "").trim().toUpperCase(); return r || n || "?"; }
+  // How much more goes out on a Monday than on another day, from the earlier months (all machines).
+  // With too little data every day weighs 1.
+  function mondayWeight(keys) {
+    var pm = 0, po = 0, dm = 0, dO = 0;
+    keys.forEach(function (k) {
+      var y = +k.slice(0, 4), mo = +k.slice(5), dIn = new Date(y, mo, 0).getDate();
+      for (var d = 1; d <= dIn; d++) { if (new Date(Date.UTC(y, mo - 1, d)).getUTCDay() === 1) dm++; else dO++; }
+      MACHINES.forEach(function (m) {
+        outTxOf(k, m, null).forEach(function (t) { var q = -t.change; if (new Date(txDate(t) + "T00:00:00Z").getUTCDay() === 1) pm += q; else po += q; });
+      });
+    });
+    if (pm + po < 30 || !dm || !dO) return 1;
+    var w = ((pm + 1) / dm) / ((po + 1) / dO);
+    return Math.round(Math.max(1 / 3, Math.min(8, w)) * 10) / 10;
+  }
+  // Weighted days of month k from day 1 to upTo (the whole month when upTo is 0)
+  function exposure(k, upTo, mon) {
+    var y = +k.slice(0, 4), mo = +k.slice(5), dIn = new Date(y, mo, 0).getDate(), last = upTo ? Math.min(upTo, dIn) : dIn, w = 0;
+    for (var d = 1; d <= last; d++) w += new Date(Date.UTC(y, mo - 1, d)).getUTCDay() === 1 ? mon : 1;
+    return w;
+  }
+  // Lumpiness of withdrawals: E[Q^2] / E[Q] over the movements (1 when every movement is one piece)
+  function lumpOf(movs) {
+    var s1 = 0, s2 = 0;
+    movs.forEach(function (t) { var q = -t.change; s1 += q; s2 += q * q; });
+    return s1 ? s2 / s1 : 1;
+  }
+  // S pieces over Wb weighted days before; x pieces in Wn weighted days now; phi = lumpiness.
+  // Negative binomial; the prior is centred on the machine's own rate (half a piece of weight).
+  function rateTestW(S, Wb, x, Wn, phi) {
+    var a = 0.5, rate0 = S > 0 ? S / Wb : 0.5 / Wb;
+    var r0 = S + a, beta = Wb + a / rate0, mu = r0 / beta * Wn;
+    var r = Math.max(0.05, 1 / ((Math.max(1, phi) - 1) / Math.max(mu, 1e-9) + 1 / r0));
+    var p = r / (r + mu), pk = Math.pow(p, r), below = 0, upTo = 0;
+    for (var k = 0; k <= x; k++) {
+      if (k < x) below += pk;
+      upTo += pk;
+      pk = pk * (k + r) / (k + 1) * (1 - p);
+    }
+    return { mu: mu, pUp: Math.max(0, 1 - below), pLow: Math.min(1, upTo) };
+  }
+  // A: 4 Very high, 3 High, 2 Watch, 1 Good, 0 Excellent. The upper levels need at least 3 pieces (Watch 2) above expected.
+  function levelA(t, x) {
+    var ex = x - t.mu;
+    if (t.pUp < 0.01 && ex >= 3) return 4;
+    if (t.pUp < 0.05 && ex >= 3) return 3;
+    if (t.pUp < 0.10 && ex >= 2) return 2;
+    if (t.pLow < 0.05 && x < t.mu) return 0;
+    return 1;
+  }
+  // B: parts taken in far more than their usual quantity this month.
+  // usual = the part's average per movement, pulled toward the machine's average (3 movements of weight),
+  // so a part seen once or twice is not judged on its own. Only parts with 2+ earlier movements count
+  // toward the level; the others give a note.
+  function partFlags(cur, base, pool) {
+    var sum = function (l) { return l.reduce(function (a, t) { return a - t.change; }, 0); };
+    var uM = base.length ? sum(base) / base.length : pool.length ? sum(pool) / pool.length : 1, by = {};
+    base.forEach(function (t) { var k = outKey(t); (by[k] = by[k] || []).push(-t.change); });
+    var large = {}, extreme = {}, notes = [], seen = {};
+    cur.forEach(function (t) {
+      var k = outKey(t), q = -t.change, qs = by[k] || [], np = qs.length;
+      var u = (qs.reduce(function (a, b) { return a + b; }, 0) + 3 * uM) / (np + 3), r = q / u, ex = q - u;
+      var name = t.name || t.reference || "(no name)";
+      if (!np) { if (q >= 10 && !seen[k]) { seen[k] = 1; notes.push({ name: name, q: q, u: null, formal: false }); } return; }
+      if (r >= 2.5 && ex >= 2) {
+        if (np >= 2) { large[k] = 1; if (r >= 4 && ex >= 5) extreme[k] = 1; }
+        if (!seen[k]) { seen[k] = 1; notes.push({ name: name, q: q, u: Math.round(u * 10) / 10, formal: np >= 2 }); }
+      }
+    });
+    var nL = Object.keys(large).length, nE = Object.keys(extreme).length;
+    return { b: nE || nL >= 2 ? 2 : nL ? 1 : 0, notes: notes };
+  }
+  // A and B together (rows: A level 0-4, columns: B 0-2). B raises A by a step at most, and never lowers it.
+  var RATE_COMBINE = [[0, 0, 1], [1, 1, 2], [2, 3, 3], [3, 3, 4], [4, 4, 4]];
+
   // Fresh start: from January 2027 the rating, the analysis and the month comparison count 2027 onwards only.
   // The trial months (September to December 2026) stay in the records but are never compared with 2027.
   var FRESH_START = "2027-01";
   function sameEra(k) { return month < FRESH_START || k >= FRESH_START; }
-  // What the rating is built on, shared by the Summary page and the Excel export
+  // What the rating is built on
   function rateSetup(day) {
     var idx = MONTHS.indexOf(month), prevKeys = [];
     for (var i = idx - 1; i >= 0 && prevKeys.length < RATE_MAX_MONTHS; i--) if (monthHasData(MONTHS[i]) && sameEra(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
     var cut = function (k) { return day ? k + "-" + pad(Math.min(day, new Date(+k.slice(0, 4), +k.slice(5), 0).getDate())) : null; };
     var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate();
     var short = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
-    return { prevKeys: prevKeys, cut: cut, daysIn: daysIn, E: day ? day / daysIn : 1,
+    var mon = mondayWeight(prevKeys), Wfull = exposure(month, 0, mon), Wn = day ? exposure(month, day, mon) : Wfull;
+    var pool = [];
+    prevKeys.forEach(function (k) { MACHINES.forEach(function (m) { pool = pool.concat(outTxOf(k, m, null)); }); });
+    return { prevKeys: prevKeys, cut: cut, daysIn: daysIn, E: Wn / Wfull, mon: mon, Wn: Wn,
+      Wb: prevKeys.reduce(function (a, k) { return a + exposure(k, 0, mon); }, 0), pool: pool,
       cur: monthStats(month, cut(month), null), prev: prevKeys.map(function (k) { return monthStats(k, null, null); }),
-      span: prevKeys.length ? short(prevKeys[0]) + (prevKeys.length > 1 ? "\u2013" + short(prevKeys[prevKeys.length - 1]) : "") : "",
+      span: prevKeys.length ? short(prevKeys[0]) + (prevKeys.length > 1 ? "–" + short(prevKeys[prevKeys.length - 1]) : "") : "",
       early: prevKeys.length > 0 && prevKeys.length < RATE_MIN_MONTHS };
   }
   // One machine: lv 0-4 = RATE level, -1 = no earlier month, -2 = not enough history yet (sub says the early signal)
   function rateOne(m, rs) {
-    var hist = rs.prev.map(function (st) { return st[m].outQty; }), now = rs.cur[m].outQty, n = hist.length;
-    var S = hist.reduce(function (a, b) { return a + b; }, 0);
-    var t = n ? rateTest(S, n, now, rs.E) : null, lv = t ? rateLevel(t, now) : -1;
-    var avgNow = n ? S / n * rs.E : 0, sub = "", sig = 0;
-    if (t && rs.early) { sub = lv >= 3 ? "early signal: clearly above normal" : lv === 2 ? "early signal: a little above normal" : "so far within normal"; if (lv >= 3) sig = 1; lv = -2; }
+    var n = rs.prevKeys.length, now = rs.cur[m].outQty, base = [];
+    rs.prevKeys.forEach(function (k) { base = base.concat(outTxOf(k, m, null)); });
+    var S = base.reduce(function (a, t) { return a - t.change; }, 0), curMovs = outTxOf(month, m, rs.cut(month));
+    // lumpiness from this machine's earlier movements, or from all machines when it has fewer than 20
+    var phi = lumpOf(base.length >= 20 ? base : rs.pool);
+    var t = n ? rateTestW(S, rs.Wb, now, rs.Wn, phi) : null;
+    var pf = n ? partFlags(curMovs, base, rs.pool) : { b: 0, notes: [] };
+    var lv = -1, sub = "", sig = 0;
+    if (t) {
+      var la = levelA(t, now), comb = RATE_COMBINE[la][pf.b];
+      if (!rs.early) lv = comb;
+      else {
+        // fewer than 3 earlier months: never Very high; High only when the pieces alone are very clear,
+        // or clear together with several parts taken in far more than usual
+        var ex = now - t.mu, hi = (t.pUp < 0.01 && ex >= 3) || (t.pUp < 0.05 && ex >= 3 && pf.b === 2);
+        var e = hi ? 3 : Math.min(comb, 2);
+        sub = e >= 3 ? "early signal: clearly above normal" : e === 2 ? "early signal: a little above normal" : "so far within normal";
+        if (e >= 3) sig = 1;
+        lv = -2;
+      }
+    }
     var label = lv >= 0 ? RATE[lv][0] : lv === -2 ? (sub.indexOf("early") === 0 ? "Early signal" : "Not enough history") : "No data";
-    return { t: t, lv: lv, n: n, S: S, now: now, avgNow: avgNow, sub: sub, sig: sig, label: label };
+    return { t: t, lv: lv, n: n, S: S, now: now, avgNow: t ? t.mu : 0, sub: sub, sig: sig, label: label, moves: curMovs.length, notes: pf.notes, phi: phi };
   }
   function scorecard(day) {
     var rs = rateSetup(day), prevKeys = rs.prevKeys, cut = rs.cut, daysIn = rs.daysIn, E = rs.E, cur = rs.cur, prev = rs.prev;
@@ -3270,7 +3374,8 @@
     scoreEarly = early;
     var basis = !prevKeys.length ? "No earlier month with data to compare yet" :
       "Compared with " + span + " (" + prevKeys.length + (prevKeys.length === 1 ? " month" : " months") + ")" +
-      (day ? "<br>Month still running: day " + day + " of " + daysIn + " = " + Math.round(E * 100) + "% of the monthly average" : "");
+      (day ? "<br>Month still running: day " + day + " of " + daysIn + " = " + Math.round(E * 100) + "% of a usual month\u2019s parts" : "") +
+      (rs.mon !== 1 ? "<br>Mondays count \u00D7" + rs.mon + " (maintenance day: most parts go out then)" : "");
     var head = '<div class="sc-head"><div><div class="sc-eyebrow">Machine performance</div><div class="sc-title">Parts consumption rating \u2014 ' + monthLabel(month) + (day ? " (to day " + day + ")" : "") + "</div></div>" +
       '<div class="sc-basis">Parts issued (Transfer out), Imported + Local<br>' + basis + "</div></div>";
     var note = early ? '<div class="sc-note">Full rating needs ' + RATE_MIN_MONTHS + " earlier months with data; there " + (prevKeys.length === 1 ? "is 1" : "are " + prevKeys.length) +
@@ -3289,6 +3394,14 @@
       var badge = lv === -1 ? pyramidSvg(-1, 40) + '<div><div class="sc-rl">No data</div><div class="sc-rs">no earlier month to compare</div></div>' :
         lv === -2 ? pyramidSvg(-1, 40) + '<div><div class="sc-rl">Not enough history</div><div class="sc-rs' + (sub.indexOf("clearly") > 0 ? " sc-sig" : "") + '">' + sub + "</div></div>" :
         pyramidSvg(lv, 40) + '<div><div class="sc-rl">' + RATE[lv][0] + '</div><div class="sc-rs">' + RATE[lv][2] + "</div></div>";
+      // one line under the rating: how many movements the pieces came in, and any part taken in far more than usual
+      var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+      var why = now ? now + (now === 1 ? " pc" : " pcs") + " in " + ro.moves + (ro.moves === 1 ? " movement" : " movements") : "";
+      ro.notes.slice(0, 2).forEach(function (x) {
+        why += " \u00B7 " + esc(x.name) + ": " + x.q + " at once" + (x.u === null ? " (new part)" : " (usually about " + x.u + (x.formal ? ")" : ", few earlier movements)"));
+      });
+      if (ro.notes.length > 2) why += " \u00B7 +" + (ro.notes.length - 2) + " more";
+      if (why) badge = badge.replace(/<\/div><\/div>$/, '<div class="sc-why">' + why + "</div></div></div>");
       rows += '<tr><td class="sc-m" data-l="Machine">' + m + '</td><td class="sc-rt" data-l="Rating"><div class="sc-rating">' + badge + "</div></td>" +
         '<td data-l="Average / month">' + (n ? r1(S / n).toFixed(1) : "\u2014") + "</td>" + (day ? '<td data-l="Average by day ' + day + '">' + (n ? r1(avgNow).toFixed(1) : "\u2014") + "</td>" : "") +
         '<td data-l="' + mName + '"><b>' + now + '</b></td><td data-l="vs average" class="' + cls + '">' + vs + "</td>" +
@@ -3304,7 +3417,7 @@
       '<table class="sc-table"><thead><tr><th>Machine</th><th class="sc-left">Rating</th><th>Avg / month</th>' + (day ? "<th>Avg by day " + day + "</th>" : "") + "<th>" + mName + "</th><th>vs average</th><th>Value issued</th><th>Imp. / Local</th></tr></thead><tbody>" + rows + "</tbody></table>" +
       monthByMonth(info) +
       '<div class="sc-foot"><b>Rating scale</b>' + RATE.map(function (r, i) { return '<span class="sc-key">' + pyramidSvg(i, 17) + " " + r[0] + ": " + r[2] + "</span>"; }).join("") +
-      '<span class="sc-key">The chance is how likely this many parts would be in a normal month, judged from the earlier months and the days gone by.</span></div>';
+      '<span class="sc-key">The rating compares the pieces issued with the earlier months, for the days gone by (Mondays weigh more when most parts go out then), allowing for parts that leave several at a time. A part taken in far more than its usual quantity can raise the level one step; it never lowers it.</span></div>';
     var kp = wrap.querySelectorAll(".sc-kpi");
     kpis.forEach(function (k, i) { kp[i].children[0].textContent = k[0]; kp[i].children[1].textContent = k[1]; kp[i].children[2].textContent = k[2]; });
     Array.prototype.forEach.call(wrap.querySelectorAll("[data-goto]"), function (b) { b.addEventListener("click", function () { selectMonth(b.getAttribute("data-goto")); }); });
