@@ -3363,7 +3363,9 @@
   // One unusual month is set aside (under 1% chance and at least 2 above what was expected), never one
   // that sits next to another unusual month: two in a row is a new level, not a bad month.
   // Order covers 9 months in 10 (Q90). Under 3 closed months Q90 is capped at max(2, 2 x the most seen).
-  function partForecast(hist, cur, E) {
+  // phi: how lumpy the part's withdrawals are (E[Q^2]/E[Q]); a part that leaves 5 at a time needs a larger
+  // safety than one that leaves one by one. The prior is centred on the part's own rate.
+  function partForecast(hist, cur, E, phi) {
     var obs = hist.map(function (x) { return { x: x, e: 1 }; });
     if (cur !== null && E > 0) obs.push({ x: cur, e: E });
     var flag = obs.map(function (o, i) {
@@ -3375,16 +3377,18 @@
     });
     var out = -1;
     flag.forEach(function (f, i) {
-      if (f === null || flag[i - 1] != null || flag[i + 1] != null) return;
+      // with fewer than 4 months, setting one aside would leave too little to go on
+      if (obs.length < 4 || f === null || flag[i - 1] != null || flag[i + 1] != null) return;
       if (out < 0 || f < flag[out]) out = i;
     });
     var S = 0, ex = 0, most = 0;
     obs.forEach(function (o, i) { most = Math.max(most, o.x); if (i !== out) { S += o.x; ex += o.e; } });
     if (!S) return { need: 0, q90: 0, mean: 0, out: out, closed: hist.length };
-    var r = S + 0.5, beta = ex + 0.5, p = beta / (beta + 1), pk = Math.pow(p, r), cdf = 0, q = 0;
+    var r0 = S + 0.5, beta = ex + 0.5 * ex / S, mean = r0 / beta;
+    var r = Math.max(0.05, 1 / ((Math.max(1, phi || 1) - 1) / Math.max(mean, 1e-9) + 1 / r0));
+    var p = r / (r + mean), pk = Math.pow(p, r), cdf = 0, q = 0;
     while (true) { cdf += pk; if (cdf >= 0.9 || q > 500) break; pk = pk * (q + r) / (q + 1) * (1 - p); q++; }
     if (hist.length < 3) q = Math.min(q, Math.max(2, 2 * most));
-    var mean = r / beta;
     return { need: Math.ceil(mean - 1e-9), q90: q, mean: mean, out: out, closed: hist.length };
   }
   function monthHasData(k) { return (allTx[k] || []).some(function (t) { return !t.source; }); }
@@ -3403,9 +3407,9 @@
     return (allTx[k] || []).filter(function (t) { return !t.source && t.machine === m && t.change < 0 && (!upTo || txDate(t) <= upTo); });
   }
   function daysBetween(a, b) { return Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 864e5); }
-  function machineAnalysis(hot, prevKeys, cut, day) {
+  function machineAnalysis(hot, prevKeys, cut, day, Ew) {
     var e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-    var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate(), nextKey = MONTHS[MONTHS.indexOf(month) + 1], E = day ? day / daysIn : 1;
+    var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate(), nextKey = MONTHS[MONTHS.indexOf(month) + 1], E = day ? (Ew || day / daysIn) : 1;
     var allKeys = prevKeys.concat([month]), short3 = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
     var nextName = nextKey ? monthLabel(nextKey) : "next month";
     var box = document.createElement("div");
@@ -3420,9 +3424,9 @@
       var key = function (t) { var r = String(t.reference || "").trim().toUpperCase(), n = String(t.name || "").trim().toUpperCase(); return r || refOfName[n] || n || "?"; };
       now.forEach(function (t) {
         var k = key(t), q = -t.change;
-        byRef[k] = byRef[k] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [] };
+        byRef[k] = byRef[k] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [], qs: [] };
         if (!byRef[k].ref) byRef[k].ref = t.reference; if (!byRef[k].name) byRef[k].name = t.name;
-        byRef[k].now += q; byRef[k].dates.push(txDate(t));
+        byRef[k].now += q; byRef[k].dates.push(txDate(t)); byRef[k].qs.push(q);
         if (t.to) takers[t.to.trim()] = (takers[t.to.trim()] || 0) + q;
         if (t.line) lines[t.line] = (lines[t.line] || 0) + q;
       });
@@ -3436,11 +3440,12 @@
       prevKeys.forEach(function (k, i) {
         outTxOf(k, m, null).forEach(function (t) {
           var r = key(t);
-          byRef[r] = byRef[r] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [] };
+          byRef[r] = byRef[r] || { ref: t.reference, name: t.name, now: 0, prev: 0, dates: [], qs: [] };
           if (!byRef[r].ref) byRef[r].ref = t.reference; if (!byRef[r].name) byRef[r].name = t.name;
           byRef[r].prev += -t.change;
           byRef[r].hist = byRef[r].hist || prevKeys.map(function () { return 0; });
           byRef[r].hist[i] += -t.change;
+          byRef[r].qs.push(-t.change);
         });
       });
       var parts = Object.keys(byRef).map(function (k) {
@@ -3453,7 +3458,11 @@
       if (!drivers.length) drivers = parts.slice(0, 3);
       var total = h.now;
       // next month: if nothing changes, the pace of this month carries on
-      var pace = day ? Math.round(h.now / day * daysIn) : h.now;
+      var pace = day ? Math.round(h.now / E) : h.now;
+      // the machine's lumpiness, for parts with few movements of their own
+      var mAll = [];
+      allKeys.forEach(function (k) { mAll = mAll.concat(outTxOf(k, m, k === month ? cut(month) : null)); });
+      var phiM = lumpOf(mAll);
       var row = function (x) {
         // find the part in this month's table by its Reference, and if that is missing or not found, by its name
         var up = function (v) { return String(v || "").trim().toUpperCase(); }, rows = (sheet[m] || []).filter(hasContent);
@@ -3461,7 +3470,11 @@
         var stock = stockRow && /^\d+$/.test(stockRow.quantity) ? parseInt(stockRow.quantity, 10) : null, min = stockRow && /^\d+$/.test(stockRow.min) ? parseInt(stockRow.min, 10) : 0;
         // closed months: the earlier ones, plus this one once it is over; a running month counts for the days gone by
         var hist = x.hist.concat(day ? [] : [x.now]).slice(-6);
-        var f = partForecast(hist, day ? x.now : null, E), need = f.need;
+        // the part's own lumpiness, pulled toward the machine's (3 movements of weight)
+        var s1 = 0, s2 = 0;
+        x.qs.forEach(function (q) { s1 += q; s2 += q * q; });
+        var phiP = ((s1 ? s2 / s1 : 1) * x.qs.length + 3 * phiM) / (x.qs.length + 3);
+        var f = partForecast(hist, day ? x.now : null, E, phiP), need = f.need;
         var order = stock === null ? null : Math.max(0, f.q90 + min - stock);
         var hk = allKeys.slice(-hist.length - (day ? 1 : 0));
         x.setAside = f.out >= 0 ? short3(hk[f.out]) + " (" + (f.out < hist.length ? hist[f.out] : x.now) + ")" : "";
@@ -3473,7 +3486,7 @@
           (every === null ? "once" : "every " + every + (every === 1 ? " day" : " days")) + '</td><td data-l="' + nx + '">' + need + (x.early ? "*" : "") + '</td><td data-l="Safety">+' + x.safety + '</td><td data-l="In stock">' + (stock === null ? "\u2014" : stock) + '</td><td data-l="To order" class="an-order">' + (order === null ? "\u2014" : order ? "order " + order : "enough") + "</td></tr>";
       };
       var tbl = '<table class="sc-table an-table"><thead><tr><th>Part (name \u00B7 reference)</th><th>Avg before</th><th>' + e(monthLabel(month).split(" ")[0].slice(0, 3)) + "</th><th>Change</th><th>How often</th><th>Need in " + e(nextName.split(" ")[0].slice(0, 3)) + "</th><th>Safety</th><th>In stock</th><th>To order</th></tr></thead><tbody>" + drivers.map(row).join("") + "</tbody></table>" +
-        '<div class="an-note">Need = average of the last ' + Math.min(6, prevKeys.length + (day ? 0 : 1)) + " closed months" + (day ? " and the days gone by this month" : "") + ", with one unusual month set aside. Safety covers 9 months in 10. To order = need + safety + Min \u2212 stock." +
+        '<div class="an-note">Need = average of the last ' + Math.min(6, prevKeys.length + (day ? 0 : 1)) + " closed months" + (day ? " and the days gone by this month" : "") + ", with one unusual month set aside. Safety covers 9 months in 10, and is larger for parts that go out several at a time. To order = need + safety + Min \u2212 stock." +
         (drivers.some(function (x) { return x.early; }) ? " *Provisional: fewer than 3 closed months." : "") + "</div>";
       // where the parts went: which line, and who took them (from the slips)
       var why = '<div class="an-why">';
@@ -3614,15 +3627,20 @@
     // lumpiness from this machine's earlier movements, or from all machines when it has fewer than 20
     var phi = lumpOf(base.length >= 20 ? base : rs.pool);
     var t = n ? rateTestW(S, rs.Wb, now, rs.Wn, phi) : null;
+    // how often parts were taken: the number of movements, one movement = one job. A part that leaves in
+    // batches widens the piece test for the whole machine, so a part taken much more often could hide there.
+    var nowM = curMovs.length, tM = n && base.length ? rateTestW(base.length, rs.Wb, nowM, rs.Wn, 1) : null;
     var pf = n ? partFlags(curMovs, base, rs.pool) : { b: 0, notes: [] };
     var lv = -1, sub = "", sig = 0;
     if (t) {
-      var la = levelA(t, now), comb = RATE_COMBINE[la][pf.b];
+      // the stronger of the two: more pieces than batches explain, or clearly more jobs than usual
+      var la = Math.max(levelA(t, now), tM ? levelA(tM, nowM) : 0), comb = RATE_COMBINE[la][pf.b];
       if (!rs.early) lv = comb;
       else {
-        // fewer than 3 earlier months: never Very high; High only when the pieces alone are very clear,
+        // fewer than 3 earlier months: never Very high; High only when it is very clear,
         // or clear together with several parts taken in far more than usual
-        var ex = now - t.mu, hi = (t.pUp < 0.01 && ex >= 3) || (t.pUp < 0.05 && ex >= 3 && pf.b === 2);
+        var strong = function (u, x) { return u && u.pUp < 0.01 && x - u.mu >= 3; }, clear = function (u, x) { return u && u.pUp < 0.05 && x - u.mu >= 3; };
+        var hi = strong(t, now) || strong(tM, nowM) || ((clear(t, now) || clear(tM, nowM)) && pf.b === 2);
         var e = hi ? 3 : Math.min(comb, 2);
         sub = e >= 3 ? "early signal: clearly above normal" : e === 2 ? "early signal: a little above normal" : "so far within normal";
         if (e >= 3) sig = 1;
@@ -3630,7 +3648,7 @@
       }
     }
     var label = lv >= 0 ? RATE[lv][0] : lv === -2 ? (sub.indexOf("early") === 0 ? "Early signal" : "Not enough history") : "No data";
-    return { t: t, lv: lv, n: n, S: S, now: now, avgNow: t ? t.mu : 0, sub: sub, sig: sig, label: label, moves: curMovs.length, notes: pf.notes, phi: phi };
+    return { t: t, lv: lv, n: n, S: S, now: now, avgNow: t ? t.mu : 0, sub: sub, sig: sig, label: label, moves: nowM, movesExp: tM ? tM.mu : null, notes: pf.notes, phi: phi };
   }
   function scorecard(day) {
     var rs = rateSetup(day), prevKeys = rs.prevKeys, cut = rs.cut, daysIn = rs.daysIn, E = rs.E, cur = rs.cur, prev = rs.prev;
@@ -3666,7 +3684,8 @@
         pyramidSvg(lv, 40) + '<div><div class="sc-rl">' + RATE[lv][0] + '</div><div class="sc-rs">' + RATE[lv][2] + "</div></div>";
       // one line under the rating: how many movements the pieces came in, and any part taken in far more than usual
       var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-      var why = now ? now + (now === 1 ? " pc" : " pcs") + " in " + ro.moves + (ro.moves === 1 ? " movement" : " movements") : "";
+      var why = now ? now + (now === 1 ? " pc" : " pcs") + " in " + ro.moves + (ro.moves === 1 ? " movement" : " movements") +
+        (ro.movesExp !== null ? " (usually about " + (Math.round(ro.movesExp * 10) / 10) + ")" : "") : "";
       ro.notes.slice(0, 2).forEach(function (x) {
         why += " \u00B7 " + esc(x.name) + ": " + x.q + " at once" + (x.u === null ? " (new part)" : " (usually about " + x.u + (x.formal ? ")" : ", few earlier movements)"));
       });
@@ -3687,13 +3706,13 @@
       '<table class="sc-table"><thead><tr><th>Machine</th><th class="sc-left">Rating</th><th>Avg / month</th>' + (day ? "<th>Avg by day " + day + "</th>" : "") + "<th>" + mName + "</th><th>vs average</th><th>Value issued</th><th>Imp. / Local</th></tr></thead><tbody>" + rows + "</tbody></table>" +
       monthByMonth(info) +
       '<div class="sc-foot"><b>Rating scale</b>' + RATE.map(function (r, i) { return '<span class="sc-key">' + pyramidSvg(i, 17) + " " + r[0] + ": " + r[2] + "</span>"; }).join("") +
-      '<span class="sc-key">The rating compares the pieces issued with the earlier months, for the days gone by (Mondays weigh more when most parts go out then), allowing for parts that leave several at a time. A part taken in far more than its usual quantity can raise the level one step; it never lowers it.</span></div>';
+      '<span class="sc-key">The rating compares the pieces issued with the earlier months, for the days gone by (Mondays weigh more when most parts go out then), allowing for parts that leave several at a time; it also looks at how many times parts were taken (movements). A part taken in far more than its usual quantity can raise the level one step; it never lowers it.</span></div>';
     var kp = wrap.querySelectorAll(".sc-kpi");
     kpis.forEach(function (k, i) { kp[i].children[0].textContent = k[0]; kp[i].children[1].textContent = k[1]; kp[i].children[2].textContent = k[2]; });
     Array.prototype.forEach.call(wrap.querySelectorAll("[data-goto]"), function (b) { b.addEventListener("click", function () { selectMonth(b.getAttribute("data-goto")); }); });
     var out = document.createElement("div");
     out.appendChild(wrap);
-    if (hot.length) out.appendChild(machineAnalysis(hot, prevKeys, cut, day));
+    if (hot.length) out.appendChild(machineAnalysis(hot, prevKeys, cut, day, rs.E));
     return out;
   }
   // Parts issued per machine, month by month (up to 7 months with data, the open month marked). Click a month to open it.
