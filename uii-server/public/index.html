@@ -1475,6 +1475,16 @@
   body.menu-open header .header-actions .me-chip .role { color: var(--muted); }
   body.menu-open header .header-actions .pend-btn .pend-n { background: #0f4c81; color: #fff; }
 
+  /* Countdown to the official start (1 January 2027) */
+  .fresh-note { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 14px; padding: 12px 16px; border: 1px solid #b9cdf8; border-radius: 10px; background: #eef4ff; color: var(--text); font-size: 14px; line-height: 1.45; }
+  .fresh-note .fresh-ic { font-size: 18px; line-height: 1.2; }
+  .fresh-note .fresh-left { font-variant-numeric: tabular-nums; color: #0f4c81; white-space: nowrap; }
+  .fresh-note .fresh-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .fresh-note.done { border-color: #a7dcbd; background: #edf9f2; }
+  html[data-theme="dark"] .fresh-note { background: rgba(91,157,255,0.12); border-color: #33507a; }
+  html[data-theme="dark"] .fresh-note .fresh-left { color: #8cbcf0; }
+  html[data-theme="dark"] .fresh-note.done { background: #10261a; border-color: #2a6b45; }
+
   /* ===== White screen: green and red strong enough to read on white =====
      These labels were made for the old dark look; on white they came out pale. Same colours, darker.
      (The black screen keeps the light versions, which read well there.) */
@@ -3492,10 +3502,14 @@
     return box;
   }
   var scoreEarly = false;
+  // Fresh start: from January 2027 the rating, the analysis and the month comparison count 2027 onwards only.
+  // The trial months (September to December 2026) stay in the records but are never compared with 2027.
+  var FRESH_START = "2027-01";
+  function sameEra(k) { return month < FRESH_START || k >= FRESH_START; }
   // What the rating is built on, shared by the Summary page and the Excel export
   function rateSetup(day) {
     var idx = MONTHS.indexOf(month), prevKeys = [];
-    for (var i = idx - 1; i >= 0 && prevKeys.length < RATE_MAX_MONTHS; i--) if (monthHasData(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
+    for (var i = idx - 1; i >= 0 && prevKeys.length < RATE_MAX_MONTHS; i--) if (monthHasData(MONTHS[i]) && sameEra(MONTHS[i])) prevKeys.unshift(MONTHS[i]);
     var cut = function (k) { return day ? k + "-" + pad(Math.min(day, new Date(+k.slice(0, 4), +k.slice(5), 0).getDate())) : null; };
     var daysIn = new Date(+month.slice(0, 4), +month.slice(5), 0).getDate();
     var short = function (k) { return monthLabel(k).split(" ")[0].slice(0, 3); };
@@ -3653,11 +3667,37 @@
       MACHINES.map(function (m) { return row(m, m); }).join("") + row("Total", null, "sc-tot") + "</tbody></table>";
   }
 
+  // Until 1 January 2027: a countdown to the system's official start. January to March 2027: a short note.
+  var freshTimer = 0;
+  function freshNote(box) {
+    var startAt = new Date(2027, 0, 1).getTime(), el = document.createElement("div");
+    if (Date.now() < startAt) {
+      el.className = "fresh-note";
+      el.innerHTML = '<span class="fresh-ic" aria-hidden="true">\uD83D\uDD12</span><div><b>Trial period.</b> The system\u2019s official count starts on <b>1 January 2027</b>, in <b class="fresh-left"></b>.' +
+        '<div class="fresh-sub">From then on the rating, the analysis and the comparisons count 2027 only. The trial months (September to December 2026) stay in the records but are not counted.</div></div>';
+      box.appendChild(el);
+      var tick = function () {
+        var ms = startAt - Date.now(), left = el.querySelector(".fresh-left");
+        if (!el.isConnected) { clearInterval(freshTimer); freshTimer = 0; return; }
+        if (ms <= 0) { clearInterval(freshTimer); freshTimer = 0; renderRows(); return; }
+        var d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, mi = Math.floor(ms / 6e4) % 60, se = Math.floor(ms / 1e3) % 60;
+        left.textContent = d + (d === 1 ? " day " : " days ") + pad(h) + ":" + pad(mi) + ":" + pad(se);
+      };
+      tick();
+      if (freshTimer) clearInterval(freshTimer);
+      freshTimer = setInterval(tick, 1000);
+    } else if (month >= FRESH_START && month <= "2027-03") {
+      el.className = "fresh-note done";
+      el.innerHTML = '<span class="fresh-ic" aria-hidden="true">\u2713</span><div><b>Fresh start on 1 January 2027.</b> The rating counts 2027 only; it needs ' + RATE_MIN_MONTHS +
+        ' earlier months, so the full rating starts in April 2027.</div>';
+      box.appendChild(el);
+    }
+  }
   function renderSummary() {
     var box = document.getElementById("summary");
     titleEl.textContent = SUM + originLabel();
     var idx = MONTHS.indexOf(month);
-    var prevKey = idx > 0 ? MONTHS[idx - 1] : null;
+    var prevKey = idx > 0 && sameEra(MONTHS[idx - 1]) ? MONTHS[idx - 1] : null;
     var cur = monthStats(month, null, origin);
     var prevFull = prevKey ? monthStats(prevKey, null, origin) : null;
     var hasPrev = prevFull && prevFull.all.n > 0;
@@ -3671,6 +3711,7 @@
     var prevLong = partial ? prevName + " 1\u2013" + today : prevKey ? monthLabel(prevKey) : "";
     metaEl.textContent = monthLabel(month) + " · " + cur.all.n + (cur.all.n === 1 ? " transaction" : " transactions");
     box.innerHTML = "";
+    freshNote(box);
 
     if (month > CURRENT_MONTH) {
       var ns = document.createElement("div");
@@ -3781,6 +3822,9 @@
   // Summary in three separate parts, one open at a time, so nothing is piled on top of each other
   var SUM_PART_KEY = "uiip-summary-part";
   function splitSummary(box) {
+    // the countdown note sits above the three parts
+    var note = box.querySelector(":scope > .fresh-note");
+    if (note) box.removeChild(note);
     var top = box.firstChild, rating = top.firstChild, analysis = top.children[1] || null, details = [];
     for (var c = top.nextSibling; c; c = c.nextSibling) details.push(c);
     var sec = { rating: document.createElement("div"), analysis: document.createElement("div"), details: document.createElement("div") };
@@ -3807,6 +3851,7 @@
       nav.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-part") === k ? "true" : "false"); });
     }
     box.innerHTML = "";
+    if (note) box.appendChild(note);
     box.appendChild(nav);
     ["rating", "analysis", "details"].forEach(function (k) { box.appendChild(sec[k]); });
     show(cur);
