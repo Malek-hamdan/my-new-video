@@ -776,8 +776,8 @@
   .bulk-ed input { font: inherit; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: transparent; color: inherit; width: 90px; }
   .bulk-ed input.b-ref { width: 160px; }
   .bulk-ed .b-msg { margin-left: 8px; color: var(--muted); }
-  body.sum-view .bulk-ed table { display: table !important; }
-  @media (max-width: 640px) { .bulk-ed { padding: 8px 12px 12px; } .bulk-ed input { width: 52px; } .bulk-ed input.b-ref { width: 104px; } .bulk-ed .b-msg { display: block; margin: 4px 0 0; } .bulk-ed td[data-l]::before { content: attr(data-l) ": "; color: var(--muted); font-size: 11.5px; } }
+  body:not(.tx-view) #bulkHost, body.area-equip #bulkHost { display: none; }
+  @media (max-width: 640px) { .bulk-ed { padding: 8px 12px 12px; } .bulk-ed input { width: 52px; } .bulk-ed input.b-ref { width: 104px; } .bulk-ed .b-msg { display: block; margin: 4px 0 0; } .bulk-ed td[data-l]::before { content: attr(data-l) ": "; color: var(--muted); font-size: 11.5px; } .bulk-ed td[data-l]:has(input)::before { display: block; margin-bottom: 2px; } }
   .an-m { padding: 14px 18px 16px; border-top: 1px solid var(--border); }
   .an-m:first-of-type { border-top: 0; }
   .an-mh { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 10px; }
@@ -1741,6 +1741,8 @@
       <strong>No parts yet</strong>
       <span>Use “Add part” for stock you already have, or “New arrival” for parts that just came in.</span>
     </div>
+
+    <div id="bulkHost"></div>
 
     <div class="parts-sum" id="partsSum" hidden></div>
 
@@ -3042,6 +3044,7 @@
     document.getElementById("thead").innerHTML = eq ? TX_HEAD.replace('class="col-mach">Machine<', 'class="col-mach">Section<') : TX_HEAD;
     titleEl.textContent = eq ? "Equipment " + TX : (txFilter === "All" ? TX : txFilter + " " + TX) + originLabel();
     if (!eq) renderTxFilter();
+    if (eq) document.getElementById("bulkHost").innerHTML = ""; else renderBulkHost();
     rowsEl.innerHTML = "";
     var inSum = 0, outSum = 0, base = eq ? equipTxAll() : partsTx();
     var shown = eq || txFilter === "All" ? base : base.filter(function (t) { return txMatches(t, txFilter); });
@@ -3495,13 +3498,22 @@
     BULK = next;
     try { localStorage.setItem(BULK_KEY, JSON.stringify(BULK)); } catch (e) {}
     if (db) db.doc("meta/bulk").set({ rules: BULK }).catch(function () { setStatus("Bulk parts not saved on the server", "error"); });
-    if (active === SUM) renderSummary();
+    if (active === SUM) renderSummary(); else if (active === TX) renderBulkHost();
+  }
+  // the list sits at the bottom of the Transaction tab (parts, not equipment), for admins only
+  function renderBulkHost() {
+    var host = document.getElementById("bulkHost"), wasOpen = host.firstChild && host.firstChild.open;
+    host.innerHTML = "";
+    if (!canBulk()) return;
+    var ed = bulkEditor();
+    if (wasOpen) ed.open = true;
+    host.appendChild(ed);
   }
   function loadBulk() {
     if (!db) return;
     db.doc("meta/bulk").get().then(function (d) {
       var v = d.exists ? (d.data() || {}).rules : null;
-      if (v && typeof v === "object") { BULK = v; try { localStorage.setItem(BULK_KEY, JSON.stringify(BULK)); } catch (e) {} if (active === SUM) renderSummary(); }
+      if (v && typeof v === "object") { BULK = v; try { localStorage.setItem(BULK_KEY, JSON.stringify(BULK)); } catch (e) {} if (active === SUM) renderSummary(); else if (active === TX) renderBulkHost(); }
     }, function () {});
   }
   function bulkEditor() {
@@ -3510,11 +3522,11 @@
     var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     el.innerHTML = "<summary>Bulk parts (" + keys.length + ")</summary>" +
       "<p>A part usually taken a few at a time that sometimes goes out in a big batch, and that batch is normal. " +
-      "For the rating only, a batch up to <b>Normal up to</b> counts as <b>Usually up to</b> pieces; above that it counts in full. Stock, value and Excel are not changed.</p>" +
+      "Record every withdrawal as usual with its real quantity. For the rating only, a batch up to <b>Normal up to</b> counts as <b>Usually up to</b> pieces; above that it counts in full. Stock, value and Excel are not changed.</p>" +
       "<table><thead><tr><th>Reference</th><th>Usually up to</th><th>Normal up to</th><th></th></tr></thead><tbody>" +
       keys.map(function (k) { return '<tr><td data-l="Reference">' + esc(k) + '</td><td data-l="Usually up to">' + BULK[k].u + '</td><td data-l="Normal up to">' + BULK[k].l + '</td><td><button class="btn b-del" type="button" data-k="' + esc(k) + '">Remove</button></td></tr>'; }).join("") +
-      '<tr><td><input class="b-ref" placeholder="e.g. OP000227" aria-label="Reference"></td><td><input class="b-u" inputmode="numeric" placeholder="5" aria-label="Usually up to"></td>' +
-      '<td><input class="b-l" inputmode="numeric" placeholder="40" aria-label="Normal up to"></td><td><button class="btn btn-primary b-add" type="button">Add</button><span class="b-msg"></span></td></tr></tbody></table>';
+      '<tr><td data-l="Reference"><input class="b-ref" placeholder="e.g. OP000227" aria-label="Reference"></td><td data-l="Usually up to"><input class="b-u" inputmode="numeric" placeholder="5" aria-label="Usually up to"></td>' +
+      '<td data-l="Normal up to"><input class="b-l" inputmode="numeric" placeholder="40" aria-label="Normal up to"></td><td><button class="btn btn-primary b-add" type="button">Add</button><span class="b-msg"></span></td></tr></tbody></table>';
     if (keys.length) el.open = true;
     el.querySelector(".b-add").addEventListener("click", function () {
       var ref = el.querySelector(".b-ref").value.trim().toUpperCase(), u = parseInt(el.querySelector(".b-u").value, 10), l = parseInt(el.querySelector(".b-l").value, 10), msg = el.querySelector(".b-msg");
@@ -3645,7 +3657,6 @@
     Array.prototype.forEach.call(wrap.querySelectorAll("[data-goto]"), function (b) { b.addEventListener("click", function () { selectMonth(b.getAttribute("data-goto")); }); });
     var out = document.createElement("div");
     out.appendChild(wrap);
-    if (canBulk()) wrap.appendChild(bulkEditor());
     if (hot.length) out.appendChild(machineAnalysis(hot, prevKeys, cut, day, rs.E));
     return out;
   }
