@@ -12,7 +12,6 @@ const PAGE = path.join(__dirname, "public", "index.html");
 const DAYS = 90, COOKIE = "uiis", MAX_BODY = 8 * 1024 * 1024;
 const COLL_RE = /^[A-Za-z][A-Za-z0-9_-]{0,40}$/, ID_RE = /^[A-Za-z0-9._:-]{1,120}$/;
 // what a permission lets a person write
-const WRITE_PERMS = ["receive", "transfer", "edit", "editRef", "delete", "approve", "backup", "users", "order"];
 
 fs.mkdirSync(path.join(DATA, "c"), { recursive: true });
 
@@ -248,76 +247,197 @@ const tries = new Map();
 function tooMany(ip) { const t = tries.get(ip); return t && t.n >= 8 && Date.now() - t.at < 15 * 60e3; }
 function wrongTry(ip) { const t = tries.get(ip); if (!t || Date.now() - t.at > 15 * 60e3) tries.set(ip, { n: 1, at: Date.now() }); else t.n++; }
 
-// ---------- live updates (Server-Sent Events) ----------
-const listeners = new Set();
-function broadcast(coll, id, data) {
-  const msg = "data: " + JSON.stringify({ c: coll, id, d: data === undefined ? null : publicDoc(coll, data), del: data === undefined }) + "\n\n";
-  for (const l of listeners) if (l.colls.has(coll)) l.res.write(msg);
+// ---------- who may read what ----------
+// Stock lists and the daily-copy index: everyone signed in. Accounts: the accounts manager sees all, others
+// only their own. Activity: people with Activity or Users. Approval requests: approvers see all, others
+// their own. Daily-copy contents: Backups only.
+const STOCK = new Set(["parts", "transactions", "consumables", "usedParts", "equipment"]);
+const KNOWN = new Set(["parts", "transactions", "consumables", "usedParts", "equipment", "users", "actlog", "pendops", "snapshots", "snapshotChunks", "meta"]);
+function can(u, p) { return !!(u && u.active !== false && u.perms && u.perms[p]); }
+function canRead(me, coll, d) {
+  if (coll === "users") return can(me, "users") || (d && d.username === me.username);
+  if (coll === "actlog") return can(me, "activity") || can(me, "users");
+  if (coll === "pendops") return can(me, "approve") || can(me, "users") || (d && d.user === me.username);
+  if (coll === "snapshotChunks") return can(me, "backup");
+  return KNOWN.has(coll);
 }
-setInterval(() => { for (const l of listeners) l.res.write(": ping\n\n"); }, 25e3).unref();
-
-// accounts go out without their password hash
+// accounts go out without their password hash; server-kept fields stay on the server
 function publicDoc(coll, d) {
   if (coll !== "users") return d;
   const o = Object.assign({}, d); delete o.pw; delete o.hash; return o;
 }
-function can(u, p) { return !!(u && u.active !== false && u.perms && u.perms[p]); }
-function adminsLeft(users) { let n = 0; for (const [, u] of users) if (u.active !== false && u.perms && u.perms.users) n++; return n; }
 
+// ---------- live updates (Server-Sent Events): each person only gets what they may read ----------
+const listeners = new Set();
+function broadcast(coll, id, data) {
+  const users = load("users");
+  const msg = "data: " + JSON.stringify({ c: coll, id, d: data === undefined ? null : publicDoc(coll, data), del: data === undefined }) + "\n\n";
+  for (const l of listeners) {
+    if (!l.colls.has(coll)) continue;
+    const u = users.get(l.user);
+    if (!u || u.active === false) { l.res.end(); listeners.delete(l); continue; }
+    if (data === undefined ? canRead(u, coll, null) || coll === "pendops" || coll === "users" : canRead(u, coll, data)) l.res.write(msg);
+  }
+}
+function closeLive(username) { for (const l of listeners) if (l.user === username) { l.res.end(); listeners.delete(l); } }
+setInterval(() => { for (const l of listeners) l.res.write(": ping\n\n"); }, 25e3).unref();
+
+function adminsLeft(users) { let n = 0; for (const [, u] of users) if (u.active !== false && u.perms && u.perms.users) n++; return n; }
 function actlogAdd(u, what, part) {
   const id = "srv" + Date.now().toString(36) + crypto.randomBytes(3).toString("hex"), now = Date.now();
   const d = { ts: now, seq: now, user: u.username, name: u.name || u.username, via: "", what, part: part || "", from: "", to: "" };
   commit("actlog", id, d); broadcast("actlog", id, d);
 }
+// every accepted change, with who made it, in a file people cannot reach (kept with the backups)
+function audit(me, coll, id, op, keys) {
+  try { fs.appendFileSync(path.join(DATA, "audit.log"), JSON.stringify({ ts: Date.now(), user: me ? me.username : "", coll, id, op, keys: keys || undefined }) + "\n"); }
+  catch (e) { console.error("[audit] " + e.message); }
+}
 
-// ---------- the rules for each write ----------
+// ---------- who may write what ----------
+// Full write on the stock lists: Edit all, or Backups (restore). Otherwise only what the permission is for:
+//  Receive: movements in and quantities going up, and a New arrival row (which its maker may then fill in);
+//  Transfer: movements out and quantities going down; Approves: both (approving a request);
+//  Edit Reference: the reference of a part; Delete: removing. "Needs approval" sends Receive and Transfer to
+//  an approver instead (pendops). Only the fields a permission covers are taken from a change.
+function full(u) { return can(u, "edit") || can(u, "backup"); }
+function waitsForOk(u) { return can(u, "needsOk") && !can(u, "edit") && !can(u, "approve"); }
+const SERVER_FIELDS = ["_by"];
+function norm(v) { return v === undefined || v === null || v === false ? "" : v; }
+function changedKeys(cur, body) {
+  const ks = new Set(Object.keys(cur).concat(Object.keys(body)));
+  return Array.from(ks).filter(k => SERVER_FIELDS.indexOf(k) < 0 && JSON.stringify(norm(cur[k])) !== JSON.stringify(norm(body[k])));
+}
+function wholeNum(v) { return /^\d+$/.test(String(v)) ? +v : null; }
+function monthKey(offset) { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + offset); return d.toISOString().slice(0, 7); }
+const NO = { err: "not_granted" }, BAD = { err: "invalid_argument" };
+function checkStock(me, coll, id, body, del, cur) {
+  if (del) return can(me, "delete") || can(me, "backup") ? { body: null } : NO;
+  if (full(me)) return { body: Object.assign({}, body, { _by: cur ? cur._by || "" : me.username }) };
+  if (waitsForOk(me)) return NO;                       // their Receive / Transfer goes to an approver
+  const inP = can(me, "receive") || can(me, "approve"), outP = can(me, "transfer") || can(me, "approve");
+  // without Edit all, only this month and last month
+  const mo = String((cur && cur.month) || body.month || "");
+  if ((coll === "parts" || coll === "transactions") && mo && mo < monthKey(-1)) return NO;
+  if (coll === "transactions") {
+    if (!cur) {
+      const ch = Number(body.change);
+      return (ch > 0 && inP) || (ch < 0 && outP) ? { body: Object.assign({}, body, { _by: me.username }) } : NO;
+    }
+    // a movement already saved: its maker may only renumber the slip or set the line
+    const ks = changedKeys(cur, body);
+    if (cur._by === me.username && ks.every(k => k === "slip" || k === "line")) return { body: Object.assign({}, cur, { slip: body.slip, line: body.line }) };
+    return NO;
+  }
+  if (!cur) return coll === "parts" && body.arrival === true && inP ? { body: Object.assign({}, body, { _by: me.username }) } : NO;
+  if (coll === "parts" && cur._by === me.username && cur.arrival === true && inP) return { body: Object.assign({}, body, { _by: cur._by }) };
+  const ks = changedKeys(cur, body);
+  if (!ks.length) return { body: cur };
+  const allowed = [];
+  if (inP || outP) allowed.push("quantity", coll === "parts" ? "loggedQty" : "", coll === "parts" ? "baseline" : "");
+  if (coll === "parts" && can(me, "editRef")) allowed.push("reference");
+  // the logged quantity always follows the quantity, and the opening-stock mark can only be turned off
+  const newQty = ks.indexOf("quantity") >= 0 && allowed.indexOf("quantity") >= 0 ? body.quantity : cur.quantity;
+  const mine = ks.filter(k => allowed.indexOf(k) >= 0 && (k !== "loggedQty" || String(body.loggedQty) === String(newQty)) && (k !== "baseline" || body.baseline === false));
+  if (!mine.length) return NO;
+  if (mine.indexOf("quantity") >= 0) {
+    const a = wholeNum(cur.quantity), b = wholeNum(body.quantity);
+    if (a === null || b === null || (b > a && !inP) || (b < a && !outP)) return NO;
+  }
+  const out = Object.assign({}, cur);
+  mine.forEach(k => { out[k] = body[k]; });          // other fields stay as they are on the server
+  return { body: out };
+}
 function checkWrite(me, coll, id, body, del) {
-  if (coll.startsWith("_")) return "not_granted";
+  if (!KNOWN.has(coll)) return BAD;
   const cur = load(coll).get(id);
   if (coll === "users") {
-    if (!can(me, "users")) return "not_granted";
+    if (!can(me, "users")) return NO;
     const users = load("users");
     if (del) {
-      if (id === me.username) return "invalid_argument";
+      if (id === me.username) return BAD;
       const copy = new Map(users); copy.delete(id);
-      return adminsLeft(copy) ? "" : "invalid_argument";
+      return adminsLeft(copy) ? { body: null } : BAD;
     }
-    if (!body || body.username !== id || !/^[a-z0-9._-]{2,30}$/.test(id)) return "invalid_argument";
-    if (!cur && !(typeof body.hash === "string" && /^[0-9a-f]{64}$/.test(body.hash))) return "invalid_argument";
+    if (!body || body.username !== id || !/^[a-z0-9._-]{2,30}$/.test(id)) return BAD;
+    if (!cur && !(typeof body.hash === "string" && /^[0-9a-f]{64}$/.test(body.hash))) return BAD;
     const copy = new Map(users); copy.set(id, body);
-    return adminsLeft(copy) ? "" : "invalid_argument";
+    return adminsLeft(copy) ? { body } : BAD;
   }
   if (coll === "actlog") {
-    if (del) return "not_granted";
-    if (!body || typeof body.user !== "string") return "invalid_argument";
-    if (cur && cur.user !== body.user) return "not_granted";
-    return "";
+    // nobody removes or rewrites someone else's entry; the name comes from the account, not from the page
+    if (del) return NO;
+    if (!body || typeof body.user !== "string" || typeof body.what !== "string") return BAD;
+    const acting = body.user !== me.username;            // an accounts manager inside someone's account
+    if (acting && !can(me, "users")) return NO;
+    if (cur && cur.user !== body.user) return NO;
+    const d = Object.assign({}, body, { via: acting ? me.name || me.username : "" });
+    if (!acting) d.name = me.name || me.username;
+    return { body: d };
   }
-  if (!WRITE_PERMS.some(p => can(me, p))) return "not_granted";
-  return "";
+  if (coll === "pendops") {
+    if (del) return can(me, "users") ? { body: null } : NO;
+    if (!body) return BAD;
+    if (!cur) {
+      const acting = body.user !== me.username;
+      if (acting && !can(me, "users")) return NO;
+      const who = acting ? load("users").get(body.user) : me;
+      if (body.status !== "waiting" || !(body.mode === "in" ? can(who, "receive") : can(who, "transfer"))) return NO;
+      return { body };
+    }
+    // a decision: approvers only, once, and only the decision fields
+    if (!can(me, "approve") || cur.status !== "waiting" || ["approved", "rejected"].indexOf(body.status) < 0) return NO;
+    if (!changedKeys(cur, body).every(k => ["status", "decidedBy", "decidedTs", "note"].indexOf(k) >= 0)) return NO;
+    return { body: Object.assign({}, cur, { status: body.status, decidedBy: me.name || me.username, decidedTs: Date.now(), note: body.note || "" }) };
+  }
+  if (coll === "snapshots" || coll === "snapshotChunks") {
+    // anyone who records may add today's copy; changing or removing copies is for Backups only
+    if (can(me, "backup")) return { body: del ? null : body };
+    if (del || cur) return NO;
+    return ["receive", "transfer", "edit", "editRef", "delete", "approve"].some(p => can(me, p)) ? { body } : NO;
+  }
+  if (coll === "meta") return can(me, "backup") ? { body: del ? null : body } : NO;
+  if (STOCK.has(coll)) return checkStock(me, coll, id, body, del, cur);
+  return NO;
 }
-function applyWrite(me, coll, id, body, del) {
+function applyWrite(me, coll, id, d, del) {
   const m = load(coll);
   if (del) {
     if (!m.has(id)) return;
     commit(coll, id);
-    if (coll === "users") dropSessionsOf(id);
+    audit(me, coll, id, "delete");
+    if (coll === "users") { dropSessionsOf(id); closeLive(id); }
     broadcast(coll, id, undefined);
     return;
   }
-  let d = body, hadPw = false;
+  let hadPw = false, cur = m.get(id);
+  const body = d;
   if (coll === "users") {
-    const cur = m.get(id) || {};
-    hadPw = !!cur.pw;
+    const c = cur || {};
+    hadPw = !!c.pw;
     d = Object.assign({}, body);
     delete d.hash;
-    d.pw = typeof body.hash === "string" && /^[0-9a-f]{64}$/.test(body.hash) ? pwMake(body.hash) : cur.pw;
+    d.pw = typeof body.hash === "string" && /^[0-9a-f]{64}$/.test(body.hash) ? pwMake(body.hash) : c.pw;
   }
   commit(coll, id, d);                                    // the account first; only then sign that person out
+  audit(me, coll, id, cur ? "change" : "add", cur ? changedKeys(cur, d) : undefined);
   if (coll === "users" && ((body.hash && hadPw) || d.active === false)) {
-    try { dropSessionsOf(id); } catch (e) { console.error("[storage] could not sign out " + id + ": " + e.message); }
+    try { dropSessionsOf(id); closeLive(id); } catch (e) { console.error("[storage] could not sign out " + id + ": " + e.message); }
   }
   broadcast(coll, id, d);
+}
+// daily copies: the server keeps the last 30 days and the latest copy taken before a restore
+function pruneCopies() {
+  try {
+    const snaps = Array.from(load("snapshots")).map(([k, v]) => Object.assign({ key: k }, v));
+    const daily = snaps.filter(s => s.kind === "daily").sort((a, b) => a.key < b.key ? 1 : -1).slice(30);
+    const pre = snaps.filter(s => s.kind === "pre").sort((a, b) => (b.at || 0) - (a.at || 0)).slice(1);
+    daily.concat(pre).forEach(s => {
+      for (let i = 0; i < (s.chunks || 0); i++) if (load("snapshotChunks").has(s.key + "-" + i)) commit("snapshotChunks", s.key + "-" + i);
+      commit("snapshots", s.key);
+      audit(null, "snapshots", s.key, "delete");
+    });
+  } catch (e) { console.error("[copies] " + e.message); }
 }
 
 // ---------- http ----------
@@ -382,7 +502,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/me") return send(res, 200, { username: me.username });
 
     if (p === "/api/live" && req.method === "GET") {
-      const cs = new Set(String(url.searchParams.get("c") || "").split(",").filter(c => COLL_RE.test(c) && !c.startsWith("_")));
+      const cs = new Set(String(url.searchParams.get("c") || "").split(",").filter(c => KNOWN.has(c)));
       res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
       res.write("retry: 3000\n\n");
       const l = { res, colls: cs, user: me.username };
@@ -396,23 +516,24 @@ const server = http.createServer(async (req, res) => {
     const coll = decodeURIComponent(m[1]), id = m[2] ? decodeURIComponent(m[2]) : null;
     if (!COLL_RE.test(coll) || coll.startsWith("_") || (id !== null && !ID_RE.test(id))) return send(res, 400, { code: "invalid_argument" });
 
+    if (!KNOWN.has(coll)) return send(res, 400, { code: "invalid_argument" });
     if (req.method === "GET" && isBroken(coll)) return send(res, 503, { code: "unavailable" });
     if (req.method === "GET" && id === null) {
       const out = [];
-      for (const [k, d] of load(coll)) out.push([k, publicDoc(coll, d)]);
+      for (const [k, d] of load(coll)) if (canRead(me, coll, d)) out.push([k, publicDoc(coll, d)]);
       return send(res, 200, out);
     }
     if (req.method === "GET") {
       const d = load(coll).get(id);
-      return send(res, 200, d ? { exists: true, d: publicDoc(coll, d) } : { exists: false });
+      return send(res, 200, d && canRead(me, coll, d) ? { exists: true, d: publicDoc(coll, d) } : { exists: false });
     }
     if (req.method === "PUT" || req.method === "DELETE") {
       const del = req.method === "DELETE";
       const body = del ? null : await readBody(req);
       if (!del && (!body || typeof body !== "object" || Array.isArray(body))) return send(res, 400, { code: "invalid_argument" });
-      const why = checkWrite(me, coll, id, body, del);
-      if (why) return send(res, why === "not_granted" ? 403 : 400, { code: why });
-      applyWrite(me, coll, id, body, del);
+      const ok = checkWrite(me, coll, id, body, del);
+      if (ok.err) return send(res, ok.err === "not_granted" ? 403 : 400, { code: ok.err });
+      applyWrite(me, coll, id, ok.body, del);
       return send(res, 200, { ok: true });
     }
     return send(res, 405, { code: "invalid_argument" });
@@ -455,4 +576,4 @@ async function makeAdmin() {
 }
 
 if (process.argv[2] === "make-admin") makeAdmin();
-else { openStore(); server.listen(PORT, "127.0.0.1", () => console.log("UII Parts on 127.0.0.1:" + PORT + ", data in " + DATA)); }
+else { openStore(); pruneCopies(); setInterval(pruneCopies, 6 * 3600e3).unref(); server.listen(PORT, "127.0.0.1", () => console.log("UII Parts on 127.0.0.1:" + PORT + ", data in " + DATA)); }
