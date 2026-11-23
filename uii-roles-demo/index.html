@@ -7062,8 +7062,13 @@
     if (dailyDone) return;
     // data can arrive a moment after the first (empty) update; wait for it briefly
     if (!hasAnyData() && Date.now() - loadedAt < 5000) return;
+    // with accounts, the daily copy is taken by someone who may take backups (the server allows only them);
+    // wait until we know who is signed in
+    var bc = document.body.classList;
+    if (document.getElementById("signOut") && !bc.contains("signed-in")) { setTimeout(maybeDailySnapshot, 1500); return; }
     dailyDone = true;
     if (readOnly || !hasAnyData()) return;
+    if (bc.contains("signed-in") && !bc.contains("can-backup")) return;
     var key = ymd(Date.now());
     listSnapshots().then(function (list) {
       if (list.some(function (m) { return m.key === key; })) return pruneSnapshots(list);

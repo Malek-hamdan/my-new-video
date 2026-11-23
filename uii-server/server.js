@@ -248,9 +248,9 @@ function tooMany(ip) { const t = tries.get(ip); return t && t.n >= 8 && Date.now
 function wrongTry(ip) { const t = tries.get(ip); if (!t || Date.now() - t.at > 15 * 60e3) tries.set(ip, { n: 1, at: Date.now() }); else t.n++; }
 
 // ---------- who may read what ----------
-// Stock lists and the daily-copy index: everyone signed in. Accounts: the accounts manager sees all, others
+// Stock lists and settings (meta): everyone signed in. Accounts: the accounts manager sees all, others
 // only their own. Activity: people with Activity or Users. Approval requests: approvers see all, others
-// their own. Daily-copy contents: Backups only.
+// their own. Daily copies (index and contents): Backups only.
 const STOCK = new Set(["parts", "transactions", "consumables", "usedParts", "equipment"]);
 const KNOWN = new Set(["parts", "transactions", "consumables", "usedParts", "equipment", "users", "actlog", "pendops", "snapshots", "snapshotChunks", "meta"]);
 function can(u, p) { return !!(u && u.active !== false && u.perms && u.perms[p]); }
@@ -258,7 +258,7 @@ function canRead(me, coll, d) {
   if (coll === "users") return can(me, "users") || (d && d.username === me.username);
   if (coll === "actlog") return can(me, "activity") || can(me, "users");
   if (coll === "pendops") return can(me, "approve") || can(me, "users") || (d && d.user === me.username);
-  if (coll === "snapshotChunks") return can(me, "backup");
+  if (coll === "snapshotChunks" || coll === "snapshots") return can(me, "backup");
   return KNOWN.has(coll);
 }
 // accounts go out without their password hash; server-kept fields stay on the server
@@ -269,14 +269,14 @@ function publicDoc(coll, d) {
 
 // ---------- live updates (Server-Sent Events): each person only gets what they may read ----------
 const listeners = new Set();
-function broadcast(coll, id, data) {
+function broadcast(coll, id, data, old) {
   const users = load("users");
   const msg = "data: " + JSON.stringify({ c: coll, id, d: data === undefined ? null : publicDoc(coll, data), del: data === undefined }) + "\n\n";
   for (const l of listeners) {
     if (!l.colls.has(coll)) continue;
     const u = users.get(l.user);
     if (!u || u.active === false) { l.res.end(); listeners.delete(l); continue; }
-    if (data === undefined ? canRead(u, coll, null) || coll === "pendops" || coll === "users" : canRead(u, coll, data)) l.res.write(msg);
+    if (canRead(u, coll, data === undefined ? old || null : data)) l.res.write(msg);
   }
 }
 function closeLive(username) { for (const l of listeners) if (l.user === username) { l.res.end(); listeners.delete(l); } }
@@ -302,7 +302,21 @@ function audit(me, coll, id, op, keys) {
 //  an approver instead (pendops). Only the fields a permission covers are taken from a change.
 function full(u) { return can(u, "edit") || can(u, "backup"); }
 function waitsForOk(u) { return can(u, "needsOk") && !can(u, "edit") && !can(u, "approve"); }
-const SERVER_FIELDS = ["_by"];
+const SERVER_FIELDS = ["_by", "_at", "createdBy"];
+// short free-text fields: printable, limited length
+function shortText(v, max) { return typeof v === "string" && v.length <= max && !/[\u0000-\u001f]/.test(v); }
+const SLIP_RE = /^[A-Za-z0-9 ._\/-]{0,40}$/;
+function slipLineOk(b) { return SLIP_RE.test(String(norm(b.slip))) && SLIP_RE.test(String(norm(b.line))); }
+// per account, per hour: Activity entries and approval requests
+const RATE = new Map();
+function overRate(user, kind, max) {
+  const k = user + "|" + kind, now = Date.now(), r = RATE.get(k);
+  if (!r || now - r.t > 3600e3) { RATE.set(k, { t: now, n: 1 }); return false; }
+  return ++r.n > max;
+}
+// the fields a New arrival row may carry, and which of them its maker may fill in afterwards
+const PART_FIELDS = ["month", "machine", "name", "reference", "quantity", "min", "price", "currency", "loggedQty", "date", "baseline", "arrival", "local", "created"];
+const ARRIVAL_FILL = ["name", "reference", "min", "price", "currency", "date", "local"];
 function norm(v) { return v === undefined || v === null || v === false ? "" : v; }
 function changedKeys(cur, body) {
   const ks = new Set(Object.keys(cur).concat(Object.keys(body)));
@@ -314,7 +328,13 @@ const NO = { err: "not_granted" }, BAD = { err: "invalid_argument" };
 function checkStock(me, coll, id, body, del, cur) {
   if (del) return can(me, "delete") || can(me, "backup") ? { body: null } : NO;
   if (full(me)) return { body: Object.assign({}, body, { _by: cur ? cur._by || "" : me.username }) };
-  if (waitsForOk(me)) return NO;                       // their Receive / Transfer goes to an approver
+  if (waitsForOk(me)) {                                // their Receive / Transfer goes to an approver
+    if (coll === "parts" && cur && can(me, "editRef")) {
+      const ks = changedKeys(cur, body);
+      if (ks.length === 1 && ks[0] === "reference" && shortText(body.reference, 80)) return { body: Object.assign({}, cur, { reference: body.reference }) };
+    }
+    return NO;
+  }
   const inP = can(me, "receive") || can(me, "approve"), outP = can(me, "transfer") || can(me, "approve");
   // without Edit all, only this month and last month
   const mo = String((cur && cur.month) || body.month || "");
@@ -322,15 +342,35 @@ function checkStock(me, coll, id, body, del, cur) {
   if (coll === "transactions") {
     if (!cur) {
       const ch = Number(body.change);
+      if (!slipLineOk(body)) return BAD;
       return (ch > 0 && inP) || (ch < 0 && outP) ? { body: Object.assign({}, body, { _by: me.username }) } : NO;
     }
-    // a movement already saved: its maker may only renumber the slip or set the line
-    const ks = changedKeys(cur, body);
-    if (cur._by === me.username && ks.every(k => k === "slip" || k === "line")) return { body: Object.assign({}, cur, { slip: body.slip, line: body.line }) };
+    // a movement already saved: its maker, still allowed that direction, may only renumber the slip or set the line
+    const ks = changedKeys(cur, body), dirOk = Number(cur.change) > 0 ? inP : outP;
+    if (cur._by === me.username && dirOk && ks.every(k => k === "slip" || k === "line")) return slipLineOk(body) ? { body: Object.assign({}, cur, { slip: body.slip, line: body.line }) } : BAD;
     return NO;
   }
-  if (!cur) return coll === "parts" && body.arrival === true && inP ? { body: Object.assign({}, body, { _by: me.username }) } : NO;
-  if (coll === "parts" && cur._by === me.username && cur.arrival === true && inP) return { body: Object.assign({}, body, { _by: cur._by }) };
+  if (!cur) {
+    // a New arrival row starts empty: no stock yet, this month or last month; the stock comes with its Receive
+    if (coll !== "parts" || body.arrival !== true || !inP) return NO;
+    if (norm(body.quantity) !== "" || norm(body.loggedQty) !== "" || body.baseline === true) return NO;
+    if (!/^\d{4}-\d{2}$/.test(String(body.month)) || body.month < monthKey(-1) || !shortText(body.machine, 40)) return NO;
+    const nb = {}; PART_FIELDS.forEach(k => { if (k in body) nb[k] = body[k]; });
+    return { body: Object.assign(nb, { _by: me.username }) };
+  }
+  if (coll === "parts" && cur._by === me.username && cur.arrival === true && inP) {
+    // its maker fills it in: the description fields, and the quantity only upwards; month, machine and the rest stay
+    const out = Object.assign({}, cur);
+    ARRIVAL_FILL.forEach(k => { if (k in body) out[k] = body[k]; });
+    const ks = changedKeys(cur, body);
+    if (ks.indexOf("quantity") >= 0) {
+      const a = wholeNum(norm(cur.quantity) === "" ? 0 : cur.quantity), b = wholeNum(body.quantity);
+      if (a === null || b === null || b < a) return NO;
+      out.quantity = body.quantity; out.loggedQty = body.quantity;
+    }
+    if (ks.some(k => ARRIVAL_FILL.indexOf(k) < 0 && ["quantity", "loggedQty"].indexOf(k) < 0)) return NO;
+    return { body: out };
+  }
   const ks = changedKeys(cur, body);
   if (!ks.length) return { body: cur };
   const allowed = [];
@@ -367,11 +407,17 @@ function checkWrite(me, coll, id, body, del) {
   if (coll === "actlog") {
     // nobody removes or rewrites someone else's entry; the name comes from the account, not from the page
     if (del) return NO;
-    if (!body || typeof body.user !== "string" || typeof body.what !== "string") return BAD;
+    if (!body || typeof body.user !== "string" || !shortText(body.what, 300)) return BAD;
+    if (!["part", "from", "to"].every(k => body[k] === undefined || shortText(String(body[k]), 200))) return BAD;
     const acting = body.user !== me.username;            // an accounts manager inside someone's account
     if (acting && !can(me, "users")) return NO;
     if (cur && cur.user !== body.user) return NO;
-    const d = Object.assign({}, body, { via: acting ? me.name || me.username : "" });
+    // the page joins quick edits of one field into one entry: allowed for 2 minutes after the entry was made
+    if (cur && Date.now() - (cur._at || 0) > 120e3) return NO;
+    if (overRate(me.username, "actlog", 600)) return { err: "rate_limited" };
+    const now = Date.now(), near = v => typeof v === "number" && Math.abs(v - now) < 10 * 60e3 ? v : now;
+    const d = { ts: near(body.ts), seq: near(body.seq), user: body.user, name: body.name, what: body.what, part: body.part || "", from: body.from || "", to: body.to || "",
+      via: acting ? me.name || me.username : "", _at: cur ? cur._at : now };
     if (!acting) d.name = me.name || me.username;
     return { body: d };
   }
@@ -382,19 +428,38 @@ function checkWrite(me, coll, id, body, del) {
       const acting = body.user !== me.username;
       if (acting && !can(me, "users")) return NO;
       const who = acting ? load("users").get(body.user) : me;
-      if (body.status !== "waiting" || !(body.mode === "in" ? can(who, "receive") : can(who, "transfer"))) return NO;
-      return { body };
+      if (!who || body.status !== "waiting" || (body.mode !== "in" && body.mode !== "out") || !(body.mode === "in" ? can(who, "receive") : can(who, "transfer"))) return NO;
+      const store = { part: "parts", cons: "consumables", used: "usedParts", equip: "equipment" }[body.kind];
+      const row = store ? load(store).get(String(body.partId)) : null, qty = wholeNum(body.qty);
+      if (!row || !qty || qty > 100000 || !slipLineOk(body)) return BAD;
+      if (!["date", "time", "me", "by", "to"].every(k => body[k] === undefined || shortText(String(body[k]), 80))) return BAD;
+      let waiting = 0; for (const [, d] of load("pendops")) if (d.user === who.username && d.status === "waiting") waiting++;
+      if (waiting >= 50 || overRate(me.username, "pendops", 120)) return { err: "rate_limited" };
+      return { body: { ts: Date.now(), user: who.username, name: who.name || who.username, status: "waiting", mode: body.mode, kind: body.kind, partId: String(body.partId),
+        month: row.month || "", machine: row.machine || row.section || "", partName: row.name || "", reference: row.reference || "", qty,
+        line: body.mode === "in" ? "" : String(norm(body.line)), date: String(norm(body.date)), time: String(norm(body.time)),
+        me: String(norm(body.me)), by: String(norm(body.by)), to: String(norm(body.to)), decidedBy: "", decidedTs: 0, note: "",
+        createdBy: me.username } };
     }
     // a decision: approvers only, once, and only the decision fields
     if (!can(me, "approve") || cur.status !== "waiting" || ["approved", "rejected"].indexOf(body.status) < 0) return NO;
-    if (!changedKeys(cur, body).every(k => ["status", "decidedBy", "decidedTs", "note"].indexOf(k) >= 0)) return NO;
+    // only the decision is read from the page; everything else stays as the server stored it
+    if (!shortText(String(norm(body.note)), 300)) return BAD;
     return { body: Object.assign({}, cur, { status: body.status, decidedBy: me.name || me.username, decidedTs: Date.now(), note: body.note || "" }) };
   }
   if (coll === "snapshots" || coll === "snapshotChunks") {
-    // anyone who records may add today's copy; changing or removing copies is for Backups only
-    if (can(me, "backup")) return { body: del ? null : body };
-    if (del || cur) return NO;
-    return ["receive", "transfer", "edit", "editRef", "delete", "approve"].some(p => can(me, p)) ? { body } : NO;
+    // copies are taken and removed by someone with Backups (the page does it when they open it), with sane names
+    if (!can(me, "backup")) return NO;
+    if (del) return { body: null };
+    const KEY = /^(\d{4}-\d{2}-\d{2}|pre-\d{10,16})$/;
+    if (coll === "snapshots") {
+      const n = body && body.chunks;
+      if (!KEY.test(id) || !(Number.isInteger(n) && n >= 0 && n <= 5000) || (body.kind !== "daily" && body.kind !== "pre")) return BAD;
+      if (body.kind === "daily" && id > new Date(Date.now() + 86400e3).toISOString().slice(0, 10)) return BAD;
+      return { body };
+    }
+    const m = /^(.+)-(\d+)$/.exec(id);
+    return m && KEY.test(m[1]) && +m[2] <= 5000 ? { body } : BAD;
   }
   if (coll === "meta") return can(me, "backup") ? { body: del ? null : body } : NO;
   if (STOCK.has(coll)) return checkStock(me, coll, id, body, del, cur);
@@ -404,10 +469,11 @@ function applyWrite(me, coll, id, d, del) {
   const m = load(coll);
   if (del) {
     if (!m.has(id)) return;
+    const old = m.get(id);
     commit(coll, id);
     audit(me, coll, id, "delete");
     if (coll === "users") { dropSessionsOf(id); closeLive(id); }
-    broadcast(coll, id, undefined);
+    broadcast(coll, id, undefined, old);
     return;
   }
   let hadPw = false, cur = m.get(id);
@@ -430,10 +496,11 @@ function applyWrite(me, coll, id, d, del) {
 function pruneCopies() {
   try {
     const snaps = Array.from(load("snapshots")).map(([k, v]) => Object.assign({ key: k }, v));
-    const daily = snaps.filter(s => s.kind === "daily").sort((a, b) => a.key < b.key ? 1 : -1).slice(30);
+    const tomorrow = new Date(Date.now() + 86400e3).toISOString().slice(0, 10);
+    const daily = snaps.filter(s => s.kind === "daily" && /^\d{4}-\d{2}-\d{2}$/.test(s.key) && s.key <= tomorrow).sort((a, b) => a.key < b.key ? 1 : -1).slice(30);
     const pre = snaps.filter(s => s.kind === "pre").sort((a, b) => (b.at || 0) - (a.at || 0)).slice(1);
     daily.concat(pre).forEach(s => {
-      for (let i = 0; i < (s.chunks || 0); i++) if (load("snapshotChunks").has(s.key + "-" + i)) commit("snapshotChunks", s.key + "-" + i);
+      for (let i = 0; i < Math.min(5000, s.chunks || 0); i++) if (load("snapshotChunks").has(s.key + "-" + i)) commit("snapshotChunks", s.key + "-" + i);
       commit("snapshots", s.key);
       audit(null, "snapshots", s.key, "delete");
     });
@@ -532,7 +599,7 @@ const server = http.createServer(async (req, res) => {
       const body = del ? null : await readBody(req);
       if (!del && (!body || typeof body !== "object" || Array.isArray(body))) return send(res, 400, { code: "invalid_argument" });
       const ok = checkWrite(me, coll, id, body, del);
-      if (ok.err) return send(res, ok.err === "not_granted" ? 403 : 400, { code: ok.err });
+      if (ok.err) return send(res, ok.err === "not_granted" ? 403 : ok.err === "rate_limited" ? 429 : 400, { code: ok.err });
       applyWrite(me, coll, id, ok.body, del);
       return send(res, 200, { ok: true });
     }
