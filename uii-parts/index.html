@@ -4877,7 +4877,7 @@
   });
 
   // ---- Blank slips: empty issue slips to fill by hand in the store room ----
-  var BLANK_PLACE_KEY = "uii-blank-place", BLANK_NEXT_KEY = "uii-blank-next";
+  var BLANK_PLACE_KEY = "uii-blank-place", BLANK_NEXT_KEY = "uii-blank-next", BLANK_WEEK_KEY = "uii-blank-week";
   function slipNo(n) { return String(n); }
   function blankStart() { return Math.max(1, parseInt(document.getElementById("blankStart").value, 10) || 1); }
   // ---- Week booklet: Monday to Sunday, ISO week numbers ----
@@ -4972,8 +4972,14 @@
       document.getElementById("blankMe").value = localStorage.getItem(TR_ME_KEY) || "";
       document.getElementById("blankPlace").value = localStorage.getItem(BLANK_PLACE_KEY) || "";
       document.getElementById("blankStart").value = localStorage.getItem(BLANK_NEXT_KEY) || "1";
-      // the booklet for the coming week: this week on a Monday, otherwise next week
+      // the booklet for the coming week: this week on a Monday, otherwise next week; but when a later week was
+      // already printed, the week after that one (after week 52 or 53 it goes on to week 1 of the new year)
       var now = new Date(), ahead = now.getDay() === 1 ? 0 : (8 - now.getDay()) % 7 || 7, wk = isoWeek(new Date(now.getFullYear(), now.getMonth(), now.getDate() + ahead));
+      var lw = /^(\d{4})-(\d{1,2})$/.exec(localStorage.getItem(BLANK_WEEK_KEY) || "");
+      if (lw) {
+        var nm = new Date(weekMonday(+lw[1], +lw[2]).getTime() + 7 * 864e5), nx = isoWeek(new Date(nm.getUTCFullYear(), nm.getUTCMonth(), nm.getUTCDate()));
+        if (nx.year * 100 + nx.week > wk.year * 100 + wk.week) wk = nx;
+      }
       blankYear = wk.year;
       document.getElementById("blankWeek").value = wk.week;
       document.getElementById("blankCover").checked = true;
@@ -5000,7 +5006,11 @@
     var me = document.getElementById("blankMe").value.trim(), place = document.getElementById("blankPlace").value.trim(), n = blankCount(), html = "";
     var st = blankStart();
     // the next print carries on from here, so no number is used twice
-    try { localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(BLANK_PLACE_KEY, place); localStorage.setItem(BLANK_NEXT_KEY, String(st + n)); } catch (e) {}
+    try {
+      localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(BLANK_PLACE_KEY, place); localStorage.setItem(BLANK_NEXT_KEY, String(st + n));
+      // remember the week printed, so the next booklet offers the week after it
+      if (blankWeek() && !blankManualOn()) localStorage.setItem(BLANK_WEEK_KEY, blankYear + "-" + blankWeek());
+    } catch (e) {}
     if (document.getElementById("blankCover").checked && blankWeek()) html += '<div class="bpage">' + coverHtml(me, place, blankWeek(), st, st + n - 1) + "</div>";
     // a stapled booklet keeps both slips on the page, so no cut line then
     var cut = document.getElementById("blankCover").checked ? "" : '<div class="slip-cut">\u2702 cut here</div>';
