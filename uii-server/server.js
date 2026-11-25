@@ -9,6 +9,8 @@ const http = require("http"), crypto = require("crypto"), fs = require("fs"), pa
 const PORT = +process.env.PORT || 3000;
 const DATA = path.resolve(process.env.DATA || path.join(__dirname, "data"));
 const PAGE = path.join(__dirname, "public", "index.html");
+const ASSETS = { "/manifest.webmanifest": "application/manifest+json", "/icon-192.png": "image/png", "/icon-512.png": "image/png",
+  "/icon-maskable-512.png": "image/png", "/apple-touch-icon.png": "image/png", "/favicon-32.png": "image/png", "/favicon.ico": "image/png" };
 const DAYS = 90, COOKIE = "uiis", MAX_BODY = 8 * 1024 * 1024;
 const COLL_RE = /^[A-Za-z][A-Za-z0-9_-]{0,40}$/, ID_RE = /^[A-Za-z0-9._:-]{1,120}$/;
 // what a permission lets a person write
@@ -539,6 +541,13 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (req.method === "HEAD" && (p === "/" || p === "/index.html")) { res.writeHead(200, { "Cache-Control": "no-store" }); return res.end(); }
+    // the app icon and the file that lets Edge / Chrome install the site as an app (a fixed list, nothing else)
+    if (req.method === "GET" && Object.prototype.hasOwnProperty.call(ASSETS, p)) {
+      return fs.readFile(path.join(__dirname, "public", p.slice(1)), (e, buf) => {
+        if (e) return send(res, 404, "not found");
+        res.writeHead(200, { "Content-Type": ASSETS[p], "Cache-Control": "public, max-age=86400" }); res.end(buf);
+      });
+    }
     if (!p.startsWith("/api/")) return send(res, 404, "not found");
     if (isBroken("users") || isBroken("_sessions")) return send(res, 503, { code: "unavailable" });
     // writes must come from the page itself (a cross-site form cannot set this header)

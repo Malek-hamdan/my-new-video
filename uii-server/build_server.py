@@ -24,6 +24,9 @@ rep('"uiip-lock:', '"uii-lock:')
 s, k = re.subn(r"var UNLOCK_HASH = 0x[0-9a-f]{8};", "var UNLOCK_HASH = 0x66d60d02;", s)
 if k != 1: sys.exit("unlock hash not found")
 rep('<title>UII Roles Demo</title>', '<title>UII Parts</title>')
+rep('<meta name="theme-color" content="#0b0d12">', '<meta name="theme-color" content="#0f4c81">')
+# installable as an app (Edge / Chrome: Install this site as an app), with the UII icon
+rep('<title>UII Parts</title>', '<title>UII Parts</title>\n<link rel="manifest" href="/manifest.webmanifest">\n<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">\n<link rel="apple-touch-icon" href="/apple-touch-icon.png">')
 rep('<div class="demo-strip">DEMO &middot; accounts and roles test &middot; separate from the real site</div>\n', '')
 rep('  // Demo only: the checks run in this page. The real version keeps them on a server.\n',
     '  // The server checks the password and keeps the accounts; the page shows what each person may do.\n')
