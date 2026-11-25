@@ -33,9 +33,11 @@ service cloud.firestore {
           && !exists(/databases/$(database)/documents/config/app)
           && getAfter(/databases/$(database)/documents/config/app).data.ownerUid == uid)
       );
-      // The owner sets everyone else's role; people may edit their own name only.
+      // Owners set everyone else's role; only the main owner (the first
+      // account) can remove someone's access. People may edit their own name.
       allow update: if (hasRole(['owner']) && uid != ownerUid()
-                        && request.resource.data.role in ['owner', 'manager', 'seller', 'accountant', 'pending'])
+                        && request.resource.data.role in ['owner', 'manager', 'seller', 'accountant', 'pending']
+                        && (request.resource.data.role != 'pending' || request.auth.uid == ownerUid()))
                     || (request.auth.uid == uid && request.resource.data.role == resource.data.role);
       allow delete: if false;
     }

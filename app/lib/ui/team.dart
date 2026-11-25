@@ -93,10 +93,16 @@ class TeamScreen extends StatelessWidget {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(u.id == me.id ? '${u.name} (you)' : u.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                         const SizedBox(height: 2),
-                        Text(u.role.blurb, style: subStyle.copyWith(fontSize: 11.5)),
+                        Text(
+                          u.role == Role.owner && u.id != app.config.ownerUid ? 'Everything except removing people' : u.role.blurb,
+                          style: subStyle.copyWith(fontSize: 11.5),
+                        ),
                       ]),
                     ),
-                    Tag(u.role == Role.pending ? 'Waiting' : u.role.label, u.role.color),
+                    Tag(
+                      u.role == Role.pending ? 'Waiting' : (u.id == app.config.ownerUid ? 'Main owner' : u.role.label),
+                      u.role.color,
+                    ),
                   ]),
                 ),
               ),
@@ -105,6 +111,10 @@ class TeamScreen extends StatelessWidget {
       ),
       const Padding(padding: EdgeInsets.fromLTRB(18, 18, 18, 8), child: Label('What each role can do')),
       const Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: _PermTable()),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+        child: Text('Removing someone\'s access: main owner only.', style: subStyle.copyWith(fontSize: 11.5)),
+      ),
       if (owner) ...[
         const Padding(padding: EdgeInsets.fromLTRB(18, 18, 18, 8), child: Label('Settings')),
         Padding(
@@ -173,7 +183,7 @@ class _PermTable extends StatelessWidget {
       ('Add payment', (r) => r.canEditPayments),
       ('See profit & payments', (r) => r.canSeeMoney),
       ('Edit capital', (r) => r.canEditCapital),
-      ('Manage team', (r) => r.canManageTeam),
+      ('Give roles', (r) => r.canManageTeam),
     ];
     Widget cell(Widget c, {bool left = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
@@ -210,7 +220,9 @@ class RoleSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final current = app.users.firstWhere((u) => u.id == user.id, orElse: () => user);
-    const options = [Role.manager, Role.seller, Role.accountant, Role.owner, Role.pending];
+    // Only the main owner (the first account) can take someone's access away.
+    final mainOwner = app.myId == app.config.ownerUid || app.demo;
+    final options = [Role.manager, Role.seller, Role.accountant, Role.owner, if (mainOwner) Role.pending];
     return SheetFrame(
       title: current.name,
       actions: const [],
