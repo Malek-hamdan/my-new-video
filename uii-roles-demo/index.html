@@ -5019,7 +5019,7 @@
   });
 
   // ---- Blank slips: empty issue slips to fill by hand in the store room ----
-  var BLANK_PLACE_KEY = "uiird-blank-place", BLANK_NEXT_KEY = "uiird-blank-next", BLANK_WEEK_KEY = "uiird-blank-week";
+  var BLANK_PLACE_KEY = "uiird-blank-place", BLANK_NEXT_KEY = "uiird-blank-next", BLANK_WEEK_KEY = "uiird-blank-week", BLANK_YEAR_KEY = "uiird-blank-year";
   function slipNo(n) { return String(n); }
   function blankStart() { return Math.max(1, parseInt(document.getElementById("blankStart").value, 10) || 1); }
   // ---- Week booklet: Monday to Sunday, ISO week numbers ----
@@ -5124,6 +5124,9 @@
       }
       blankYear = wk.year;
       document.getElementById("blankWeek").value = wk.week;
+      // the slip numbers start again at 1 with the first booklet of a new year
+      var ny = parseInt(localStorage.getItem(BLANK_YEAR_KEY), 10) || 2026;
+      if (wk.year > ny) document.getElementById("blankStart").value = "1";
       document.getElementById("blankCover").checked = true;
       document.getElementById("blankDatesBox").hidden = false;
       blankSetMode(false);
@@ -5152,6 +5155,7 @@
       localStorage.setItem(TR_ME_KEY, me); localStorage.setItem(BLANK_PLACE_KEY, place); localStorage.setItem(BLANK_NEXT_KEY, String(st + n));
       // remember the week printed, so the next booklet offers the week after it
       if (blankWeek() && !blankManualOn()) localStorage.setItem(BLANK_WEEK_KEY, blankYear + "-" + blankWeek());
+      if (blankYear) localStorage.setItem(BLANK_YEAR_KEY, String(blankYear));
     } catch (e) {}
     if (document.getElementById("blankCover").checked && blankWeek()) html += '<div class="bpage">' + coverHtml(me, place, blankWeek(), st, st + n - 1) + "</div>";
     // a stapled booklet keeps both slips on the page, so no cut line then
