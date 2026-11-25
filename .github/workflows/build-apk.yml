@@ -17,6 +17,9 @@ concurrency:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
     defaults:
       run:
         working-directory: app
@@ -34,18 +37,24 @@ jobs:
           channel: stable
           cache: true
 
-      # Keep one signing key across builds so a new APK installs over the old
-      # one. Uses repository secrets when set, else a key kept in the cache.
+      # Every APK must be signed with the same key, or Android refuses to
+      # install it over the previous one. The permanent key lives in the
+      # repository secrets; until they are set, a key kept in the cache is used.
       - name: Restore signing key
+        id: debugkey
+        if: ${{ env.KEYSTORE_B64 == '' }}
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
           key: animewear-debug-keystore-v1
 
+      - name: Stop if the usual signing key is missing
+        if: ${{ env.KEYSTORE_B64 == '' && steps.debugkey.outputs.cache-hit != 'true' }}
+        run: |
+          echo "::error::No signing key found. Set ANDROID_KEYSTORE_B64 and ANDROID_KEYSTORE_PASSWORD in the repository secrets."
+          exit 1
+
       - name: Use release key from secrets
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         if: ${{ env.KEYSTORE_B64 != '' }}
         run: |
           echo "$KEYSTORE_B64" | base64 -d > android/app/release.jks
