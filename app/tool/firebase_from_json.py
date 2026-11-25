@@ -25,6 +25,7 @@ out.write_text(f"""import 'package:firebase_core/firebase_core.dart';
 /// google-services.json. These values are not secret: anyone who has the APK
 /// can read them. Access to the data is controlled by sign-in and the rules
 /// in firestore.rules.
+// ignore: unnecessary_nullable_for_final_variable_declarations
 const FirebaseOptions? firebaseOptions = FirebaseOptions(
 {body},
 );
