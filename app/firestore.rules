@@ -10,7 +10,7 @@ service cloud.firestore {
     function role() {
       return signedIn() && exists(userDoc()) ? get(userDoc()).data.role : 'none';
     }
-    function is(roles) { return role() in roles; }
+    function hasRole(roles) { return role() in roles; }
     function ownerUid() { return get(/databases/$(database)/documents/config/app).data.ownerUid; }
 
     // Shared settings. Created once by the very first account (the owner).
@@ -19,12 +19,12 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
         && getAfter(userDoc()).data.role == 'owner';
-      allow update: if is(['owner'])
+      allow update: if hasRole(['owner'])
         && request.resource.data.ownerUid == resource.data.ownerUid;
     }
 
     match /users/{uid} {
-      allow read: if request.auth.uid == uid || is(['owner', 'manager', 'seller', 'accountant']);
+      allow read: if request.auth.uid == uid || hasRole(['owner', 'manager', 'seller', 'accountant']);
       // A new account starts with no access. Only the very first account may
       // make itself owner, in the same write that creates config/app.
       allow create: if signedIn() && request.auth.uid == uid && (
@@ -34,26 +34,26 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/config/app).data.ownerUid == uid)
       );
       // The owner sets everyone else's role; people may edit their own name only.
-      allow update: if (is(['owner']) && uid != ownerUid()
+      allow update: if (hasRole(['owner']) && uid != ownerUid()
                         && request.resource.data.role in ['owner', 'manager', 'seller', 'accountant', 'pending'])
                     || (request.auth.uid == uid && request.resource.data.role == resource.data.role);
       allow delete: if false;
     }
 
     match /sales/{id} {
-      allow read: if is(['owner', 'manager', 'seller', 'accountant']);
-      allow create: if is(['owner', 'manager', 'seller']) && request.resource.data.by == request.auth.uid;
-      allow update, delete: if is(['owner', 'manager']);
+      allow read: if hasRole(['owner', 'manager', 'seller', 'accountant']);
+      allow create: if hasRole(['owner', 'manager', 'seller']) && request.resource.data.by == request.auth.uid;
+      allow update, delete: if hasRole(['owner', 'manager']);
     }
 
     match /payments/{id} {
-      allow read: if is(['owner', 'manager', 'accountant']);
-      allow write: if is(['owner', 'manager']);
+      allow read: if hasRole(['owner', 'manager', 'accountant']);
+      allow write: if hasRole(['owner', 'manager']);
     }
 
     match /capital/{id} {
-      allow read: if is(['owner', 'manager', 'accountant']);
-      allow write: if is(['owner']);
+      allow read: if hasRole(['owner', 'manager', 'accountant']);
+      allow write: if hasRole(['owner']);
     }
   }
 }
