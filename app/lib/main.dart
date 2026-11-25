@@ -44,7 +44,7 @@ class LedgerApp extends StatelessWidget {
   Widget build(BuildContext context) => AppScope(
         state: state,
         child: MaterialApp(
-          title: 'AnimeWear Ledger',
+          title: 'animewear.lb',
           debugShowCheckedModeBanner: false,
           theme: buildTheme(),
           home: const _Root(),
