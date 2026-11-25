@@ -254,7 +254,14 @@ class RoleSheet extends StatelessWidget {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(r == Role.pending ? 'Remove access' : r.label, style: TextStyle(fontWeight: FontWeight.w700, color: r == Role.pending ? C.down : C.fg)),
                     const SizedBox(height: 3),
-                    Text(r == Role.pending ? 'They stay signed in but see nothing' : r.blurb, style: subStyle),
+                    Text(
+                      r == Role.pending
+                          ? 'They stay signed in but see nothing'
+                          : r == Role.owner
+                              ? 'Everything except removing people'
+                              : r.blurb,
+                      style: subStyle,
+                    ),
                   ]),
                 ),
                 AnimatedScale(
