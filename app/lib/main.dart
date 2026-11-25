@@ -9,6 +9,7 @@ import 'state.dart';
 import 'theme.dart';
 import 'ui/auth.dart';
 import 'ui/shell.dart';
+import 'ui/updater.dart';
 import 'ui/widgets.dart';
 
 Future<void> main() async {
@@ -70,7 +71,7 @@ class _Root extends StatelessWidget {
       page = const WaitingScreen();
     } else {
       key = 'shell';
-      page = const Shell();
+      page = const UpdateWatcher(child: Shell());
     }
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 480),

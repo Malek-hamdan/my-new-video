@@ -54,14 +54,22 @@ jobs:
 
       - run: flutter pub get
       - run: flutter analyze
-      - run: flutter build apk --release
-
-      - name: Name the APK
+      # The build number is the run number, so every build is newer than the
+      # last and installed apps can tell an update is waiting.
+      - name: Build APK
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | cut -d' ' -f2 | cut -d+ -f1)
+          flutter build apk --release --build-name="$VERSION" --build-number="$GITHUB_RUN_NUMBER"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Name the APK and write version.json
+        run: |
           cp build/app/outputs/flutter-apk/app-release.apk AnimeWear.apk
           echo "APK=AnimeWear.apk" >> "$GITHUB_ENV"
-          echo "Version ${VERSION}, build ${GITHUB_RUN_NUMBER}"
+          NOTES=$(git log -1 --pretty=%s)
+          python3 -c 'import json,sys; print(json.dumps({"version": sys.argv[1], "build": int(sys.argv[2]), "notes": sys.argv[3]}))' \
+            "$VERSION" "$GITHUB_RUN_NUMBER" "$NOTES" > version.json
+          cat version.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -78,4 +86,6 @@ jobs:
           body: |
             Latest AnimeWear Ledger build #${{ github.run_number }} from `${{ github.ref_name }}`.
             On Android: download the .apk below, open it, and allow installing from this source.
-          files: app/${{ env.APK }}
+          files: |
+            app/${{ env.APK }}
+            app/version.json

@@ -1,10 +1,12 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../fmt.dart';
 import '../models.dart';
 import '../state.dart';
 import '../theme.dart';
 import 'forms.dart';
+import 'updater.dart';
 import 'website.dart';
 import 'widgets.dart';
 
@@ -153,6 +155,7 @@ class TeamScreen extends StatelessWidget {
           ),
         ),
       ],
+      const Padding(padding: EdgeInsets.fromLTRB(16, 18, 16, 0), child: _UpdateRow()),
       Padding(
         padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
         child: Text(
@@ -302,4 +305,59 @@ class _RateSheetState extends State<RateSheet> {
       ],
     );
   }
+}
+
+class _UpdateRow extends StatefulWidget {
+  const _UpdateRow();
+  @override
+  State<_UpdateRow> createState() => _UpdateRowState();
+}
+
+class _UpdateRowState extends State<_UpdateRow> {
+  String _version = '';
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((i) {
+      if (mounted) setState(() => _version = '${i.version} (${i.buildNumber})');
+    }).catchError((_) {});
+  }
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+        scale: .98,
+        onTap: _checking
+            ? null
+            : () async {
+                setState(() => _checking = true);
+                final u = await checkForUpdate();
+                if (!mounted || !context.mounted) return;
+                setState(() => _checking = false);
+                if (u != null) {
+                  showSheet(context, UpdateSheet(info: u));
+                } else {
+                  toast(context, "You're on the latest version");
+                }
+              },
+        child: Panel(
+          child: Row(children: [
+            const Icon(Icons.system_update_rounded, color: C.up),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Check for updates', style: TextStyle(fontWeight: FontWeight.w600)),
+                if (_version.isNotEmpty) Text('Version $_version', style: subStyle.copyWith(fontSize: 11.5)),
+              ]),
+            ),
+            AnimatedSwitcher(
+              duration: kFast,
+              child: _checking
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.mute))
+                  : const Icon(Icons.chevron_right_rounded, color: C.mute),
+            ),
+          ]),
+        ),
+      );
 }
