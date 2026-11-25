@@ -71,11 +71,15 @@ class AppUser {
 class AppConfig {
   final double lbpRate;
   final String ownerUid;
-  const AppConfig({this.lbpRate = 89500, this.ownerUid = ''});
+  final String website;
+  const AppConfig({this.lbpRate = 89500, this.ownerUid = '', this.website = ''});
   factory AppConfig.fromMap(Map<String, dynamic> m) => AppConfig(
         lbpRate: readNum(m['lbpRate']) > 0 ? readNum(m['lbpRate']) : 89500,
         ownerUid: readStr(m['ownerUid']),
+        website: readStr(m['website']),
       );
+  AppConfig copyWith({double? lbpRate, String? website}) =>
+      AppConfig(lbpRate: lbpRate ?? this.lbpRate, ownerUid: ownerUid, website: website ?? this.website);
 }
 
 class Sale {

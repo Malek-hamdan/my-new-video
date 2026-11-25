@@ -5,6 +5,7 @@ import '../models.dart';
 import '../state.dart';
 import '../theme.dart';
 import 'dashboard.dart';
+import 'website.dart';
 import 'widgets.dart';
 
 class SalesScreen extends StatefulWidget {
@@ -41,6 +42,7 @@ class _SalesScreenState extends State<SalesScreen> {
           ]),
           trailing: const LogoMark(size: 40),
         ).enter(0),
+        if (!app.role.canSeeMoney) const WebsiteButton().enter(1),
         if (app.role.canSeeMoney) const PeriodPills().enter(1),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),

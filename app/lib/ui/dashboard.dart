@@ -6,6 +6,7 @@ import '../models.dart';
 import '../state.dart';
 import '../theme.dart';
 import 'forms.dart';
+import 'website.dart';
 import 'widgets.dart';
 
 class PeriodPills extends StatelessWidget {
@@ -56,6 +57,7 @@ class DashboardScreen extends StatelessWidget {
           Avatar(me.initial),
         ]),
       ),
+      const WebsiteButton(),
       const PeriodPills(),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),

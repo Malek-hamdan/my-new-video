@@ -5,6 +5,7 @@ import '../models.dart';
 import '../state.dart';
 import '../theme.dart';
 import 'forms.dart';
+import 'website.dart';
 import 'widgets.dart';
 
 class TeamScreen extends StatelessWidget {
@@ -117,6 +118,25 @@ class TeamScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 const Expanded(child: Text('Dollar rate', style: TextStyle(fontWeight: FontWeight.w600))),
                 Text('1 \$ = ${lbp(app.config.lbpRate)}', style: mono(12, weight: FontWeight.w500)),
+                const Icon(Icons.chevron_right_rounded, color: C.mute),
+              ]),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Pressable(
+            scale: .98,
+            onTap: () => showSheet(context, const WebsiteSheet()),
+            child: Panel(
+              child: Row(children: [
+                const Icon(Icons.language_rounded, color: C.red),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('Website', style: TextStyle(fontWeight: FontWeight.w600))),
+                Flexible(
+                  child: Text(siteOf(app).isEmpty ? 'Not set' : prettyUrl(siteOf(app)),
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: subStyle.copyWith(fontSize: 12)),
+                ),
                 const Icon(Icons.chevron_right_rounded, color: C.mute),
               ]),
             ),

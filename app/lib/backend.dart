@@ -27,6 +27,7 @@ abstract class Backend {
   Future<void> deleteCapital(String id);
   Future<void> setRole(String uid, Role role);
   Future<void> setRate(double rate);
+  Future<void> setWebsite(String url);
 }
 
 /// Live, shared data in the business's Firebase project.
@@ -138,6 +139,8 @@ class FirebaseBackend implements Backend {
   Future<void> setRole(String uid, Role role) => _db.doc('users/$uid').update({'role': role.name});
   @override
   Future<void> setRate(double rate) => _db.doc('config/app').update({'lbpRate': rate});
+  @override
+  Future<void> setWebsite(String url) => _db.doc('config/app').update({'website': url});
 }
 
 /// In-memory sample data, used when the app is not connected to Firebase yet.
@@ -313,7 +316,9 @@ class DemoBackend implements Backend {
   }
 
   @override
-  Future<void> setRate(double rate) async => _config.value = AppConfig(lbpRate: rate, ownerUid: 'u0');
+  Future<void> setRate(double rate) async => _config.value = _config.value.copyWith(lbpRate: rate);
+  @override
+  Future<void> setWebsite(String url) async => _config.value = _config.value.copyWith(website: url);
 }
 
 /// A value that replays its latest state to every new listener.
