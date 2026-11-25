@@ -3,23 +3,23 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
 :root{
-  --ink:#15121F; --panel:#1F1B2E; --panel2:#2A2540; --line:#3A3456;
-  --fg:#F3F0FA; --mute:#A49DBD; --sakura:#FF4F7B; --gold:#FFC845;
-  --up:#3DDC97; --down:#FF6B5E; --indigo:#7B6CFF;
+  --ink:#0B0A0B; --panel:#171415; --panel2:#2A2022; --line:#332A2C;
+  --fg:#F6F2F2; --mute:#A89C9D; --sakura:#E01E2B; --gold:#FFC845;
+  --up:#3DDC97; --down:#FF6B5E; --indigo:#D9D2D2;
   --display:"Dela Gothic One",Impact,sans-serif; --body:Inter,system-ui,sans-serif; --num:"JetBrains Mono",ui-monospace,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0c0a14;font-family:var(--body);color:var(--fg);padding:40px;display:flex;flex-wrap:wrap;gap:40px}
-.phone{width:360px;height:780px;background:var(--ink);border-radius:36px;overflow:hidden;position:relative;display:flex;flex-direction:column;border:1px solid #2a2540}
+body{background:#050505;font-family:var(--body);color:var(--fg);padding:40px;display:flex;flex-wrap:wrap;gap:40px}
+.phone{width:360px;height:780px;background:var(--ink);border-radius:36px;overflow:hidden;position:relative;display:flex;flex-direction:column;border:1px solid #2a2224}
 .status{height:32px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:12px;font-weight:600;color:var(--mute)}
 .top{padding:6px 18px 12px;display:flex;align-items:center;gap:10px}
-.logo{width:38px;height:38px;border-radius:10px;background:var(--sakura);display:grid;place-items:center;font-family:var(--display);font-size:15px;color:var(--ink);transform:rotate(-4deg);box-shadow:3px 3px 0 var(--gold)}
+.logo{width:44px;height:44px;border-radius:12px;background:#000 url(../brand/mark.png) center/118% no-repeat;border:1px solid var(--line);flex-shrink:0}
 .brand{flex:1}
 .brand b{font-family:var(--display);font-size:17px;letter-spacing:.5px;display:block;line-height:1.1}
 .brand span{font-size:11px;color:var(--mute)}
 .brand span b{font-family:var(--num);display:inline;font-size:11px;letter-spacing:0}
 .content>*{flex-shrink:0}
-.avatar{width:34px;height:34px;border-radius:50%;background:var(--indigo);display:grid;place-items:center;font-weight:700;font-size:13px}
+.avatar{width:34px;height:34px;border-radius:50%;background:#7A1016;display:grid;place-items:center;font-weight:700;font-size:13px}
 .role{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:rgba(255,200,69,.15);color:var(--gold)}
 .content{flex:1;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:12px}
 h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
@@ -28,8 +28,8 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
 .between{justify-content:space-between}
 .chip{font-size:11px;padding:6px 11px;border-radius:99px;background:var(--panel);color:var(--mute);border:1px solid var(--line);white-space:nowrap}
 .chip.on{background:var(--fg);color:var(--ink);border-color:var(--fg);font-weight:600}
-.hero{background:linear-gradient(135deg,#2C2152,#1F1B2E);border:1px solid var(--line);border-radius:18px;padding:16px;position:relative;overflow:hidden}
-.hero:after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(255,79,123,.35),transparent 70%)}
+.hero{background:linear-gradient(135deg,#3A1114,#171415);border:1px solid var(--line);border-radius:18px;padding:16px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(224,30,43,.35),transparent 70%)}
 .label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--mute)}
 .big{font-family:var(--num);font-size:32px;font-weight:700;margin:4px 0}
 .num{font-family:var(--num);font-variant-numeric:tabular-nums}
@@ -54,8 +54,8 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
 .nav div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:var(--mute);font-weight:500}
 .nav svg{width:21px;height:21px}
 .nav .on{color:var(--sakura)}
-.fab{position:absolute;right:18px;bottom:86px;width:56px;height:56px;border-radius:18px;background:var(--sakura);display:grid;place-items:center;box-shadow:4px 4px 0 var(--gold)}
-.fab svg{width:26px;height:26px;color:var(--ink)}
+.fab{position:absolute;right:18px;bottom:86px;width:56px;height:56px;border-radius:18px;background:var(--sakura);display:grid;place-items:center;box-shadow:0 8px 24px rgba(224,30,43,.35)}
+.fab svg{width:26px;height:26px;color:#fff}
 .bars{display:flex;align-items:flex-end;gap:5px;height:84px;padding-top:6px}
 .bars .d{flex:1;display:flex;gap:2px;align-items:flex-end;height:100%}
 .bars .r{flex:1;background:var(--sakura);border-radius:3px 3px 0 0}
@@ -71,12 +71,12 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mute)}
 .inp{background:var(--ink);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:13px}
-.inp.focus{border-color:var(--sakura);box-shadow:0 0 0 3px rgba(255,79,123,.18)}
+.inp.focus{border-color:var(--sakura);box-shadow:0 0 0 3px rgba(224,30,43,.18)}
 .seg{display:flex;background:var(--ink);border-radius:11px;padding:3px;border:1px solid var(--line)}
 .seg div{flex:1;text-align:center;font-size:12px;padding:7px 0;border-radius:8px;color:var(--mute)}
 .seg .on{background:var(--panel2);color:var(--fg);font-weight:600}
 .total{display:flex;justify-content:space-between;align-items:center;background:var(--ink);border-radius:14px;padding:12px 14px;border:1px dashed var(--line)}
-.btn{background:var(--sakura);color:var(--ink);font-weight:700;text-align:center;padding:14px;border-radius:14px;font-size:14px;box-shadow:3px 3px 0 var(--gold)}
+.btn{background:var(--sakura);color:#fff;font-weight:700;text-align:center;padding:14px;border-radius:14px;font-size:14px;box-shadow:none}
 .bar{height:8px;background:var(--ink);border-radius:9px;overflow:hidden;margin-top:6px}
 .bar i{display:block;height:100%;border-radius:9px}
 .alloc{padding:11px 12px;border-bottom:1px solid var(--line)}
@@ -106,7 +106,7 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
 <!-- 1 DASHBOARD -->
 <div class="phone" id="s1">
  <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
- <div class="top"><div class="logo">AW</div><div class="brand"><b>ANIMEWEAR LB</b><span>Business ledger</span></div><div class="avatar">M</div></div>
+ <div class="top"><div class="logo"></div><div class="brand"><b>ANIMEWEAR.LB</b><span>Business ledger</span></div><div class="avatar">M</div></div>
  <div class="content">
   <div class="row" style="gap:6px"><div class="chip on">Nov 2026</div><div class="chip">Oct</div><div class="chip">Sep</div><div class="chip">All time</div></div>
   <div class="hero">
@@ -150,19 +150,19 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
 <!-- 2 SALES -->
 <div class="phone" id="s2">
  <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
- <div class="top"><div class="brand"><b style="font-size:22px">SALES</b><span>November · 120 orders · <b class="num" style="color:var(--fg)">$4,560</b></span></div><div class="logo">AW</div></div>
+ <div class="top"><div class="brand"><b style="font-size:22px">SALES</b><span>November · 120 orders · <b class="num" style="color:var(--fg)">$4,560</b></span></div><div class="logo"></div></div>
  <div class="content">
   <div class="search"><svg><use href="#find"/></svg>Search customer, design, phone…</div>
   <div class="row" style="gap:6px"><div class="chip on">All</div><div class="chip">Instagram</div><div class="chip">WhatsApp</div><div class="chip">TikTok</div></div>
   <div class="label" style="margin-top:2px">Today · Wed 25 Nov</div>
   <div class="card">
-   <div class="item"><div class="ic" style="background:rgba(255,79,123,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Akatsuki Cloud Tee · L ×2</div><div class="t2">Karim H. · Instagram · 4:12 PM</div></div><div><div class="amt">$50.00</div><span class="tag ok">Whish</span></div></div>
-   <div class="item"><div class="ic" style="background:rgba(255,79,123,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Gear 5 Luffy Oversized · M</div><div class="t2">Lea S. · WhatsApp · 2:40 PM</div></div><div><div class="amt">$28.00</div><span class="tag ok">Cash</span></div></div>
-   <div class="item"><div class="ic" style="background:rgba(255,79,123,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Gojo Infinity Tee · XL ×3</div><div class="t2">Rami K. · TikTok · 11:05 AM</div></div><div><div class="amt">$72.00</div><span class="tag wait">COD</span></div></div>
+   <div class="item"><div class="ic" style="background:rgba(224,30,43,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Akatsuki Cloud Tee · L ×2</div><div class="t2">Karim H. · Instagram · 4:12 PM</div></div><div><div class="amt">$50.00</div><span class="tag ok">Whish</span></div></div>
+   <div class="item"><div class="ic" style="background:rgba(224,30,43,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Gear 5 Luffy Oversized · M</div><div class="t2">Lea S. · WhatsApp · 2:40 PM</div></div><div><div class="amt">$28.00</div><span class="tag ok">Cash</span></div></div>
+   <div class="item"><div class="ic" style="background:rgba(224,30,43,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Gojo Infinity Tee · XL ×3</div><div class="t2">Rami K. · TikTok · 11:05 AM</div></div><div><div class="amt">$72.00</div><span class="tag wait">COD</span></div></div>
   </div>
   <div class="label">Yesterday · Tue 24 Nov</div>
   <div class="card">
-   <div class="item"><div class="ic" style="background:rgba(255,79,123,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Demon Slayer Hashira Pack ×4</div><div class="t2">Nour A. · Instagram · 8:30 PM</div></div><div><div class="amt">$96.00</div><span class="tag ok">OMT</span></div></div>
+   <div class="item"><div class="ic" style="background:rgba(224,30,43,.15);color:var(--sakura)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Demon Slayer Hashira Pack ×4</div><div class="t2">Nour A. · Instagram · 8:30 PM</div></div><div><div class="amt">$96.00</div><span class="tag ok">OMT</span></div></div>
    <div class="item"><div class="ic" style="background:rgba(255,107,94,.15);color:var(--down)"><svg><use href="#shirt"/></svg></div><div class="grow"><div class="t1">Zoro Santoryu Tee · S</div><div class="t2">Jad M. · Instagram · 6:02 PM</div></div><div><div class="amt down">−$25.00</div><span class="tag ref">Refunded</span></div></div>
   </div>
  </div>
@@ -193,7 +193,7 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
 <!-- 4 PAYMENTS -->
 <div class="phone" id="s4">
  <div class="status"><span>9:41</span><span>5G ▮▮▮</span></div>
- <div class="top"><div class="brand"><b style="font-size:22px">PAYMENTS</b><span>November · paid <b class="num" style="color:var(--fg)">$2,376</b> · pending <b class="num pink">$420</b></span></div><div class="logo">AW</div></div>
+ <div class="top"><div class="brand"><b style="font-size:22px">PAYMENTS</b><span>November · paid <b class="num" style="color:var(--fg)">$2,376</b> · pending <b class="num pink">$420</b></span></div><div class="logo"></div></div>
  <div class="content">
   <div class="row" style="gap:6px;flex-wrap:wrap"><div class="chip on">All</div><div class="chip">Stock</div><div class="chip">Printing</div><div class="chip">Ads</div><div class="chip">Delivery</div></div>
   <div class="card" style="padding:12px">
@@ -204,8 +204,8 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
    <div class="legend" style="flex-wrap:wrap;row-gap:4px"><span><i style="background:var(--sakura)"></i>Stock 38%</span><span><i style="background:var(--indigo)"></i>Printing 24%</span><span><i style="background:var(--gold)"></i>Ads 18%</span><span><i style="background:var(--up)"></i>Delivery 12%</span><span><i style="background:#8a83a8"></i>Other 8%</span></div>
   </div>
   <div class="card">
-   <div class="item"><div class="ic" style="background:rgba(255,79,123,.15);color:var(--sakura)"><svg><use href="#box"/></svg></div><div class="grow"><div class="t1">Blank tees · 100 pcs</div><div class="t2">Stock · Supplier Dora · 24 Nov, 10:00</div></div><div><div class="amt">$450.00</div><span class="tag ok">Paid</span></div></div>
-   <div class="item"><div class="ic" style="background:rgba(123,108,255,.18);color:var(--indigo)"><svg><use href="#print"/></svg></div><div class="grow"><div class="t1">DTF printing · 60 designs</div><div class="t2">Printing · PrintHub · 23 Nov, 3:30 PM</div></div><div><div class="amt">$300.00</div><span class="tag wait">Pending</span></div></div>
+   <div class="item"><div class="ic" style="background:rgba(224,30,43,.15);color:var(--sakura)"><svg><use href="#box"/></svg></div><div class="grow"><div class="t1">Blank tees · 100 pcs</div><div class="t2">Stock · Supplier Dora · 24 Nov, 10:00</div></div><div><div class="amt">$450.00</div><span class="tag ok">Paid</span></div></div>
+   <div class="item"><div class="ic" style="background:rgba(217,210,210,.12);color:var(--indigo)"><svg><use href="#print"/></svg></div><div class="grow"><div class="t1">DTF printing · 60 designs</div><div class="t2">Printing · PrintHub · 23 Nov, 3:30 PM</div></div><div><div class="amt">$300.00</div><span class="tag wait">Pending</span></div></div>
    <div class="item"><div class="ic" style="background:rgba(255,200,69,.15);color:var(--gold)"><svg><use href="#mega"/></svg></div><div class="grow"><div class="t1">Instagram ads · Black Friday</div><div class="t2">Ads · Meta · 22 Nov, 9:15 AM</div></div><div><div class="amt">$120.00</div><span class="tag ok">Paid</span></div></div>
    <div class="item"><div class="ic" style="background:rgba(61,220,151,.15);color:var(--up)"><svg><use href="#truck"/></svg></div><div class="grow"><div class="t1">Delivery batch · 34 orders</div><div class="t2">Delivery · Wakilni · 21 Nov, 6:00 PM</div></div><div><div class="amt">$102.00</div><span class="tag ok">Paid</span></div></div>
   </div>
@@ -248,8 +248,8 @@ h2{font-family:var(--display);font-size:22px;letter-spacing:.3px}
  <div class="content">
   <div class="card">
    <div class="item"><div class="avatar">M</div><div class="grow"><div class="t1">You</div><div class="t2">Full access</div></div><span class="role">Owner</span></div>
-   <div class="item"><div class="avatar" style="background:#2E8B6E">S</div><div class="grow"><div class="t1">Sara</div><div class="t2">Sales + payments</div></div><span class="role" style="background:rgba(123,108,255,.18);color:#b3aaff">Manager</span></div>
-   <div class="item"><div class="avatar" style="background:#C2410C">A</div><div class="grow"><div class="t1">Ali</div><div class="t2">Records sales only</div></div><span class="role" style="background:rgba(255,79,123,.15);color:var(--sakura)">Seller</span></div>
+   <div class="item"><div class="avatar" style="background:#2E8B6E">S</div><div class="grow"><div class="t1">Sara</div><div class="t2">Sales + payments</div></div><span class="role" style="background:rgba(217,210,210,.12);color:#E8E2E2">Manager</span></div>
+   <div class="item"><div class="avatar" style="background:#C2410C">A</div><div class="grow"><div class="t1">Ali</div><div class="t2">Records sales only</div></div><span class="role" style="background:rgba(224,30,43,.15);color:var(--sakura)">Seller</span></div>
    <div class="item"><div class="avatar" style="background:#4B5563">R</div><div class="grow"><div class="t1">Rita</div><div class="t2">Reads reports, can't edit</div></div><span class="role" style="background:rgba(164,157,189,.15);color:var(--mute)">Accountant</span></div>
   </div>
   <div class="label">What each role can do</div>
