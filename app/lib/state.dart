@@ -204,7 +204,7 @@ class AppState extends ChangeNotifier {
       set.add(DateTime(p.date.year, p.date.month));
     }
     final l = set.toList()..sort((a, b) => b.compareTo(a));
-    return l.take(12).toList();
+    return l;
   }
 
   Product? productById(String id) {

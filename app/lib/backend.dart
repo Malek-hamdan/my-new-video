@@ -99,7 +99,6 @@ class FirebaseBackend implements Backend {
   Stream<List<T>> _list<T>(String col, T Function(String, Map<String, dynamic>) f) => _db
       .collection(col)
       .orderBy('date', descending: true)
-      .limit(5000)
       .snapshots()
       .map((q) => q.docs.map((d) => f(d.id, d.data())).toList());
 

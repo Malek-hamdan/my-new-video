@@ -6,6 +6,7 @@ import '../models.dart';
 import '../state.dart';
 import '../theme.dart';
 import 'forms.dart';
+import 'report.dart';
 import 'website.dart';
 import 'widgets.dart';
 
@@ -94,7 +95,17 @@ class DashboardScreen extends StatelessWidget {
             colors: [C.redDeep.withValues(alpha: .55), C.panel],
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Label('Net profit · $period'),
+            Row(children: [
+              Expanded(child: Label('Net profit · $period')),
+              if (app.month != null)
+                Pressable(
+                  onTap: () => showSheet(context, MonthReport(month: app.month!)),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text('Full report ›', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: C.gold)),
+                  ),
+                ),
+            ]),
             const SizedBox(height: 6),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               RollingMoney(app.net, format: signedMoney0, style: mono(36, color: app.net >= 0 ? C.up : C.down)),
@@ -141,6 +152,7 @@ class DashboardScreen extends StatelessWidget {
       ),
       Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 0), child: DailyChart(days: app.daily)),
       Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 0), child: MonthsCard(months: app.lastSixMonths)),
+      const Padding(padding: EdgeInsets.fromLTRB(16, 10, 16, 0), child: ReportsButton()),
       Padding(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
         child: const Label('Latest activity'),
@@ -155,10 +167,12 @@ class DashboardScreen extends StatelessWidget {
       const SizedBox(height: 120),
     ];
 
-    return ListView(
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-      padding: EdgeInsets.zero,
-      children: [for (var i = 0; i < blocks.length; i++) blocks[i].enter(i)],
+    return MonthEndReport(
+      child: ListView(
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        padding: EdgeInsets.zero,
+        children: [for (var i = 0; i < blocks.length; i++) blocks[i].enter(i)],
+      ),
     );
   }
 }
