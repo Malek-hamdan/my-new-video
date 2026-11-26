@@ -25,7 +25,7 @@ class _SalesScreenState extends State<SalesScreen> {
     final list = app.periodSales.where((s) {
       if (_channel != null && s.channel != _channel) return false;
       if (q.isEmpty) return true;
-      return '${s.item} ${s.customer} ${s.phone} ${s.size} ${s.byName} ${s.note}'.toLowerCase().contains(q);
+      return '${s.label} ${s.customer} ${s.phone} ${s.byName} ${s.note}'.toLowerCase().contains(q);
     }).toList();
     final total = list.where((s) => s.completed).fold(0.0, (a, s) => a + s.totalUsd);
     final pieces = list.where((s) => s.completed).fold(0, (a, s) => a + s.qty);

@@ -311,7 +311,7 @@ class SaleTile extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${s.item} · ${s.size}${s.qty > 1 ? ' ×${s.qty}' : ''}',
+              Text(s.label,
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
               const SizedBox(height: 3),
               Text(who, maxLines: 1, overflow: TextOverflow.ellipsis, style: subStyle.copyWith(fontSize: 11.5)),
@@ -414,7 +414,7 @@ class SaleDetail extends StatelessWidget {
   final Sale sale;
   @override
   Widget build(BuildContext context) => _Detail(title: 'Sale', amount: money(sale.totalUsd), rows: [
-        ('Item', '${sale.item} · ${sale.size} ×${sale.qty}'),
+        ('Items', sale.items.map((i) => i.label).join('\n')),
         ('Customer', [sale.customer, sale.phone].where((x) => x.isNotEmpty).join(' · ')),
         ('When', '${dateLabel(sale.date)} · ${timeLabel(sale.date)}'),
         ('Paid with', sale.method),

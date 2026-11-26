@@ -83,26 +83,66 @@ class AppConfig {
       AppConfig(lbpRate: lbpRate ?? this.lbpRate, ownerUid: ownerUid, website: website ?? this.website);
 }
 
+/// One line of an order: a design, size, how many, and its price and cost.
+class SaleItem {
+  final String productId, name, type, size;
+  final int qty;
+
+  /// Price per piece in the order's currency.
+  final double price;
+
+  /// What one piece cost you, in USD (0 = unknown).
+  final double cost;
+
+  const SaleItem({
+    this.productId = '',
+    required this.name,
+    this.type = 'T-shirt',
+    this.size = 'M',
+    this.qty = 1,
+    this.price = 0,
+    this.cost = 0,
+  });
+
+  double get subtotal => price * qty;
+  String get label => '$name · $size${qty > 1 ? ' ×$qty' : ''}';
+
+  Map<String, dynamic> toMap() => {
+        'productId': productId,
+        'name': name,
+        'type': type,
+        'size': size,
+        'qty': qty,
+        'price': price,
+        'cost': cost,
+      };
+
+  factory SaleItem.fromMap(Map m) => SaleItem(
+        productId: readStr(m['productId']),
+        name: readStr(m['name']),
+        type: readStr(m['type']).isEmpty ? 'T-shirt' : readStr(m['type']),
+        size: readStr(m['size']),
+        qty: readNum(m['qty']).round(),
+        price: readNum(m['price']),
+        cost: readNum(m['cost']),
+      );
+}
+
+/// One order. It can hold several items, each with its own design, size,
+/// price and cost.
 class Sale {
   final String id;
   final DateTime date;
-  final String customer, phone, item, size, currency, method, channel, status, note, by, byName;
-  final String productId, type;
-  final int qty;
-  final double unitPrice, discount, total, totalUsd;
-
-  /// Cost per piece in USD when sold (0 = unknown).
-  final double unitCost;
+  final String customer, phone, currency, method, channel, status, note, by, byName;
+  final List<SaleItem> items;
+  final double discount, total, totalUsd;
 
   const Sale({
-    this.productId = '',
-    this.type = 'T-shirt',
     this.id = '',
     required this.date,
     this.customer = '',
     this.phone = '',
-    required this.item,
-    this.size = 'M',
+    required this.items,
     this.currency = 'USD',
     this.method = 'Cash',
     this.channel = 'Instagram',
@@ -110,9 +150,6 @@ class Sale {
     this.note = '',
     this.by = '',
     this.byName = '',
-    required this.qty,
-    required this.unitPrice,
-    this.unitCost = 0,
     this.discount = 0,
     required this.total,
     required this.totalUsd,
@@ -120,22 +157,50 @@ class Sale {
 
   bool get completed => status == 'completed';
 
-  /// Profit on the pieces themselves: what came in minus what they cost.
-  /// Null when the cost is unknown.
-  double? get profit => unitCost <= 0 || !completed ? null : totalUsd - unitCost * qty;
+  /// Pieces in the order.
+  int get qty => items.fold(0, (a, i) => a + i.qty);
 
-  /// Pieces this sale takes out of stock (none when refunded or not from stock).
-  Map<String, int> get stockUse =>
-      productId.isEmpty || !completed || qty <= 0 ? const {} : {'$productId|$size': qty};
+  /// Every design in the order, joined.
+  String get item => items.map((i) => i.name).join(' + ');
+  String get label => items.map((i) => i.label).join(' + ');
+  String get size => items.isEmpty ? '' : items.first.size;
+  String get type => items.isEmpty ? 'T-shirt' : items.first.type;
+  bool hasProduct(String productId) => items.any((i) => i.productId == productId);
+  int piecesOf(String productId) => items.where((i) => i.productId == productId).fold(0, (a, i) => a + i.qty);
+
+  /// USD each currency unit is worth in this order (also spreads the discount).
+  double get _usdRate {
+    final sub = items.fold(0.0, (a, i) => a + i.subtotal);
+    return sub <= 0 ? 0 : totalUsd / sub;
+  }
+
+  /// What one item brought in, in USD, after its share of the discount.
+  double usdOf(SaleItem i) => i.subtotal * _usdRate;
+
+  bool get allCostsKnown => items.isNotEmpty && items.every((i) => i.cost > 0);
+  double get costUsd => items.fold(0.0, (a, i) => a + i.cost * i.qty);
+
+  /// Profit on the pieces: what came in minus what they cost. Null when any
+  /// item's cost is unknown.
+  double? get profit => !completed || !allCostsKnown ? null : totalUsd - costUsd;
+
+  /// Pieces this order takes out of stock (none when refunded).
+  Map<String, int> get stockUse {
+    if (!completed) return const {};
+    final m = <String, int>{};
+    for (final i in items) {
+      if (i.productId.isEmpty || i.qty <= 0) continue;
+      final k = '${i.productId}|${i.size}';
+      m[k] = (m[k] ?? 0) + i.qty;
+    }
+    return m;
+  }
 
   Map<String, dynamic> toMap() => {
-        'productId': productId,
-        'type': type,
+        'items': [for (final i in items) i.toMap()],
         'date': date,
         'customer': customer,
         'phone': phone,
-        'item': item,
-        'size': size,
         'currency': currency,
         'method': method,
         'channel': channel,
@@ -143,37 +208,53 @@ class Sale {
         'note': note,
         'by': by,
         'byName': byName,
-        'qty': qty,
-        'unitPrice': unitPrice,
-        'unitCost': unitCost,
         'discount': discount,
         'total': total,
         'totalUsd': totalUsd,
+        // Summary fields, kept so older app versions can still read the order.
+        'item': item,
+        'size': size,
+        'type': type,
+        'qty': qty,
+        'unitPrice': items.isEmpty ? 0 : items.first.price,
+        'unitCost': items.isEmpty ? 0 : items.first.cost,
+        'productId': items.isEmpty ? '' : items.first.productId,
       };
 
-  factory Sale.fromMap(String id, Map<String, dynamic> m) => Sale(
-        id: id,
-        productId: readStr(m['productId']),
-        type: readStr(m['type']).isEmpty ? 'T-shirt' : readStr(m['type']),
-        date: readDate(m['date']),
-        customer: readStr(m['customer']),
-        phone: readStr(m['phone']),
-        item: readStr(m['item']),
-        size: readStr(m['size']),
-        currency: readStr(m['currency']).isEmpty ? 'USD' : readStr(m['currency']),
-        method: readStr(m['method']),
-        channel: readStr(m['channel']),
-        status: readStr(m['status']).isEmpty ? 'completed' : readStr(m['status']),
-        note: readStr(m['note']),
-        by: readStr(m['by']),
-        byName: readStr(m['byName']),
-        qty: readNum(m['qty']).round(),
-        unitPrice: readNum(m['unitPrice']),
-        unitCost: readNum(m['unitCost']),
-        discount: readNum(m['discount']),
-        total: readNum(m['total']),
-        totalUsd: readNum(m['totalUsd']),
-      );
+  factory Sale.fromMap(String id, Map<String, dynamic> m) {
+    final raw = m['items'];
+    final items = raw is List && raw.isNotEmpty
+        ? [for (final x in raw) if (x is Map) SaleItem.fromMap(x)]
+        : [
+            // An order saved before orders could hold several items.
+            SaleItem(
+              productId: readStr(m['productId']),
+              name: readStr(m['item']),
+              type: readStr(m['type']).isEmpty ? 'T-shirt' : readStr(m['type']),
+              size: readStr(m['size']),
+              qty: readNum(m['qty']).round(),
+              price: readNum(m['unitPrice']),
+              cost: readNum(m['unitCost']),
+            ),
+          ];
+    return Sale(
+      id: id,
+      date: readDate(m['date']),
+      customer: readStr(m['customer']),
+      phone: readStr(m['phone']),
+      items: items,
+      currency: readStr(m['currency']).isEmpty ? 'USD' : readStr(m['currency']),
+      method: readStr(m['method']),
+      channel: readStr(m['channel']),
+      status: readStr(m['status']).isEmpty ? 'completed' : readStr(m['status']),
+      note: readStr(m['note']),
+      by: readStr(m['by']),
+      byName: readStr(m['byName']),
+      discount: readNum(m['discount']),
+      total: readNum(m['total']),
+      totalUsd: readNum(m['totalUsd']),
+    );
+  }
 }
 
 class Payment {

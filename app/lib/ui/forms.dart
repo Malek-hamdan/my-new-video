@@ -216,6 +216,46 @@ class TotalBox extends StatelessWidget {
 
 // ───────────────────────────── Sale ─────────────────────────────
 
+/// One item being edited in the sale form.
+class _ItemDraft {
+  _ItemDraft({SaleItem? from})
+      : productId = from?.productId ?? '',
+        type = from?.type ?? 'T-shirt',
+        size = from == null || from.size.isEmpty ? 'M' : from.size,
+        name = TextEditingController(text: from?.name),
+        qty = TextEditingController(text: '${from?.qty ?? 1}'),
+        price = TextEditingController(text: from == null ? '' : _num(from.price)),
+        cost = TextEditingController(text: (from?.cost ?? 0) > 0 ? _num(from!.cost) : '');
+
+  final key = UniqueKey();
+  String productId, type, size;
+  final TextEditingController name, qty, price, cost;
+
+  int get pieces => parseNum(qty.text).round();
+  double get subtotal => parseNum(qty.text) * parseNum(price.text);
+  double get costEach => parseNum(cost.text);
+  bool get valid => name.text.trim().isNotEmpty && pieces > 0 && parseNum(price.text) > 0;
+
+  SaleItem toItem() => SaleItem(
+        productId: productId,
+        name: name.text.trim(),
+        type: type,
+        size: size,
+        qty: pieces,
+        price: parseNum(price.text),
+        cost: costEach,
+      );
+
+  void dispose() {
+    name.dispose();
+    qty.dispose();
+    price.dispose();
+    cost.dispose();
+  }
+}
+
+String _num(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
 class SaleForm extends StatefulWidget {
   const SaleForm({super.key, this.sale});
   final Sale? sale;
@@ -227,39 +267,48 @@ class _SaleFormState extends State<SaleForm> {
   late DateTime date = widget.sale?.date ?? DateTime.now();
   late final customer = TextEditingController(text: widget.sale?.customer);
   late final phone = TextEditingController(text: widget.sale?.phone);
-  late final item = TextEditingController(text: widget.sale?.item);
-  late final qty = TextEditingController(text: '${widget.sale?.qty ?? 1}');
-  late final price = TextEditingController(text: widget.sale == null ? '' : _n(widget.sale!.unitPrice));
-  late final discount = TextEditingController(text: widget.sale == null || widget.sale!.discount == 0 ? '' : _n(widget.sale!.discount));
+  late final discount = TextEditingController(text: widget.sale == null || widget.sale!.discount == 0 ? '' : _num(widget.sale!.discount));
   late final note = TextEditingController(text: widget.sale?.note);
-  late String size = widget.sale?.size ?? 'M';
   late String method = widget.sale?.method ?? 'Cash';
   late String channel = widget.sale?.channel ?? 'Instagram';
   late String currency = widget.sale?.currency ?? 'USD';
   late String status = widget.sale?.status ?? 'completed';
-  late String productId = widget.sale?.productId ?? '';
-  late String type = widget.sale?.type ?? 'T-shirt';
-  late final cost = TextEditingController(
-      text: (widget.sale?.unitCost ?? 0) > 0 ? _n(widget.sale!.unitCost) : '');
-  double get unitCost => parseNum(cost.text);
+  late final List<_ItemDraft> drafts = widget.sale == null || widget.sale!.items.isEmpty
+      ? [_ItemDraft()]
+      : [for (final i in widget.sale!.items) _ItemDraft(from: i)];
   bool tried = false;
 
-  void _pick(Product? p) {
+  @override
+  void dispose() {
+    for (final d in drafts) {
+      d.dispose();
+    }
+    customer.dispose();
+    phone.dispose();
+    discount.dispose();
+    note.dispose();
+    super.dispose();
+  }
+
+  double get subtotal => drafts.fold(0.0, (a, d) => a + d.subtotal);
+  double get total => (subtotal - parseNum(discount.text)).clamp(0, double.infinity);
+  bool get valid => drafts.every((d) => d.valid);
+
+  void _pick(_ItemDraft d, Product? p) {
     setState(() {
       if (p == null) {
-        productId = '';
+        d.productId = '';
         return;
       }
-      productId = p.id;
-      type = p.type;
-      if (p.cost > 0) cost.text = _n(p.cost);
-      item.text = p.name;
-      if (p.price > 0) price.text = _n(p.price);
-      // Jump to a size that still has stock if the current one is empty.
-      if (p.qty(size) <= 0) {
+      d.productId = p.id;
+      d.type = p.type;
+      d.name.text = p.name;
+      if (p.price > 0) d.price.text = _num(p.price);
+      if (p.cost > 0) d.cost.text = _num(p.cost);
+      if (_available(d, p, d.size) <= 0) {
         for (final s in sizes) {
-          if (p.qty(s) > 0) {
-            size = s;
+          if (_available(d, p, s) > 0) {
+            d.size = s;
             break;
           }
         }
@@ -267,16 +316,22 @@ class _SaleFormState extends State<SaleForm> {
     });
   }
 
-  /// Pieces of the chosen size available to this sale (an edited sale's own
-  /// pieces count as available).
-  int _available(Product p, String s) {
-    final own = widget.sale != null && widget.sale!.productId == p.id && widget.sale!.size == s && widget.sale!.completed ? widget.sale!.qty : 0;
-    return p.qty(s) + own;
+  /// Pieces of [size] still free for draft [d]: the stock count, plus what
+  /// this order already took before the edit, minus what the other items in
+  /// the form are taking.
+  int _available(_ItemDraft d, Product p, String size) {
+    var n = p.qty(size);
+    final before = widget.sale;
+    if (before != null && before.completed) {
+      for (final i in before.items) {
+        if (i.productId == p.id && i.size == size) n += i.qty;
+      }
+    }
+    for (final o in drafts) {
+      if (!identical(o, d) && o.productId == p.id && o.size == size) n -= o.pieces;
+    }
+    return n;
   }
-
-  static String _n(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
-
-  double get total => (parseNum(qty.text) * parseNum(price.text) - parseNum(discount.text)).clamp(0, double.infinity);
 
   @override
   Widget build(BuildContext context) {
@@ -284,56 +339,45 @@ class _SaleFormState extends State<SaleForm> {
     final rate = app.config.lbpRate;
     final usd = currency == 'USD' ? total : total / rate;
     final editing = widget.sale != null;
-    final valid = item.text.trim().isNotEmpty && parseNum(qty.text) > 0 && parseNum(price.text) > 0;
-    final product = productId.isEmpty ? null : app.productById(productId);
-    final avail = product == null ? null : _available(product, size);
-    final short = avail != null && status == 'completed' && parseNum(qty.text) > avail;
+    final costKnown = drafts.every((d) => d.costEach > 0);
+    final pieceCost = drafts.fold(0.0, (a, d) => a + d.costEach * d.pieces);
+    final pieces = drafts.fold(0, (a, d) => a + d.pieces);
 
     return SheetFrame(
       title: editing ? 'Edit sale' : 'New sale',
       items: [
-        if (app.products.isNotEmpty) Field('From stock', ProductPicker(selectedId: productId, onChanged: _pick)),
         DateTimeRow(value: date, onChanged: (d) => setState(() => date = d)),
         Row(children: [
           Expanded(flex: 3, child: Field('Customer', Input(controller: customer, hint: 'Name'))),
           const SizedBox(width: 12),
           Expanded(flex: 2, child: Field('Phone', Input(controller: phone, hint: '70 123 456', phone: true))),
         ]),
-        Field('Design / item', Input(controller: item, hint: 'e.g. Akatsuki Cloud Tee', onChanged: (_) => setState(() {}))),
-        if (product == null)
-          Field('Type', SlidePicker(options: productTypes, labels: const ['Tee', 'Oversize', 'Hoodie', 'Sweater', 'Other'], selected: type, onChanged: (v) => setState(() => type = v))),
-        Field(
-          'Size',
-          SlidePicker(
-            options: sizes,
-            labels: product == null ? null : [for (final s in sizes) '$s·${_available(product, s)}'],
-            selected: size,
-            onChanged: (v) => setState(() => size = v),
+        for (var k = 0; k < drafts.length; k++)
+          KeyedSubtree(
+            key: drafts[k].key,
+            child: _itemCard(app, drafts[k], k).animate().fadeIn(duration: kMed).slideY(begin: .08, curve: kCurve),
+          ),
+        Pressable(
+          onTap: () => setState(() => drafts.add(_ItemDraft())),
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: C.red.withValues(alpha: .5)),
+              color: C.red.withValues(alpha: .06),
+            ),
+            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.add_rounded, color: C.red, size: 20),
+              SizedBox(width: 8),
+              Text('Add another item', style: TextStyle(fontWeight: FontWeight.w700, color: C.red)),
+            ]),
           ),
         ),
-        Row(children: [
-          Expanded(child: Field('Qty', Input(controller: qty, number: true, onChanged: (_) => setState(() {})))),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: Field('Unit price', Input(controller: price, number: true, hint: '0', prefix: currency == 'USD' ? r'$ ' : 'LBP ', onChanged: (_) => setState(() {}))),
-          ),
-        ]),
-        if (app.role.canSeeMoney)
-          Field(
-            'Cost per piece (what it cost you)',
-            Input(controller: cost, number: true, hint: 'e.g. 9', prefix: r'$ ', onChanged: (_) => setState(() {})),
-          ),
         Row(children: [
           Expanded(child: Field('Currency', SlidePicker(options: const ['USD', 'LBP'], selected: currency, onChanged: (v) => setState(() => currency = v)))),
           const SizedBox(width: 12),
           Expanded(child: Field('Discount', Input(controller: discount, number: true, hint: '0', onChanged: (_) => setState(() {})))),
         ]),
-        if (short)
-          Text(
-            avail <= 0 ? 'Size $size is out of stock. Saving will put the count below zero.' : 'Only $avail left in size $size.',
-            style: const TextStyle(color: C.gold, fontSize: 12.5, fontWeight: FontWeight.w600),
-          ).animate().fadeIn(duration: kFast),
         Field('Paid with', SlidePicker(options: saleMethods, selected: method, onChanged: (v) => setState(() => method = v))),
         Field(
           'Channel',
@@ -345,15 +389,15 @@ class _SaleFormState extends State<SaleForm> {
             SlidePicker(options: const ['completed', 'refunded'], labels: const ['Completed', 'Refunded'], selected: status, onChanged: (v) => setState(() => status = v)),
           ),
         Field('Note', Input(controller: note, hint: 'Optional')),
-        TotalBox(label: 'Total', usd: usd, rate: rate, native: total, currency: currency),
-        if (app.role.canSeeMoney && unitCost > 0 && parseNum(qty.text) > 0)
+        TotalBox(label: drafts.length > 1 ? 'Total · $pieces pcs' : 'Total', usd: usd, rate: rate, native: total, currency: currency),
+        if (app.role.canSeeMoney && pieceCost > 0)
           ProfitBox(
             label: 'Profit on this sale',
-            profit: usd - unitCost * parseNum(qty.text),
-            sub: 'cost ${money(unitCost)} × ${parseNum(qty.text).round()}',
+            profit: usd - pieceCost,
+            sub: costKnown ? 'pieces cost ${money(pieceCost)}' : 'some items have no cost yet',
           ),
         if (tried && !valid)
-          const Text('Add the item, a quantity and a price to save.', style: TextStyle(color: C.down, fontSize: 12)).animate().shakeX(hz: 5, amount: 3),
+          const Text('Every item needs a name, a quantity and a price.', style: TextStyle(color: C.down, fontSize: 12)).animate().shakeX(hz: 5, amount: 3),
       ],
       actions: [
         ActionButton(
@@ -370,20 +414,14 @@ class _SaleFormState extends State<SaleForm> {
               date: date,
               customer: customer.text.trim(),
               phone: phone.text.trim(),
-              item: item.text.trim(),
-              size: size,
+              items: [for (final d in drafts) d.toItem()],
               currency: currency,
               method: method,
               channel: channel,
               status: status,
-              productId: productId,
-              type: type,
-              unitCost: unitCost,
               note: note.text.trim(),
               by: widget.sale?.by ?? app.myId,
               byName: widget.sale?.byName ?? app.myName,
-              qty: parseNum(qty.text).round(),
-              unitPrice: parseNum(price.text),
               discount: parseNum(discount.text),
               total: total,
               totalUsd: usd,
@@ -406,7 +444,96 @@ class _SaleFormState extends State<SaleForm> {
       ],
     );
   }
+
+  Widget _itemCard(AppState app, _ItemDraft d, int index) {
+    final product = d.productId.isEmpty ? null : app.productById(d.productId);
+    final avail = product == null ? null : _available(d, product, d.size);
+    final short = avail != null && status == 'completed' && d.pieces > avail;
+    final multi = drafts.length > 1;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: C.ink.withValues(alpha: .6),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: C.line),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Label(multi ? 'Item ${index + 1}' : 'Item'),
+          const Spacer(),
+          if (d.subtotal > 0) Text(currency == 'USD' ? money(d.subtotal) : lbp(d.subtotal), style: mono(12.5, color: C.mute)),
+          if (multi) ...[
+            const SizedBox(width: 8),
+            Pressable(
+              onTap: () => setState(() {
+                drafts.remove(d);
+                d.dispose();
+              }),
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(color: C.down.withValues(alpha: .12), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.close_rounded, size: 17, color: C.down),
+              ),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 12),
+        if (app.products.isNotEmpty) ...[
+          ProductPicker(selectedId: d.productId, onChanged: (p) => _pick(d, p)),
+          const SizedBox(height: 12),
+        ],
+        Field('Design / item', Input(controller: d.name, hint: 'e.g. Akatsuki Cloud Tee', onChanged: (_) => setState(() {}))),
+        const SizedBox(height: 12),
+        if (product == null) ...[
+          Field(
+            'Type',
+            SlidePicker(
+              options: productTypes,
+              labels: const ['Tee', 'Oversize', 'Hoodie', 'Sweater', 'Other'],
+              selected: d.type,
+              onChanged: (v) => setState(() => d.type = v),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Field(
+          'Size',
+          SlidePicker(
+            options: sizes,
+            labels: product == null ? null : [for (final s in sizes) '$s·${_available(d, product, s)}'],
+            selected: d.size,
+            onChanged: (v) => setState(() => d.size = v),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: Field('Qty', Input(controller: d.qty, number: true, onChanged: (_) => setState(() {})))),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: Field('Price each', Input(controller: d.price, number: true, hint: '0', prefix: currency == 'USD' ? r'$ ' : 'LBP ', onChanged: (_) => setState(() {}))),
+          ),
+          if (app.role.canSeeMoney) ...[
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 2,
+              child: Field('Cost each', Input(controller: d.cost, number: true, hint: 'e.g. 9', prefix: r'$ ', onChanged: (_) => setState(() {}))),
+            ),
+          ],
+        ]),
+        if (short) ...[
+          const SizedBox(height: 8),
+          Text(
+            avail <= 0 ? 'Size ${d.size} is out of stock. Saving will put the count below zero.' : 'Only $avail left in size ${d.size}.',
+            style: const TextStyle(color: C.gold, fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ]),
+    );
+  }
 }
+
 
 // ──────────────────────────── Payment ────────────────────────────
 
@@ -422,7 +549,7 @@ class _PaymentFormState extends State<PaymentForm> {
   late String category = widget.payment?.category ?? 'Stock';
   late final desc = TextEditingController(text: widget.payment?.description);
   late final payee = TextEditingController(text: widget.payment?.payee);
-  late final amount = TextEditingController(text: widget.payment == null ? '' : _SaleFormState._n(widget.payment!.amount));
+  late final amount = TextEditingController(text: widget.payment == null ? '' : _num(widget.payment!.amount));
   late final note = TextEditingController(text: widget.payment?.note);
   late String currency = widget.payment?.currency ?? 'USD';
   late String method = widget.payment?.method ?? 'Cash';
@@ -518,7 +645,7 @@ class CapitalForm extends StatefulWidget {
 class _CapitalFormState extends State<CapitalForm> {
   late String kind = widget.entry?.kind ?? widget.kind;
   late DateTime date = widget.entry?.date ?? DateTime.now();
-  late final amount = TextEditingController(text: widget.entry == null ? '' : _SaleFormState._n(widget.entry!.amount));
+  late final amount = TextEditingController(text: widget.entry == null ? '' : _num(widget.entry!.amount));
   late final label = TextEditingController(text: widget.entry?.label);
   late String category = widget.entry?.category.isNotEmpty == true ? widget.entry!.category : 'Stock';
   bool tried = false;

@@ -127,11 +127,8 @@ class AppState extends ChangeNotifier {
       st.sales += s.totalUsd;
       st.orders += 1;
       st.pieces += s.qty;
-      if (s.unitCost > 0) {
-        st.pieceCost += s.unitCost * s.qty;
-      } else {
-        st.salesWithoutCost += 1;
-      }
+      st.pieceCost += s.costUsd;
+      if (!s.allCostsKnown) st.salesWithoutCost += 1;
     }
     for (final p in payments) {
       if (!p.paid || !inside(p.date)) continue;

@@ -29,9 +29,11 @@ class MonthReport extends StatelessWidget {
     // Top designs by pieces sold.
     final byDesign = <String, (int, double)>{};
     for (final s in sales) {
-      final k = s.item.isEmpty ? 'Other' : s.item;
-      final v = byDesign[k] ?? (0, 0.0);
-      byDesign[k] = (v.$1 + s.qty, v.$2 + s.totalUsd);
+      for (final it in s.items) {
+        final k = it.name.isEmpty ? 'Other' : it.name;
+        final v = byDesign[k] ?? (0, 0.0);
+        byDesign[k] = (v.$1 + it.qty, v.$2 + s.usdOf(it));
+      }
     }
     final topDesigns = byDesign.entries.toList()..sort((a, b) => b.value.$1.compareTo(a.value.$1));
 
@@ -48,7 +50,9 @@ class MonthReport extends StatelessWidget {
     final bySeller = sumBy(sales, (s) => s.byName.isEmpty ? 'Someone' : s.byName);
     final byType = <String, int>{};
     for (final s in sales) {
-      byType[s.type] = (byType[s.type] ?? 0) + s.qty;
+      for (final it in s.items) {
+        byType[it.type] = (byType[it.type] ?? 0) + it.qty;
+      }
     }
     final byCategory = <String, double>{};
     for (final p in pays) {

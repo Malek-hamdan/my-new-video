@@ -181,8 +181,8 @@ class ProductSheet extends StatelessWidget {
     final app = AppScope.of(context);
     final p = app.productById(productId);
     if (p == null) return const SizedBox(height: 120, child: Center(child: Text('This design was removed.', style: subStyle)));
-    final sold = app.sales.where((s) => s.productId == p.id && s.completed).fold(0, (a, s) => a + s.qty);
-    final soldMonth = app.periodSales.where((s) => s.productId == p.id && s.completed).fold(0, (a, s) => a + s.qty);
+    final sold = app.sales.where((s) => s.completed).fold(0, (a, s) => a + s.piecesOf(p.id));
+    final soldMonth = app.periodSales.where((s) => s.completed).fold(0, (a, s) => a + s.piecesOf(p.id));
     final manage = app.role.canManageStock;
     return SheetFrame(
       title: p.name,
