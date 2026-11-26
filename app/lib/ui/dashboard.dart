@@ -145,7 +145,13 @@ class DashboardScreen extends StatelessWidget {
           children: [
             _Tile('Tees sold', Text(count(app.piecesSold), style: mono(20)), '${app.orders} orders'),
             _Tile('Avg order', RollingMoney(app.avgOrder, format: money, style: mono(20)), 'per completed sale'),
-            _Tile('Capital left', RollingMoney(app.capitalLeft, style: mono(20, color: C.gold)), 'of ${money0(app.capitalIn)}'),
+            _Tile(
+              app.leftToRecover > 0 ? 'To earn back' : 'Earned back',
+              app.leftToRecover > 0
+                  ? RollingMoney(app.leftToRecover, style: mono(20, color: C.gold))
+                  : RollingMoney(app.salesAllTime - app.spentAllTime, format: signedMoney0, style: mono(20, color: C.up)),
+              app.leftToRecover > 0 ? '${(app.recoveredShare * 100).round()}% of ${money0(app.spentAllTime)} back' : 'all spending covered ✓',
+            ),
             _Tile('Pending to pay', RollingMoney(app.pendingTotal, style: mono(20, color: C.red)), '${pend.length} payment${pend.length == 1 ? '' : 's'}'),
           ],
         ),

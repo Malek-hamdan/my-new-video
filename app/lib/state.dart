@@ -156,6 +156,16 @@ class AppState extends ChangeNotifier {
   double get capitalIn => capital.where((c) => c.isDeposit).fold(0, (a, c) => a + c.amount);
   double get spentAllTime => payments.where((p) => p.paid).fold(0, (a, p) => a + p.amountUsd);
   double get capitalLeft => capitalIn - spentAllTime;
+
+  /// All money in from sales, ever.
+  double get salesAllTime => sales.where((s) => s.completed).fold(0, (a, s) => a + s.totalUsd);
+
+  /// How much sales still need to bring in before everything spent so far
+  /// (capital included) has come back. 0 once it has.
+  double get leftToRecover => (spentAllTime - salesAllTime).clamp(0, double.infinity);
+
+  /// Share of everything spent that sales have brought back (0 to 1).
+  double get recoveredShare => spentAllTime <= 0 ? 1 : (salesAllTime / spentAllTime).clamp(0, 1);
   Iterable<Payment> get pending => payments.where((p) => !p.paid);
   double get pendingTotal => pending.fold(0, (a, p) => a + p.amountUsd);
 

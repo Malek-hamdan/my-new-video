@@ -47,10 +47,21 @@ class CapitalScreen extends StatelessWidget {
               const Text('Left ', style: subStyle),
               RollingMoney(app.capitalLeft, style: mono(13, color: app.capitalLeft >= 0 ? C.gold : C.down)),
             ]),
-            if (app.capitalLeft < 0) ...[
-              const SizedBox(height: 8),
-              Text('Spending is above capital: the extra is coming from sales.', style: subStyle.copyWith(fontSize: 11, color: C.down)),
-            ],
+            const SizedBox(height: 16),
+            Row(children: [
+              Label(app.leftToRecover > 0 ? 'Still to earn back' : 'Capital earned back ✓', color: app.leftToRecover > 0 ? C.mute : C.up),
+              const Spacer(),
+              Text('${(app.recoveredShare * 100).round()}%', style: mono(12, color: C.up)),
+            ]),
+            const SizedBox(height: 6),
+            _Bar(frac: app.recoveredShare, color: C.up, height: 10),
+            const SizedBox(height: 8),
+            Text(
+              app.leftToRecover > 0
+                  ? 'Sales so far ${money0(app.salesAllTime)} of ${money0(app.spentAllTime)} spent · ${money0(app.leftToRecover)} to go'
+                  : 'Sales ${money0(app.salesAllTime)} have covered all ${money0(app.spentAllTime)} spent',
+              style: subStyle.copyWith(fontSize: 11.5),
+            ),
           ]),
         ),
       ),
