@@ -239,19 +239,20 @@ class _SaleFormState extends State<SaleForm> {
   late String status = widget.sale?.status ?? 'completed';
   late String productId = widget.sale?.productId ?? '';
   late String type = widget.sale?.type ?? 'T-shirt';
-  late double unitCost = widget.sale?.unitCost ?? 0;
+  late final cost = TextEditingController(
+      text: (widget.sale?.unitCost ?? 0) > 0 ? _n(widget.sale!.unitCost) : '');
+  double get unitCost => parseNum(cost.text);
   bool tried = false;
 
   void _pick(Product? p) {
     setState(() {
       if (p == null) {
         productId = '';
-        unitCost = 0;
         return;
       }
       productId = p.id;
       type = p.type;
-      unitCost = p.cost;
+      if (p.cost > 0) cost.text = _n(p.cost);
       item.text = p.name;
       if (p.price > 0) price.text = _n(p.price);
       // Jump to a size that still has stock if the current one is empty.
@@ -318,6 +319,11 @@ class _SaleFormState extends State<SaleForm> {
             child: Field('Unit price', Input(controller: price, number: true, hint: '0', prefix: currency == 'USD' ? r'$ ' : 'LBP ', onChanged: (_) => setState(() {}))),
           ),
         ]),
+        if (app.role.canSeeMoney)
+          Field(
+            'Cost per piece (what it cost you)',
+            Input(controller: cost, number: true, hint: 'e.g. 9', prefix: r'$ ', onChanged: (_) => setState(() {})),
+          ),
         Row(children: [
           Expanded(child: Field('Currency', SlidePicker(options: const ['USD', 'LBP'], selected: currency, onChanged: (v) => setState(() => currency = v)))),
           const SizedBox(width: 12),
