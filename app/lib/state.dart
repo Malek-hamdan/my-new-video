@@ -32,6 +32,10 @@ class AppState extends ChangeNotifier {
   List<Payment> payments = [];
   List<CapitalEntry> capital = [];
   List<AppUser> users = [];
+  List<Product> products = [];
+
+  /// Set to a tab name ("Stock") to ask the main screen to switch to it.
+  final tabRequest = ValueNotifier<String?>(null);
   AppConfig config = const AppConfig();
 
   /// Selected period: first day of a month, or null for all time.
@@ -51,6 +55,7 @@ class AppState extends ChangeNotifier {
     payments = [];
     capital = [];
     users = [];
+    products = [];
     loaded = false;
     if (me == null || !role.active) return;
 
@@ -66,6 +71,10 @@ class AppState extends ChangeNotifier {
     }, onError: onErr));
     _subs.add(backend.users().listen((v) {
       users = v;
+      notifyListeners();
+    }, onError: onErr));
+    _subs.add(backend.products().listen((v) {
+      products = v;
       notifyListeners();
     }, onError: onErr));
     _subs.add(backend.config().listen((v) {
@@ -159,6 +168,17 @@ class AppState extends ChangeNotifier {
     final l = set.toList()..sort((a, b) => b.compareTo(a));
     return l.take(12).toList();
   }
+
+  Product? productById(String id) {
+    for (final p in products) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  int get piecesInStock => products.fold(0, (a, p) => a + p.total);
+  double get stockValue => products.fold(0.0, (a, p) => a + p.value);
+  List<Product> get lowStock => products.where((p) => p.lowSizes.isNotEmpty).toList();
 
   String get myName => me?.name ?? '';
   String get myId => me?.id ?? '';

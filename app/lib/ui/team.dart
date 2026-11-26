@@ -184,6 +184,7 @@ class _PermTable extends StatelessWidget {
       ('Add sale', (r) => r.canAddSale),
       ('Edit / delete sale', (r) => r.canEditSale),
       ('Add payment', (r) => r.canEditPayments),
+      ('Manage stock', (r) => r.canManageStock),
       ('See profit & payments', (r) => r.canSeeMoney),
       ('Edit capital', (r) => r.canEditCapital),
       ('Give roles', (r) => r.canManageTeam),

@@ -6,6 +6,7 @@ import '../fmt.dart';
 import '../models.dart';
 import '../state.dart';
 import '../theme.dart';
+import 'stock.dart';
 import 'widgets.dart';
 
 /// Shared sheet layout: grab handle, title, scrolling body, action buttons.
@@ -236,7 +237,38 @@ class _SaleFormState extends State<SaleForm> {
   late String channel = widget.sale?.channel ?? 'Instagram';
   late String currency = widget.sale?.currency ?? 'USD';
   late String status = widget.sale?.status ?? 'completed';
+  late String productId = widget.sale?.productId ?? '';
+  late String type = widget.sale?.type ?? 'T-shirt';
   bool tried = false;
+
+  void _pick(Product? p) {
+    setState(() {
+      if (p == null) {
+        productId = '';
+        return;
+      }
+      productId = p.id;
+      type = p.type;
+      item.text = p.name;
+      if (p.price > 0) price.text = _n(p.price);
+      // Jump to a size that still has stock if the current one is empty.
+      if (p.qty(size) <= 0) {
+        for (final s in sizes) {
+          if (p.qty(s) > 0) {
+            size = s;
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  /// Pieces of the chosen size available to this sale (an edited sale's own
+  /// pieces count as available).
+  int _available(Product p, String s) {
+    final own = widget.sale != null && widget.sale!.productId == p.id && widget.sale!.size == s && widget.sale!.completed ? widget.sale!.qty : 0;
+    return p.qty(s) + own;
+  }
 
   static String _n(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
@@ -249,10 +281,14 @@ class _SaleFormState extends State<SaleForm> {
     final usd = currency == 'USD' ? total : total / rate;
     final editing = widget.sale != null;
     final valid = item.text.trim().isNotEmpty && parseNum(qty.text) > 0 && parseNum(price.text) > 0;
+    final product = productId.isEmpty ? null : app.productById(productId);
+    final avail = product == null ? null : _available(product, size);
+    final short = avail != null && status == 'completed' && parseNum(qty.text) > avail;
 
     return SheetFrame(
       title: editing ? 'Edit sale' : 'New sale',
       items: [
+        if (app.products.isNotEmpty) Field('From stock', ProductPicker(selectedId: productId, onChanged: _pick)),
         DateTimeRow(value: date, onChanged: (d) => setState(() => date = d)),
         Row(children: [
           Expanded(flex: 3, child: Field('Customer', Input(controller: customer, hint: 'Name'))),
@@ -260,7 +296,17 @@ class _SaleFormState extends State<SaleForm> {
           Expanded(flex: 2, child: Field('Phone', Input(controller: phone, hint: '70 123 456', phone: true))),
         ]),
         Field('Design / item', Input(controller: item, hint: 'e.g. Akatsuki Cloud Tee', onChanged: (_) => setState(() {}))),
-        Field('Size', SlidePicker(options: sizes, selected: size, onChanged: (v) => setState(() => size = v))),
+        if (product == null)
+          Field('Type', SlidePicker(options: productTypes, labels: const ['Tee', 'Oversize', 'Hoodie', 'Sweater', 'Other'], selected: type, onChanged: (v) => setState(() => type = v))),
+        Field(
+          'Size',
+          SlidePicker(
+            options: sizes,
+            labels: product == null ? null : [for (final s in sizes) '$s·${_available(product, s)}'],
+            selected: size,
+            onChanged: (v) => setState(() => size = v),
+          ),
+        ),
         Row(children: [
           Expanded(child: Field('Qty', Input(controller: qty, number: true, onChanged: (_) => setState(() {})))),
           const SizedBox(width: 12),
@@ -274,6 +320,11 @@ class _SaleFormState extends State<SaleForm> {
           const SizedBox(width: 12),
           Expanded(child: Field('Discount', Input(controller: discount, number: true, hint: '0', onChanged: (_) => setState(() {})))),
         ]),
+        if (short)
+          Text(
+            avail <= 0 ? 'Size $size is out of stock. Saving will put the count below zero.' : 'Only $avail left in size $size.',
+            style: const TextStyle(color: C.gold, fontSize: 12.5, fontWeight: FontWeight.w600),
+          ).animate().fadeIn(duration: kFast),
         Field('Paid with', SlidePicker(options: saleMethods, selected: method, onChanged: (v) => setState(() => method = v))),
         Field(
           'Channel',
@@ -310,6 +361,8 @@ class _SaleFormState extends State<SaleForm> {
               method: method,
               channel: channel,
               status: status,
+              productId: productId,
+              type: type,
               note: note.text.trim(),
               by: widget.sale?.by ?? app.myId,
               byName: widget.sale?.byName ?? app.myName,
@@ -319,7 +372,7 @@ class _SaleFormState extends State<SaleForm> {
               total: total,
               totalUsd: usd,
             );
-            await guard(context, () => app.backend.saveSale(s));
+            await guard(context, () => app.backend.saveSale(s, previous: widget.sale));
             if (context.mounted) {
               Navigator.pop(context);
               toast(context, editing ? 'Sale updated' : 'Sale saved · ${money(usd)}');
@@ -328,7 +381,7 @@ class _SaleFormState extends State<SaleForm> {
         ),
         if (editing && app.role.canEditSale)
           DeleteButton(onConfirm: () async {
-            await guard(context, () => app.backend.deleteSale(widget.sale!.id));
+            await guard(context, () => app.backend.deleteSale(widget.sale!));
             if (context.mounted) {
               Navigator.pop(context);
               toast(context, 'Sale deleted', icon: Icons.delete_rounded, color: C.down);

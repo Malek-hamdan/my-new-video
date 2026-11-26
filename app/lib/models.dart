@@ -33,6 +33,7 @@ extension RoleX on Role {
   bool get canEditSale => this == Role.owner || this == Role.manager;
   bool get canSeeMoney => this == Role.owner || this == Role.manager || this == Role.accountant;
   bool get canEditPayments => this == Role.owner || this == Role.manager;
+  bool get canManageStock => this == Role.owner || this == Role.manager;
   bool get canEditCapital => this == Role.owner;
   bool get canManageTeam => this == Role.owner;
 
@@ -86,10 +87,13 @@ class Sale {
   final String id;
   final DateTime date;
   final String customer, phone, item, size, currency, method, channel, status, note, by, byName;
+  final String productId, type;
   final int qty;
   final double unitPrice, discount, total, totalUsd;
 
   const Sale({
+    this.productId = '',
+    this.type = 'T-shirt',
     this.id = '',
     required this.date,
     this.customer = '',
@@ -112,7 +116,13 @@ class Sale {
 
   bool get completed => status == 'completed';
 
+  /// Pieces this sale takes out of stock (none when refunded or not from stock).
+  Map<String, int> get stockUse =>
+      productId.isEmpty || !completed || qty <= 0 ? const {} : {'$productId|$size': qty};
+
   Map<String, dynamic> toMap() => {
+        'productId': productId,
+        'type': type,
         'date': date,
         'customer': customer,
         'phone': phone,
@@ -134,6 +144,8 @@ class Sale {
 
   factory Sale.fromMap(String id, Map<String, dynamic> m) => Sale(
         id: id,
+        productId: readStr(m['productId']),
+        type: readStr(m['type']).isEmpty ? 'T-shirt' : readStr(m['type']),
         date: readDate(m['date']),
         customer: readStr(m['customer']),
         phone: readStr(m['phone']),
@@ -278,3 +290,67 @@ const payMethods = ['Cash', 'Whish', 'OMT', 'Bank', 'Card'];
 const saleMethods = ['Cash', 'Whish', 'OMT', 'COD', 'Card'];
 const channels = ['Instagram', 'WhatsApp', 'TikTok', 'Store', 'Website'];
 const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+/// One design kept in stock, counted per size.
+class Product {
+  final String id, name, type;
+  final Map<String, int> sizes;
+  final double cost, price;
+  final bool active;
+
+  const Product({
+    this.id = '',
+    required this.name,
+    this.type = 'T-shirt',
+    this.sizes = const {},
+    this.cost = 0,
+    this.price = 0,
+    this.active = true,
+  });
+
+  int get total => sizes.values.fold(0, (a, b) => a + (b > 0 ? b : 0));
+  int qty(String size) => sizes[size] ?? 0;
+  double get value => total * cost;
+  List<String> get lowSizes => [for (final s in productSizes) if (sizes.containsKey(s) && qty(s) <= kLowStock) s];
+
+  Map<String, dynamic> toMap() => {
+        'name': name,
+        'type': type,
+        'sizes': sizes,
+        'cost': cost,
+        'price': price,
+        'active': active,
+      };
+
+  factory Product.fromMap(String id, Map<String, dynamic> m) => Product(
+        id: id,
+        name: readStr(m['name']),
+        type: readStr(m['type']).isEmpty ? 'T-shirt' : readStr(m['type']),
+        sizes: {
+          for (final e in ((m['sizes'] as Map?) ?? const {}).entries) '${e.key}': readNum(e.value).round(),
+        },
+        cost: readNum(m['cost']),
+        price: readNum(m['price']),
+        active: m['active'] != false,
+      );
+}
+
+const productTypes = ['T-shirt', 'Oversized', 'Hoodie', 'Sweater', 'Other'];
+const productSizes = sizes;
+
+/// At or below this many pieces a size counts as running low.
+const kLowStock = 2;
+
+/// How stock must change when a sale goes from [before] to [after]
+/// (either may be null for a new or deleted sale). Keys are "productId|size".
+Map<String, int> stockDelta(Sale? before, Sale? after) {
+  final d = <String, int>{};
+  for (final e in (before?.stockUse ?? const <String, int>{}).entries) {
+    d[e.key] = (d[e.key] ?? 0) + e.value; // give back what the old sale took
+  }
+  for (final e in (after?.stockUse ?? const <String, int>{}).entries) {
+    d[e.key] = (d[e.key] ?? 0) - e.value; // take what the new sale needs
+  }
+  d.removeWhere((_, v) => v == 0);
+  return d;
+}

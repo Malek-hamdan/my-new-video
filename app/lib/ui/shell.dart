@@ -9,6 +9,7 @@ import 'capital.dart';
 import 'dashboard.dart';
 import 'forms.dart';
 import 'lists.dart';
+import 'stock.dart';
 import 'team.dart';
 import 'widgets.dart';
 
@@ -28,10 +29,36 @@ class Shell extends StatefulWidget {
 
 class _ShellState extends State<Shell> {
   String _current = 'Home';
+  AppState? _app;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = AppScope.read(context);
+    if (!identical(app, _app)) {
+      _app?.tabRequest.removeListener(_onTabRequest);
+      _app = app..tabRequest.addListener(_onTabRequest);
+    }
+  }
+
+  void _onTabRequest() {
+    final t = _app?.tabRequest.value;
+    if (t == null) return;
+    _app!.tabRequest.value = null;
+    HapticFeedback.selectionClick();
+    setState(() => _current = t);
+  }
+
+  @override
+  void dispose() {
+    _app?.tabRequest.removeListener(_onTabRequest);
+    super.dispose();
+  }
 
   List<_Tab> _tabs(Role r) => [
         if (r.canSeeMoney) _Tab('Home', Icons.space_dashboard_rounded, () => const DashboardScreen(), r.canAddSale ? () => const QuickAdd() : null),
         _Tab('Sales', Icons.checkroom_rounded, () => const SalesScreen(), r.canAddSale ? () => const SaleForm() : null),
+        _Tab('Stock', Icons.inventory_2_rounded, () => const StockScreen(), r.canManageStock ? () => const ProductForm() : null),
         if (r.canSeeMoney) _Tab('Payments', Icons.account_balance_wallet_rounded, () => const PaymentsScreen(), r.canEditPayments ? () => const PaymentForm() : null),
         if (r.canSeeMoney) _Tab('Capital', Icons.pie_chart_rounded, () => const CapitalScreen(), r.canEditCapital ? () => const CapitalForm() : null),
         _Tab('Team', Icons.groups_rounded, () => const TeamScreen(), null),
@@ -151,7 +178,7 @@ class _NavItem extends StatelessWidget {
           AnimatedContainer(
             duration: kMed,
             curve: Curves.easeOutBack,
-            padding: EdgeInsets.symmetric(horizontal: on ? 18 : 10, vertical: 5),
+            padding: EdgeInsets.symmetric(horizontal: on ? 14 : 8, vertical: 5),
             decoration: BoxDecoration(
               color: on ? C.red.withValues(alpha: .16) : Colors.transparent,
               borderRadius: BorderRadius.circular(20),

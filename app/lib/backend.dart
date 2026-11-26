@@ -19,8 +19,14 @@ abstract class Backend {
   Stream<List<AppUser>> users();
   Stream<AppConfig> config();
 
-  Future<void> saveSale(Sale s);
-  Future<void> deleteSale(String id);
+  /// Saves a sale and moves stock to match; pass the sale as it was before
+  /// an edit so the old quantity is given back first.
+  Future<void> saveSale(Sale s, {Sale? previous});
+  Future<void> deleteSale(Sale s);
+  Stream<List<Product>> products();
+  Future<void> saveProduct(Product p);
+  Future<void> archiveProduct(String id);
+  Future<void> addStock(String productId, Map<String, int> add);
   Future<void> savePayment(Payment p);
   Future<void> deletePayment(String id);
   Future<void> saveCapital(CapitalEntry c);
@@ -124,9 +130,55 @@ class FirebaseBackend implements Backend {
   }
 
   @override
-  Future<void> saveSale(Sale s) => _save('sales', s.id, s.toMap());
+  Future<void> saveSale(Sale s, {Sale? previous}) {
+    final batch = _db.batch();
+    final ref = s.id.isEmpty ? _db.collection('sales').doc() : _db.doc('sales/${s.id}');
+    batch.set(
+      ref,
+      {...s.toMap(), s.id.isEmpty ? 'createdAt' : 'updatedAt': FieldValue.serverTimestamp()},
+      SetOptions(merge: true),
+    );
+    _applyStock(batch, stockDelta(previous, s));
+    return batch.commit();
+  }
+
   @override
-  Future<void> deleteSale(String id) => _db.doc('sales/$id').delete();
+  Future<void> deleteSale(Sale s) {
+    final batch = _db.batch();
+    batch.delete(_db.doc('sales/${s.id}'));
+    _applyStock(batch, stockDelta(s, null));
+    return batch.commit();
+  }
+
+  void _applyStock(WriteBatch batch, Map<String, int> delta) {
+    for (final e in delta.entries) {
+      final [pid, size] = e.key.split('|');
+      batch.update(_db.doc('products/$pid'), {
+        'sizes.$size': FieldValue.increment(e.value),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  @override
+  Stream<List<Product>> products() => _db
+      .collection('products')
+      .snapshots()
+      .map((q) => q.docs.map((d) => Product.fromMap(d.id, d.data())).where((p) => p.active).toList()
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())));
+
+  @override
+  Future<void> saveProduct(Product p) => _save('products', p.id, p.toMap());
+
+  @override
+  Future<void> archiveProduct(String id) =>
+      _db.doc('products/$id').update({'active': false, 'updatedAt': FieldValue.serverTimestamp()});
+
+  @override
+  Future<void> addStock(String productId, Map<String, int> add) => _db.doc('products/$productId').update({
+        for (final e in add.entries) 'sizes.${e.key}': FieldValue.increment(e.value),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
   @override
   Future<void> savePayment(Payment p) => _save('payments', p.id, p.toMap());
   @override
@@ -154,6 +206,7 @@ class DemoBackend implements Backend {
   final _payments = _Box<List<Payment>>([]);
   final _capital = _Box<List<CapitalEntry>>([]);
   final _users = _Box<List<AppUser>>([]);
+  final _products = _Box<List<Product>>([]);
   final _config = _Box<AppConfig>(const AppConfig(ownerUid: 'u0'));
   int _n = 1000;
 
@@ -234,6 +287,12 @@ class DemoBackend implements Backend {
       for (final (i, e) in [('Stock', 2000.0), ('Printing', 1200.0), ('Ads', 1000.0), ('Delivery', 500.0), ('Packaging', 400.0)].indexed)
         CapitalEntry(id: 'a$i', kind: 'allocation', date: now.subtract(const Duration(days: 100)), amount: e.$2, category: e.$1, label: 'Budget', by: 'u0', byName: 'Owner'),
     ];
+    _products.value = [
+      const Product(id: 'pr1', name: 'Akatsuki Cloud Tee', type: 'T-shirt', cost: 8, price: 25, sizes: {'S': 4, 'M': 9, 'L': 6, 'XL': 2}),
+      const Product(id: 'pr2', name: 'Gear 5 Luffy', type: 'Oversized', cost: 10, price: 28, sizes: {'M': 5, 'L': 1, 'XL': 3}),
+      const Product(id: 'pr3', name: 'Gojo Infinity Tee', type: 'T-shirt', cost: 8, price: 25, sizes: {'S': 2, 'M': 7, 'L': 8, 'XL': 0}),
+      const Product(id: 'pr4', name: 'Eren Titan Hoodie', type: 'Hoodie', cost: 18, price: 45, sizes: {'M': 3, 'L': 4, 'XL': 1}),
+    ];
     _users.value = users;
     _sales.value = _sorted(sales);
     _payments.value = _sorted(pays);
@@ -279,14 +338,58 @@ class DemoBackend implements Backend {
       _sorted([for (final x in list) if (idOf(x) != id) x, item]);
 
   @override
-  Future<void> saveSale(Sale s) async {
+  Future<void> saveSale(Sale s, {Sale? previous}) async {
     await _tick();
     final id = s.id.isEmpty ? _id() : s.id;
     _sales.value = _upsert(_sales.value, Sale.fromMap(id, s.toMap()), id, (x) => x.id);
+    _moveStock(stockDelta(previous, s));
   }
 
   @override
-  Future<void> deleteSale(String id) async => _sales.value = [for (final x in _sales.value) if (x.id != id) x];
+  Future<void> deleteSale(Sale s) async {
+    _sales.value = [for (final x in _sales.value) if (x.id != s.id) x];
+    _moveStock(stockDelta(s, null));
+  }
+
+  void _moveStock(Map<String, int> delta) {
+    _products.value = [
+      for (final p in _products.value)
+        Product(
+          id: p.id,
+          name: p.name,
+          type: p.type,
+          cost: p.cost,
+          price: p.price,
+          sizes: {
+            ...p.sizes,
+            for (final e in delta.entries)
+              if (e.key.startsWith('${p.id}|'))
+                e.key.split('|')[1]: (p.sizes[e.key.split('|')[1]] ?? 0) + e.value,
+          },
+        ),
+    ];
+  }
+
+  @override
+  Stream<List<Product>> products() => _products.stream.map((l) => l.where((p) => p.active).toList());
+
+  @override
+  Future<void> saveProduct(Product p) async {
+    await _tick();
+    final id = p.id.isEmpty ? _id() : p.id;
+    final saved = Product.fromMap(id, p.toMap());
+    _products.value = [for (final x in _products.value) if (x.id != id) x, saved]
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  @override
+  Future<void> archiveProduct(String id) async => _products.value = [for (final x in _products.value) if (x.id != id) x];
+
+  @override
+  Future<void> addStock(String productId, Map<String, int> add) async {
+    await _tick();
+    _moveStock({for (final e in add.entries) '$productId|${e.key}': e.value});
+  }
 
   @override
   Future<void> savePayment(Payment p) async {

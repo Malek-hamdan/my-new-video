@@ -58,6 +58,30 @@ class DashboardScreen extends StatelessWidget {
         ]),
       ),
       const WebsiteButton(),
+      if (app.lowStock.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Pressable(
+            scale: .97,
+            onTap: () => app.tabRequest.value = 'Stock',
+            child: Panel(
+              color: C.gold.withValues(alpha: .08),
+              child: Row(children: [
+                const Icon(Icons.inventory_2_rounded, color: C.gold, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${app.lowStock.length} ${app.lowStock.length == 1 ? 'design is' : 'designs are'} running low · ${app.lowStock.take(2).map((p) => p.name).join(', ')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: C.mute),
+              ]),
+            ),
+          ),
+        ),
       const PeriodPills(),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),

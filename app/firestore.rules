@@ -48,6 +48,16 @@ service cloud.firestore {
       allow update, delete: if hasRole(['owner', 'manager']);
     }
 
+    // Stock: managers and owners edit designs; a seller's sale may only
+    // move the size counts.
+    match /products/{id} {
+      allow read: if hasRole(['owner', 'manager', 'seller', 'accountant']);
+      allow create, delete: if hasRole(['owner', 'manager']);
+      allow update: if hasRole(['owner', 'manager'])
+        || (hasRole(['seller'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sizes', 'updatedAt']));
+    }
+
     match /payments/{id} {
       allow read: if hasRole(['owner', 'manager', 'accountant']);
       allow write: if hasRole(['owner', 'manager']);
