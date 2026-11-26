@@ -4,7 +4,7 @@
 # daily data copies, then asks for the first admin's username and password (typed here, never stored in a file).
 set -euo pipefail
 
-REV="0000000000000000000000000000000000000000"
+REV="e54747e2abf7a86500a9c2dbf259fb7b18860658"
 SUM_SERVER="8d86b3df6e388f653862ffffa0b77d1a272b08284495637a3bc139899f6f922d"
 SUM_PAGE="97589f4baa0541dedf6a7e4e256e41c97351e5b1a650143dc81ad76c17bd6603"
 ASSETS="manifest.webmanifest:40bec7e1780bc6d073ba70c1dd65276319bf51c0bc16e5679ca17cb131e311eb icon-192.png:79f941979922fc3e432eda86ae40d11652a0f1b8b6838a65e1037851c2fdb6a5 icon-512.png:5fa63fbc6f6d88d7635cc43b938e9d928f0614ac8174c463801d95aa2a64d91d icon-maskable-512.png:35be84a9550cc1c60fd3f8482c02038c23dc284fcab4b630387571644f308535 apple-touch-icon.png:efaee9db10aae282818246c01e84c7a11db6d4f9d52546452563db513fd9eba7 favicon-32.png:0c1fa49992ae2cea934d28b0a9b4dbecb1692cca1c6fb228d80bba4d29952e24 favicon.ico:0c1fa49992ae2cea934d28b0a9b4dbecb1692cca1c6fb228d80bba4d29952e24"
