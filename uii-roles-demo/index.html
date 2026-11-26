@@ -2910,6 +2910,11 @@
     void tr.offsetWidth;
     tr.classList.add("flash");
   }
+  // used by the Messages panel (server page): open a part by its month and id
+  window.uiiOpenPart = function (k, id) {
+    if (k && k !== month) selectMonth(k);
+    setTimeout(function () { var r = findRow(id); if (r) openPart(r); }, 60);
+  };
   var searchTimer = 0;
   searchEl.addEventListener("input", function () { clearTimeout(searchTimer); searchTimer = setTimeout(renderSearch, searchEl.value.trim().length < 2 ? 250 : 120); });
   searchEl.addEventListener("keydown", function (e) {

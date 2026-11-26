@@ -679,9 +679,10 @@ const server = http.createServer(async (req, res) => {
     const me = w.user;
 
     if (p === "/api/me") return send(res, 200, { username: me.username });
+    if (p === "/api/chat" || p.startsWith("/api/chat/")) return await handleChat(req, res, me, url, p);
 
     if (p === "/api/live" && req.method === "GET") {
-      const cs = new Set(String(url.searchParams.get("c") || "").split(",").filter(c => KNOWN.has(c)));
+      const cs = new Set(String(url.searchParams.get("c") || "").split(",").filter(c => KNOWN.has(c) || c === "chat"));
       // at most 6 live links per person (the oldest is closed) and 100 in all
       const mine = Array.from(listeners).filter(x => x.user === me.username);
       if (mine.length >= 6) dropLive(mine[0]);
@@ -729,6 +730,244 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+
+// ---------- messages: private chats and groups ----------
+// People write to people (one to one, or in a group they make). The admin (a person who may manage accounts) can read
+// every conversation, and sees who has seen what; nobody else sees who saw their or anyone's messages except the sender.
+// Kept like the other lists, but reachable only through /api/chat/...: "chats", "chatreads" (one document per person:
+// what they have read, which chats they muted) and one "msgs_YYYYMM" per month for the messages themselves.
+// Until 1 Jan 2027 only an admin can use it, unless an admin switches it on for everyone.
+const CHAT_START = Date.UTC(2027, 0, 1), MSG_MAX = 2000, CHAT_BODY = 16 * 1024;
+const chatIndex = new Map();                                // chat id -> [{ ts, id, from }], oldest first
+let lastMsgTs = 0;
+function monthOf(ts) { const d = new Date(ts); return "msgs_" + d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, "0"); }
+function indexMsg(m) {
+  let a = chatIndex.get(m.chat); if (!a) { a = []; chatIndex.set(m.chat, a); }
+  a.push({ ts: m.ts, id: m.id, from: m.from });
+  if (m.ts > lastMsgTs) lastMsgTs = m.ts;
+}
+function buildChatIndex() {
+  const names = new Set(Array.from(manifest()).concat(Array.from(colls.keys())));
+  for (const name of names) {
+    if (!/^msgs_\d{6}$/.test(name)) continue;
+    const m = load(name);
+    if (broken.has(name)) continue;
+    for (const [, d] of m) if (d && d.chat && d.ts) indexMsg(d);
+  }
+  for (const a of chatIndex.values()) a.sort((x, y) => x.ts - y.ts);
+}
+function getMsg(e) { return load(monthOf(e.ts)).get(e.id) || null; }
+function nextTs() { lastMsgTs = Math.max(Date.now(), lastMsgTs + 1); return lastMsgTs; }
+function chatFeature() { return load("meta").get("features") || {}; }
+function messagesOn(me) { return can(me, "users") || Date.now() >= CHAT_START || chatFeature().messages === true; }
+function activePerson(name) { const u = load("users").get(name); return u && u.active !== false ? u : null; }
+function directory() { return Array.from(load("users")).filter(([, u]) => u.active !== false).map(([k, u]) => ({ username: k, name: u.name || k })); }
+function admins() { return Array.from(load("users")).filter(([, u]) => u.active !== false && can(u, "users")).map(([k]) => k); }
+function liveChat(id) { const c = load("chats").get(id); return c && !c.deleted ? c : null; }
+function isMember(c, user) { return c.members.indexOf(user) >= 0; }
+function readsOf(user) { const r = load("chatreads").get(user); return { c: Object.assign({}, r && r.c), m: Object.assign({}, r && r.m) }; }
+function joinedAt(c, user) { return (c.joined && c.joined[user]) || 0; }
+function msgOut(m, c, me, seeSeen) {
+  const o = { id: m.id, chat: m.chat, from: m.from, ts: m.ts, text: m.text, reply: m.reply || null, part: m.part || null };
+  if (m.from === me || seeSeen) {            // who has seen it: only the sender, and an admin
+    const others = c.members.filter(x => x !== m.from); o.seen = {};
+    for (const u of others) if (m.seen && m.seen[u]) o.seen[u] = m.seen[u];
+    o.total = others.length;
+  }
+  return o;
+}
+function unreadCount(c, me) {
+  const a = chatIndex.get(c.id) || [], rd = readsOf(me).c[c.id] || 0, from = joinedAt(c, me);
+  let n = 0;
+  for (let i = a.length - 1; i >= 0; i--) { const e = a[i]; if (e.ts <= rd || e.ts < from) break; if (e.from !== me) n++; }
+  return n;
+}
+function chatOut(c, me, seeSeen, member) {
+  const a = chatIndex.get(c.id) || [], from = member ? joinedAt(c, me) : 0;
+  let last = null;
+  for (let i = a.length - 1; i >= 0; i--) if (a[i].ts >= from) { last = getMsg(a[i]); break; }
+  return { id: c.id, type: c.type, name: c.name || "", members: c.members, by: c.by || "", created: c.created || 0, deleted: !!c.deleted,
+    last: last ? msgOut(last, c, me, seeSeen) : null, unread: member ? unreadCount(c, me) : 0, muted: member && !!readsOf(me).m[c.id], member };
+}
+function chatPushTo(user, payload) {
+  const msg = "data: " + JSON.stringify(Object.assign({ c: "chat" }, payload)) + "\n\n";
+  for (const l of Array.from(listeners)) if (l.user === user && l.colls.has("chat")) liveWrite(l, msg);
+}
+function chatPushAll(payload) { const seen = new Set(); for (const l of Array.from(listeners)) if (l.colls.has("chat") && !seen.has(l.user)) { seen.add(l.user); chatPushTo(l.user, payload); } }
+function cleanText(v, max) {
+  if (typeof v !== "string") return null;
+  const t = v.replace(/\r\n/g, "\n").trim();
+  if (!t || t.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(t)) return null;
+  return t;
+}
+const adminReadAt = new Map();
+async function handleChat(req, res, me, url, p) {
+  const admin = can(me, "users"), name = me.username, sub = p.slice("/api/chat".length).replace(/^\//, "");
+  const bad = c => send(res, c || 400, { code: c === 403 ? "not_granted" : c === 404 ? "not_found" : c === 429 ? "rate_limited" : "invalid_argument" });
+  if (sub === "switch" && !admin) return bad(403);
+  if (!messagesOn(me)) return send(res, 200, { on: false });
+  const body = async () => { const b = await readBody(req, CHAT_BODY); return b && typeof b === "object" && !Array.isArray(b) ? b : null; };
+  const getMethod = req.method === "GET", post = req.method === "POST";
+  if (isBroken("chats") || isBroken("chatreads") || isBroken("meta")) return send(res, 503, { code: "unavailable" });
+
+  if (sub === "boot" && getMethod) {
+    const mine = Array.from(load("chats").values()).filter(c => !c.deleted && isMember(c, name)).map(c => chatOut(c, name, admin, true))
+      .sort((a, b) => (b.last ? b.last.ts : b.created) - (a.last ? a.last.ts : a.created));
+    return send(res, 200, { on: true, me: { username: name, name: me.name || name, admin }, people: directory(), chats: mine,
+      features: { staffOn: chatFeature().messages === true || Date.now() >= CHAT_START, auto: Date.now() >= CHAT_START, start: CHAT_START } });
+  }
+  if (sub === "all" && getMethod) {
+    if (!admin) return bad(403);
+    const all = Array.from(load("chats").values()).map(c => chatOut(c, name, true, isMember(c, name)))
+      .sort((a, b) => (b.last ? b.last.ts : b.created) - (a.last ? a.last.ts : a.created));
+    return send(res, 200, { chats: all });
+  }
+  if (sub === "switch" && post) {
+    if (!admin) return bad(403);
+    const b = await body(); if (!b || typeof b.on !== "boolean") return bad();
+    commit("meta", "features", Object.assign({}, chatFeature(), { messages: b.on, by: name, at: Date.now() }));
+    audit(me, "meta", "features", "messages " + (b.on ? "on" : "off"));
+    chatPushAll({ kind: "chat" });
+    return send(res, 200, { ok: true });
+  }
+  if (sub === "dm" && post) {
+    const b = await body(); if (!b || typeof b.with !== "string") return bad();
+    const other = b.with;
+    if (other === name || !activePerson(other)) return bad();
+    const id = "dm:" + [name, other].sort().join(":"); let c = load("chats").get(id);
+    if (!c) { c = { id, type: "dm", name: "", members: [name, other].sort(), by: name, created: Date.now(), joined: {} }; commit("chats", id, c); chatPushTo(other, { kind: "chat", chat: id }); }
+    return send(res, 200, { chat: chatOut(c, name, admin, true) });
+  }
+  if (sub === "group" && post) {
+    if (overRate(name, "groups", 10, 3600e3)) return bad(429);
+    const b = await body(); if (!b) return bad();
+    const gname = cleanText(b.name, 40); if (!gname || !Array.isArray(b.members)) return bad();
+    const members = Array.from(new Set(b.members.filter(x => typeof x === "string" && x !== name && activePerson(x))));
+    if (!members.length || members.length > 29) return bad();
+    const id = "g" + crypto.randomBytes(6).toString("hex"), now = Date.now(), joined = {};
+    members.concat([name]).forEach(u => { joined[u] = now; });
+    const c = { id, type: "group", name: gname, members: [name].concat(members), by: name, created: now, joined };
+    commit("chats", id, c); audit(me, "chats", id, "group created", members);
+    members.forEach(u => chatPushTo(u, { kind: "chat", chat: id }));
+    return send(res, 200, { chat: chatOut(c, name, admin, true) });
+  }
+  if (sub === "parts" && getMethod) {
+    // the parts of the newest month, found by name, reference or machine
+    const q = String(url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 60), all = Array.from(load("parts"));
+    let latest = ""; for (const [, r] of all) if (r.month && r.month > latest) latest = r.month;
+    const items = all.filter(([, r]) => r.month === latest && (!q || (String(r.name || "") + " " + String(r.reference || "") + " " + String(r.machine || "")).toLowerCase().indexOf(q) >= 0))
+      .sort((x, y) => String(x[1].name || "").localeCompare(String(y[1].name || ""))).slice(0, 20)
+      .map(([k, r]) => ({ id: k, name: r.name || "", reference: r.reference || "", machine: r.machine || "", month: r.month, quantity: String(r.quantity == null ? "" : r.quantity) }));
+    return send(res, 200, { month: latest, items });
+  }
+  if (sub === "search" && getMethod) {
+    if (overRate(name, "msearch", 60, 60e3)) return bad(429);
+    const q = String(url.searchParams.get("q") || "").trim().toLowerCase().slice(0, 60); if (q.length < 2) return send(res, 200, { results: [] });
+    const found = []; let scanned = 0;
+    for (const c of load("chats").values()) {
+      if (c.deleted || !isMember(c, name)) continue;
+      const a = chatIndex.get(c.id) || [], from = joinedAt(c, name);
+      for (let i = a.length - 1; i >= 0 && scanned < 20000; i--, scanned++) {
+        if (a[i].ts < from) break;
+        const m = getMsg(a[i]); if (!m) continue;
+        const hay = (m.text + " " + (m.part ? m.part.name + " " + m.part.reference : "")).toLowerCase();
+        if (hay.indexOf(q) >= 0) found.push({ chat: c.id, msg: msgOut(m, c, name, admin) });
+      }
+    }
+    found.sort((x, y) => y.msg.ts - x.msg.ts);
+    return send(res, 200, { results: found.slice(0, 30) });
+  }
+  const mm = sub.match(/^c\/([^/]+)\/(messages|send|read|mute|members)$/), md = sub.match(/^c\/([^/]+)$/);
+  if (md && req.method === "DELETE") {
+    const c = liveChat(decodeURIComponent(md[1])); if (!c || c.type !== "group") return bad(404);
+    if (!admin && c.by !== name) return bad(403);
+    commit("chats", c.id, Object.assign({}, c, { deleted: Date.now() })); audit(me, "chats", c.id, "group deleted");
+    c.members.forEach(u => chatPushTo(u, { kind: "chat", chat: c.id }));
+    return send(res, 200, { ok: true });
+  }
+  if (!mm) return bad(404);
+  const id = decodeURIComponent(mm[1]), act = mm[2], c = liveChat(id) || (admin ? load("chats").get(id) : null);
+  if (!c) return bad(404);
+  const member = isMember(c, name);
+
+  if (act === "messages" && getMethod) {
+    if (!member && !admin) return bad(403);
+    if (!member) {        // an admin reading someone else's conversation is written down (once in 10 minutes)
+      const k = name + "|" + id, now = Date.now();
+      if (!adminReadAt.has(k) || now - adminReadAt.get(k) > 600e3) { adminReadAt.set(k, now); audit(me, "chats", id, "admin read"); }
+    }
+    const before = Number(url.searchParams.get("before")) || Infinity, limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit")) || 40));
+    const a = chatIndex.get(id) || [], from = member ? joinedAt(c, name) : 0, picked = [];
+    for (let i = a.length - 1; i >= 0 && picked.length < limit; i--) { if (a[i].ts >= before) continue; if (a[i].ts < from) break; picked.push(a[i]); }
+    const more = picked.length === limit && a.some(e => e.ts < picked[picked.length - 1].ts && e.ts >= from);
+    const msgs = picked.reverse().map(getMsg).filter(Boolean).map(m => msgOut(m, c, name, admin));
+    return send(res, 200, { messages: msgs, more, chat: chatOut(c, name, admin, member) });
+  }
+  if (!member || c.deleted) return bad(403);
+
+  if (act === "send" && post) {
+    if (overRate(name, "msg", 60, 60e3) || overRate(name, "msgday", 1500, 86400e3)) return bad(429);
+    const b = await body(); if (!b) return bad();
+    const text = cleanText(b.text, MSG_MAX); if (!text) return bad();
+    if (!c.members.some(u => u !== name && activePerson(u))) return bad();
+    let reply = null, part = null;
+    if (b.reply !== undefined && b.reply !== null) {
+      if (typeof b.reply !== "string") return bad();
+      const e = (chatIndex.get(id) || []).find(x => x.id === b.reply), src = e && e.ts >= joinedAt(c, name) ? getMsg(e) : null;
+      if (!src) return bad();
+      reply = { id: src.id, from: src.from, text: src.text.slice(0, 120) };
+    }
+    if (b.part !== undefined && b.part !== null) {
+      const pid = b.part && typeof b.part.id === "string" ? b.part.id : null, r = pid ? load("parts").get(pid) : null;
+      if (!r) return bad();
+      part = { id: pid, name: String(r.name || "").slice(0, 120), reference: String(r.reference || "").slice(0, 80), machine: String(r.machine || "").slice(0, 40), month: String(r.month || ""), quantity: String(r.quantity == null ? "" : r.quantity).slice(0, 12) };
+    }
+    const ts = nextTs(), m = { id: ts + "-" + crypto.randomBytes(3).toString("hex"), chat: id, from: name, ts, text, reply, part, seen: {} };
+    commit(monthOf(ts), m.id, m); indexMsg(m);
+    const rd = load("chatreads").get(name) || { c: {}, m: {} }; commit("chatreads", name, { c: Object.assign({}, rd.c, { [id]: ts }), m: rd.m || {} });
+    const to = new Set(c.members.concat(admins()));
+    for (const u of to) { const uu = load("users").get(u); chatPushTo(u, { kind: "msg", chat: id, msg: msgOut(m, c, u, can(uu, "users")) }); }
+    return send(res, 200, { ok: true, msg: msgOut(m, c, name, admin) });
+  }
+  if (act === "read" && post) {
+    const b = await body(); const upTo = Math.min(Number(b && b.upTo) || 0, lastMsgTs);
+    if (!upTo) return bad();
+    const a = chatIndex.get(id) || [], from = joinedAt(c, name), now = Date.now(), done = [], authors = new Set();
+    for (let i = a.length - 1; i >= 0 && done.length < 300; i--) {
+      const e = a[i]; if (e.ts > upTo) continue; if (e.ts < from) break;
+      if (e.from === name) continue;
+      const m = getMsg(e); if (!m || (m.seen && m.seen[name])) { if (m) break; continue; }
+      commit(monthOf(m.ts), m.id, Object.assign({}, m, { seen: Object.assign({}, m.seen, { [name]: now }) })); done.push(m.id); authors.add(m.from);
+    }
+    const rd = readsOf(name), prev = rd.c[id] || 0;
+    if (upTo > prev) { rd.c[id] = upTo; commit("chatreads", name, rd); }
+    if (done.length) for (const u of new Set(Array.from(authors).concat(admins()))) chatPushTo(u, { kind: "seen", chat: id, ids: done, by: name, at: now });
+    chatPushTo(name, { kind: "read", chat: id });
+    return send(res, 200, { ok: true, unread: unreadCount(c, name) });
+  }
+  if (act === "mute" && post) {
+    const b = await body(); if (!b || typeof b.muted !== "boolean") return bad();
+    const rd = readsOf(name); if (b.muted) rd.m[id] = true; else delete rd.m[id];
+    commit("chatreads", name, rd); chatPushTo(name, { kind: "read", chat: id });
+    return send(res, 200, { ok: true });
+  }
+  if (act === "members" && post) {
+    if (c.type !== "group") return bad();
+    const b = await body(); if (!b) return bad();
+    const add = Array.isArray(b.add) ? b.add.filter(x => typeof x === "string") : [], rem = Array.isArray(b.remove) ? b.remove.filter(x => typeof x === "string") : [];
+    const leaving = rem.length === 1 && rem[0] === name && !add.length;
+    if (!admin && c.by !== name && !leaving) return bad(403);
+    let members = c.members.slice(); const joined = Object.assign({}, c.joined), now = Date.now(), newcomers = [];
+    for (const u of add) if (activePerson(u) && members.indexOf(u) < 0) { members.push(u); joined[u] = now; newcomers.push(u); }
+    for (const u of rem) { if (u === c.by && !admin && !leaving) continue; members = members.filter(x => x !== u); }
+    if (members.length < 2 || members.length > 30) return bad();
+    const next = Object.assign({}, c, { members, joined }); commit("chats", id, next); audit(me, "chats", id, "members", add.concat(rem.map(x => "-" + x)));
+    for (const u of new Set(c.members.concat(members))) chatPushTo(u, { kind: "chat", chat: id });
+    return send(res, 200, { chat: chatOut(next, name, admin, isMember(next, name)) });
+  }
+  return bad(404);
+}
+
 // ---------- make or reset an admin from the shell ----------
 async function makeAdmin() {
   if (typeof process.getuid === "function" && process.getuid() === 0 && !process.env.UII_ALLOW_ROOT) { console.error("Do not run this as root (the data files would become root's). Use the command: uii-admin"); process.exit(1); }
@@ -763,5 +1002,5 @@ async function makeAdmin() {
 }
 
 if (process.argv[2] === "make-admin") makeAdmin();
-else { openStore(); pruneCopies(); pruneActivity(); setInterval(pruneCopies, 6 * 3600e3).unref(); setInterval(pruneActivity, 6 * 3600e3).unref();
+else { openStore(); buildChatIndex(); pruneCopies(); pruneActivity(); setInterval(pruneCopies, 6 * 3600e3).unref(); setInterval(pruneActivity, 6 * 3600e3).unref();
   server.headersTimeout = 15e3; server.requestTimeout = 30e3; server.keepAliveTimeout = 5e3; server.maxConnections = 300; server.listen(PORT, "127.0.0.1", () => console.log("UII Parts on 127.0.0.1:" + PORT + ", data in " + DATA)); }

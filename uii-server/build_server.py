@@ -53,6 +53,11 @@ s = re.sub(r"  /\* Accounts and permissions \(demo\) \*/\n  \.demo-strip \{[^\n]
 rep("  // the first time, the demo starts with five people\n", "")
 shim = open(os.path.join(HERE, "shim.js"), encoding="utf-8").read()
 rep('<script>\n', '<script>\n' + shim + '</script>\n<script>\n')
+# Messages (private chats and groups): its style and its script, at the end of the page
+msgcss = open(os.path.join(HERE, "messages.css"), encoding="utf-8").read()
+msgjs = open(os.path.join(HERE, "messages.js"), encoding="utf-8").read()
+rep('</head>', '<style>\n' + msgcss + '</style>\n</head>')
+rep('</body>', '<script>\n' + msgjs + '</script>\n</body>')
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 open(OUT, "w", encoding="utf-8").write(s)
 print("wrote", OUT, len(s))
