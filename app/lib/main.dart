@@ -71,9 +71,11 @@ class _Root extends StatelessWidget {
       page = const WaitingScreen();
     } else {
       key = 'shell';
-      page = const UpdateWatcher(child: Shell());
+      page = const Shell();
     }
-    return AnimatedSwitcher(
+    // Updates are offered on every screen, including sign-in and the
+    // waiting screen, so nobody gets stuck on an old version.
+    return UpdateWatcher(child: AnimatedSwitcher(
       duration: const Duration(milliseconds: 480),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
@@ -82,6 +84,6 @@ class _Root extends StatelessWidget {
         child: ScaleTransition(scale: Tween(begin: 1.03, end: 1.0).animate(a), child: child),
       ),
       child: KeyedSubtree(key: ValueKey(key), child: page),
-    );
+    ));
   }
 }
