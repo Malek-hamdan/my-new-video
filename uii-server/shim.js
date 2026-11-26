@@ -17,6 +17,10 @@
   }
   // ---- cache and live link ----
   var cache = {}, subs = {}, timers = {}, loading = {}, queued = {};
+  // Names that mean something special to JavaScript objects (the server refuses them, this is the second guard):
+  // lists are kept in objects without a prototype, and such ids are skipped.
+  function reserved(id) { return id === "__proto__" || id === "constructor" || id === "prototype"; }
+  function bag() { return Object.create(null); }
   function snap(c) {
     var m = cache[c] || {}, docs = Object.keys(m).map(function (id) {
       var v = m[id];
@@ -33,14 +37,15 @@
     }, 30);
   }
   function apply(ev) {
-    if (!cache[ev.c]) cache[ev.c] = {};
+    if (reserved(ev.id)) return;
+    if (!cache[ev.c]) cache[ev.c] = bag();
     if (ev.del) delete cache[ev.c][ev.id]; else cache[ev.c][ev.id] = ev.d;
   }
   function fetchAll(c) {
     loading[c] = true; queued[c] = [];
     return api("GET", "/api/c/" + encodeURIComponent(c)).then(function (rows) {
-      var m = {};
-      rows.forEach(function (r) { m[r[0]] = r[1]; });
+      var m = bag();
+      rows.forEach(function (r) { if (!reserved(r[0])) m[r[0]] = r[1]; });
       cache[c] = m;
       loading[c] = false;
       queued[c].forEach(apply); queued[c] = [];
@@ -84,7 +89,7 @@
         },
         get: function () {
           return api("GET", "/api/c/" + encodeURIComponent(c)).then(function (rows) {
-            var m = {}; rows.forEach(function (r) { m[r[0]] = r[1]; });
+            var m = bag(); rows.forEach(function (r) { if (!reserved(r[0])) m[r[0]] = r[1]; });
             var docs = Object.keys(m).map(function (id) { var v = m[id]; return { id: id, exists: true, data: function () { return JSON.parse(JSON.stringify(v)); } }; });
             return { docs: docs, size: docs.length, empty: !docs.length, metadata: { fromCache: false } };
           });
