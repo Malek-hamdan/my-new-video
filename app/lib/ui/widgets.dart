@@ -519,3 +519,35 @@ class ScreenTitle extends StatelessWidget {
         ]),
       );
 }
+
+/// "Profit per piece" box: green when positive, red when selling at a loss.
+class ProfitBox extends StatelessWidget {
+  const ProfitBox({super.key, required this.label, required this.profit, this.sub});
+  final String label;
+  final double profit;
+  final String? sub;
+  @override
+  Widget build(BuildContext context) {
+    final c = profit >= 0 ? C.up : C.down;
+    return AnimatedContainer(
+      duration: kMed,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.withValues(alpha: .35)),
+      ),
+      child: Row(children: [
+        Icon(profit >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: c, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Label(label, color: c),
+            if (sub != null) ...[const SizedBox(height: 3), Text(sub!, style: subStyle.copyWith(fontSize: 11))],
+          ]),
+        ),
+        RollingMoney(profit, format: (v) => v >= 0 ? '+${money(v)}' : money(v), style: mono(20, color: c)),
+      ]),
+    );
+  }
+}

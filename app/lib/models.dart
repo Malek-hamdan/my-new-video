@@ -91,6 +91,9 @@ class Sale {
   final int qty;
   final double unitPrice, discount, total, totalUsd;
 
+  /// Cost per piece in USD when sold (0 = unknown).
+  final double unitCost;
+
   const Sale({
     this.productId = '',
     this.type = 'T-shirt',
@@ -109,12 +112,17 @@ class Sale {
     this.byName = '',
     required this.qty,
     required this.unitPrice,
+    this.unitCost = 0,
     this.discount = 0,
     required this.total,
     required this.totalUsd,
   });
 
   bool get completed => status == 'completed';
+
+  /// Profit on the pieces themselves: what came in minus what they cost.
+  /// Null when the cost is unknown.
+  double? get profit => unitCost <= 0 || !completed ? null : totalUsd - unitCost * qty;
 
   /// Pieces this sale takes out of stock (none when refunded or not from stock).
   Map<String, int> get stockUse =>
@@ -137,6 +145,7 @@ class Sale {
         'byName': byName,
         'qty': qty,
         'unitPrice': unitPrice,
+        'unitCost': unitCost,
         'discount': discount,
         'total': total,
         'totalUsd': totalUsd,
@@ -160,6 +169,7 @@ class Sale {
         byName: readStr(m['byName']),
         qty: readNum(m['qty']).round(),
         unitPrice: readNum(m['unitPrice']),
+        unitCost: readNum(m['unitCost']),
         discount: readNum(m['discount']),
         total: readNum(m['total']),
         totalUsd: readNum(m['totalUsd']),
@@ -311,6 +321,8 @@ class Product {
   int get total => sizes.values.fold(0, (a, b) => a + (b > 0 ? b : 0));
   int qty(String size) => sizes[size] ?? 0;
   double get value => total * cost;
+  double get profitEach => price - cost;
+  double get marginPct => price <= 0 ? 0 : (price - cost) / price * 100;
   List<String> get lowSizes => [for (final s in productSizes) if (sizes.containsKey(s) && qty(s) <= kLowStock) s];
 
   Map<String, dynamic> toMap() => {

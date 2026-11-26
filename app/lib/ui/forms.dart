@@ -239,16 +239,19 @@ class _SaleFormState extends State<SaleForm> {
   late String status = widget.sale?.status ?? 'completed';
   late String productId = widget.sale?.productId ?? '';
   late String type = widget.sale?.type ?? 'T-shirt';
+  late double unitCost = widget.sale?.unitCost ?? 0;
   bool tried = false;
 
   void _pick(Product? p) {
     setState(() {
       if (p == null) {
         productId = '';
+        unitCost = 0;
         return;
       }
       productId = p.id;
       type = p.type;
+      unitCost = p.cost;
       item.text = p.name;
       if (p.price > 0) price.text = _n(p.price);
       // Jump to a size that still has stock if the current one is empty.
@@ -337,6 +340,12 @@ class _SaleFormState extends State<SaleForm> {
           ),
         Field('Note', Input(controller: note, hint: 'Optional')),
         TotalBox(label: 'Total', usd: usd, rate: rate, native: total, currency: currency),
+        if (app.role.canSeeMoney && unitCost > 0 && parseNum(qty.text) > 0)
+          ProfitBox(
+            label: 'Profit on this sale',
+            profit: usd - unitCost * parseNum(qty.text),
+            sub: 'cost ${money(unitCost)} × ${parseNum(qty.text).round()}',
+          ),
         if (tried && !valid)
           const Text('Add the item, a quantity and a price to save.', style: TextStyle(color: C.down, fontSize: 12)).animate().shakeX(hz: 5, amount: 3),
       ],
@@ -363,6 +372,7 @@ class _SaleFormState extends State<SaleForm> {
               status: status,
               productId: productId,
               type: type,
+              unitCost: unitCost,
               note: note.text.trim(),
               by: widget.sale?.by ?? app.myId,
               byName: widget.sale?.byName ?? app.myName,

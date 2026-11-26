@@ -109,7 +109,11 @@ class ProductCard extends StatelessWidget {
                 Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                 const SizedBox(height: 3),
                 Text(
-                  [p.type, if (app.role.canSeeMoney && p.price > 0) 'sells ${money0(p.price)}'].join(' · '),
+                  [
+                    p.type,
+                    if (app.role.canSeeMoney && p.price > 0) 'sells ${money0(p.price)}',
+                    if (app.role.canSeeMoney && p.cost > 0 && p.price > 0) '+${money0(p.profitEach)} each',
+                  ].join(' · '),
                   style: subStyle.copyWith(fontSize: 11.5),
                 ),
               ]),
@@ -187,15 +191,21 @@ class ProductSheet extends StatelessWidget {
         Row(children: [
           Expanded(child: _Stat('In stock', '${p.total}', C.fg)),
           const SizedBox(width: 10),
-          Expanded(child: _Stat(app.month == null ? 'Sold' : 'Sold this period', '$soldMonth', C.up)),
+          Expanded(child: _Stat(app.month == null ? 'Sold' : 'Sold · month', '$soldMonth', C.up)),
           const SizedBox(width: 10),
-          Expanded(child: _Stat('Sold all time', '$sold', C.mute)),
+          Expanded(child: _Stat('Sold · ever', '$sold', C.mute)),
         ]),
         const Label('By size'),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final s in productSizes)
             if (p.sizes.containsKey(s)) SizeChip(size: s, qty: p.qty(s)),
         ]),
+        if (app.role.canSeeMoney && p.cost > 0 && p.price > 0)
+          ProfitBox(
+            label: 'Profit per piece',
+            profit: p.profitEach,
+            sub: '${p.marginPct.round()}% of the price · ${money0(p.profitEach * p.total)} if the ${p.total} in stock sell',
+          ),
         if (app.role.canSeeMoney && p.cost > 0)
           Text('Stock value at cost: ${money(p.value)}', style: subStyle.copyWith(fontSize: 12)),
       ],
@@ -336,10 +346,17 @@ class _ProductFormState extends State<ProductForm> {
         Field('Design name', Input(controller: name, hint: 'e.g. Akatsuki Cloud Tee', onChanged: (_) => setState(() {}))),
         Field('Type', SlidePicker(options: productTypes, labels: const ['Tee', 'Oversize', 'Hoodie', 'Sweater', 'Other'], selected: type, onChanged: (v) => setState(() => type = v))),
         Row(children: [
-          Expanded(child: Field('Cost per piece', Input(controller: cost, number: true, hint: '0', prefix: r'$ '))),
+          Expanded(child: Field('Cost per piece', Input(controller: cost, number: true, hint: '0', prefix: r'$ ', onChanged: (_) => setState(() {})))),
           const SizedBox(width: 12),
-          Expanded(child: Field('Selling price', Input(controller: price, number: true, hint: '0', prefix: r'$ '))),
+          Expanded(child: Field('Selling price', Input(controller: price, number: true, hint: '0', prefix: r'$ ', onChanged: (_) => setState(() {})))),
         ]),
+        if (parseNum(cost.text) > 0 && parseNum(price.text) > 0)
+          ProfitBox(
+            label: 'Profit per piece',
+            profit: parseNum(price.text) - parseNum(cost.text),
+            sub: '${((parseNum(price.text) - parseNum(cost.text)) / parseNum(price.text) * 100).round()}% of the price'
+                '${counts.values.fold(0, (a, b) => a + b) > 0 ? ' · ${money0((parseNum(price.text) - parseNum(cost.text)) * counts.values.fold(0, (a, b) => a + b))} if all ${counts.values.fold(0, (a, b) => a + b)} sell' : ''}',
+          ),
         Row(children: [
           Label(editing ? 'Pieces in stock now' : 'How many you have'),
           const Spacer(),
