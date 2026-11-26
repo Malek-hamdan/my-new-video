@@ -36,6 +36,7 @@ class DashboardScreen extends StatelessWidget {
     final me = app.me!;
     final period = app.month == null ? 'All time' : monthLabel(app.month!).split(' ').first;
     final pend = app.pending.toList();
+    final stats = app.statsFor(app.month);
     final recent = <(DateTime, Widget)>[
       for (final s in app.sales.take(6)) (s.date, SaleTile(sale: s)),
       for (final p in app.payments.take(6)) (p.date, PaymentTile(payment: p)),
@@ -95,15 +96,28 @@ class DashboardScreen extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Label('Net profit · $period'),
             const SizedBox(height: 6),
-            RollingMoney(app.net, format: signedMoney0, style: mono(36, color: app.net >= 0 ? C.up : C.down)),
-            const SizedBox(height: 10),
-            Row(children: [
-              const Text('Sales ', style: subStyle),
-              RollingMoney(app.revenue, style: mono(13)),
-              const SizedBox(width: 18),
-              const Text('Payments ', style: subStyle),
-              RollingMoney(app.spent, style: mono(13)),
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              RollingMoney(app.net, format: signedMoney0, style: mono(36, color: app.net >= 0 ? C.up : C.down)),
+              const SizedBox(width: 10),
+              if (app.month != null) Padding(padding: const EdgeInsets.only(bottom: 6), child: _VsLastMonth(month: app.month!)),
             ]),
+            const SizedBox(height: 10),
+            Wrap(spacing: 14, runSpacing: 4, children: [
+              _Fig('Sales', stats.sales),
+              _Fig('Pieces cost', stats.pieceCost),
+              _Fig('Expenses', stats.expenses),
+            ]),
+            if (stats.stockBought > 0) ...[
+              const SizedBox(height: 6),
+              Text('Stock bought ${money0(stats.stockBought)} · counted as the pieces sell', style: subStyle.copyWith(fontSize: 11)),
+            ],
+            if (stats.salesWithoutCost > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                '${stats.salesWithoutCost} ${stats.salesWithoutCost == 1 ? 'sale has' : 'sales have'} no cost (not picked from stock), so profit may read high.',
+                style: subStyle.copyWith(fontSize: 11, color: C.gold),
+              ),
+            ],
           ]),
         ),
       ),
@@ -126,6 +140,7 @@ class DashboardScreen extends StatelessWidget {
         ),
       ),
       Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 0), child: DailyChart(days: app.daily)),
+      Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 0), child: MonthsCard(months: app.lastSixMonths)),
       Padding(
         padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
         child: const Label('Latest activity'),
@@ -435,4 +450,118 @@ List<Widget> groupedByDay<T>(List<T> items, DateTime Function(T) dateOf, Widget 
 
 extension FadeKey on Widget {
   Widget fadeKey(Object key) => KeyedSubtree(key: ValueKey(key), child: animate().fadeIn(duration: kMed));
+}
+
+class _Fig extends StatelessWidget {
+  const _Fig(this.label, this.value);
+  final String label;
+  final double value;
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Text('$label ', style: subStyle),
+        RollingMoney(value, style: mono(13)),
+      ]);
+}
+
+/// "▲ $120 vs Oct" next to the month's profit.
+class _VsLastMonth extends StatelessWidget {
+  const _VsLastMonth({required this.month});
+  final DateTime month;
+  @override
+  Widget build(BuildContext context) {
+    final app = AppScope.of(context);
+    final prevMonth = DateTime(month.year, month.month - 1);
+    final prev = app.statsFor(prevMonth);
+    if (prev.empty) return const SizedBox.shrink();
+    final diff = app.statsFor(month).profit - prev.profit;
+    final c = diff >= 0 ? C.up : C.down;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: c.withValues(alpha: .12), borderRadius: BorderRadius.circular(8)),
+      child: Text(
+        '${diff >= 0 ? '▲' : '▼'} ${money0(diff.abs())} vs ${monthShort(prevMonth)}',
+        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c),
+      ),
+    ).animate().fadeIn(duration: kMed).slideX(begin: .2);
+  }
+}
+
+/// Last six months side by side: sales and profit bars plus a small table.
+class MonthsCard extends StatelessWidget {
+  const MonthsCard({super.key, required this.months});
+  final List<MonthStats> months;
+
+  @override
+  Widget build(BuildContext context) {
+    var top = 1.0;
+    for (final m in months) {
+      if (m.sales > top) top = m.sales;
+      if (m.profit.abs() > top) top = m.profit.abs();
+    }
+    return Panel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Label('Month by month')),
+          _dot(C.red, 'Sales'),
+          const SizedBox(width: 12),
+          _dot(C.up, 'Profit'),
+        ]),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 110,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            for (var i = 0; i < months.length; i++)
+              Expanded(
+                child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  Expanded(
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
+                      _bar(months[i].sales / top, C.red, i),
+                      const SizedBox(width: 3),
+                      _bar(months[i].profit.abs() / top, months[i].profit >= 0 ? C.up : C.down, i),
+                    ]),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(monthShort(months[i].month!), style: subStyle.copyWith(fontSize: 10.5)),
+                ]),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        const Divider(color: C.line, height: 1),
+        for (final m in months.reversed.where((m) => !m.empty))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(children: [
+              SizedBox(width: 44, child: Text(monthShort(m.month!), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5))),
+              Expanded(child: Text('${m.orders} orders · ${m.pieces} pcs', style: subStyle.copyWith(fontSize: 11.5))),
+              Text(money0(m.sales), style: mono(12.5, weight: FontWeight.w500)),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 64,
+                child: Text(signedMoney0(m.profit), textAlign: TextAlign.right, style: mono(12.5, color: m.profit >= 0 ? C.up : C.down)),
+              ),
+            ]),
+          ),
+        if (months.every((m) => m.empty))
+          const Padding(padding: EdgeInsets.only(top: 10), child: Text('Months appear here as you record sales.', style: subStyle)),
+      ]),
+    );
+  }
+
+  Widget _bar(double f, Color c, int i) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: f.clamp(0, 1)),
+        duration: Duration(milliseconds: 700 + i * 60),
+        curve: Curves.easeOutCubic,
+        builder: (_, v, _) => Container(
+          width: 12,
+          height: (88 * v).clamp(2, 88),
+          decoration: BoxDecoration(color: c, borderRadius: const BorderRadius.vertical(top: Radius.circular(3))),
+        ),
+      );
+
+  Widget _dot(Color c, String t) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 5),
+        Text(t, style: subStyle.copyWith(fontSize: 10.5)),
+      ]);
 }

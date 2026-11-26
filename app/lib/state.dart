@@ -110,7 +110,45 @@ class AppState extends ChangeNotifier {
 
   double get revenue => periodSales.where((s) => s.completed).fold(0, (a, s) => a + s.totalUsd);
   double get spent => periodPayments.where((p) => p.paid).fold(0, (a, p) => a + p.amountUsd);
-  double get net => revenue - spent;
+  /// Profit for the selected period: see [statsFor].
+  double get net => statsFor(month).profit;
+
+  /// Figures for one month (or all time when [m] is null).
+  ///
+  /// Profit counts stock as a cost only when it sells: sales minus what the
+  /// sold pieces cost, minus every other paid expense. Payments in the Stock
+  /// category buy inventory, so they are left out here (they still count
+  /// against capital).
+  MonthStats statsFor(DateTime? m) {
+    bool inside(DateTime d) => m == null || (d.year == m.year && d.month == m.month);
+    final st = MonthStats(m);
+    for (final s in sales) {
+      if (!s.completed || !inside(s.date)) continue;
+      st.sales += s.totalUsd;
+      st.orders += 1;
+      st.pieces += s.qty;
+      if (s.unitCost > 0) {
+        st.pieceCost += s.unitCost * s.qty;
+      } else {
+        st.salesWithoutCost += 1;
+      }
+    }
+    for (final p in payments) {
+      if (!p.paid || !inside(p.date)) continue;
+      if (p.category == 'Stock') {
+        st.stockBought += p.amountUsd;
+      } else {
+        st.expenses += p.amountUsd;
+      }
+    }
+    return st;
+  }
+
+  /// The six months ending with the current one, oldest first.
+  List<MonthStats> get lastSixMonths {
+    final now = DateTime.now();
+    return [for (var i = 5; i >= 0; i--) statsFor(DateTime(now.year, now.month - i))];
+  }
   int get piecesSold => periodSales.where((s) => s.completed).fold(0, (a, s) => a + s.qty);
   int get orders => periodSales.where((s) => s.completed).length;
   double get avgOrder => orders == 0 ? 0 : revenue / orders;
@@ -201,4 +239,14 @@ class AppScope extends InheritedNotifier<AppState> {
 
   static AppState read(BuildContext context) =>
       context.getInheritedWidgetOfExactType<AppScope>()!.notifier!;
+}
+
+class MonthStats {
+  MonthStats(this.month);
+  final DateTime? month;
+  double sales = 0, pieceCost = 0, expenses = 0, stockBought = 0;
+  int orders = 0, pieces = 0, salesWithoutCost = 0;
+
+  double get profit => sales - pieceCost - expenses;
+  bool get empty => orders == 0 && expenses == 0 && stockBought == 0;
 }
