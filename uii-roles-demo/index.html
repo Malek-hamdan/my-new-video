@@ -6213,9 +6213,9 @@
       T(Object.keys(all).join(", ")), T(noPrice || "")]];
     return packXlsx([{ name: "Stock value", xml: sheetXml({
       title: "UII \u2014 Stock value \u00B7 " + monthLabel(month),
-      subtitle: "Quantity \u00D7 unit price of every part on the shelves" + (noPrice ? " \u00B7 " + noPrice + (noPrice === 1 ? " part has" : " parts have") + " no price and " + (noPrice === 1 ? "is" : "are") + " not counted" : "") + " \u00B7 " + stamp,
+      subtitle: "Quantity \u00D7 unit price" + (noPrice ? " \u00B7 " + noPrice + " without price, not counted" : "") + " \u00B7 " + stamp,
       theme: "ALL", rows: rows, totals: totals,
-      columns: [{ name: "Machine", width: 14 }, { name: "Parts", width: 10 }, { name: "Pieces", width: 11 }, { name: "Stock value", width: 18 }, { name: "Currency", width: 11 }, { name: "No price", width: 11 }]
+      columns: [{ name: "Machine", width: 16 }, { name: "Parts", width: 10 }, { name: "Pieces", width: 11 }, { name: "Stock value", width: 18 }, { name: "Currency", width: 11 }, { name: "No price", width: 11 }]
     }) }]);
   }
   // Hidden "_data" sheet: a marker in A1, then the JSON split to fit Excel's cell size
