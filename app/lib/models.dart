@@ -371,6 +371,7 @@ const categories = <Category>[
   Category('Equipment', Icons.precision_manufacturing_rounded, Color(0xFF5BC0EB)),
   Category('Salaries', Icons.badge_rounded, Color(0xFFFF9F45)),
   Category('Rent', Icons.storefront_rounded, Color(0xFFE88AB8)),
+  Category('Website', Icons.language_rounded, Color(0xFF7DD3FC)),
   Category('Other', Icons.more_horiz_rounded, C.mute),
 ];
 

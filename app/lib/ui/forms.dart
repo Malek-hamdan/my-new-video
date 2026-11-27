@@ -570,6 +570,31 @@ class _PaymentFormState extends State<PaymentForm> {
       items: [
         DateTimeRow(value: date, onChanged: (d) => setState(() => date = d)),
         Field('Category', CategoryGrid(selected: category, onChanged: (v) => setState(() => category = v))),
+        AnimatedSwitcher(
+          duration: kMed,
+          child: Container(
+            key: ValueKey(category == 'Stock'),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: (category == 'Stock' ? C.gold : C.red).withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              Icon(category == 'Stock' ? Icons.account_balance_rounded : Icons.trending_down_rounded,
+                  size: 18, color: category == 'Stock' ? C.gold : C.red),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  category == 'Stock'
+                      ? 'Stock: comes out of capital only. Profit uses the cost you type on each sale.'
+                      : 'Comes out of this month\'s profit.',
+                  style: const TextStyle(fontSize: 12, height: 1.35),
+                ),
+              ),
+            ]),
+          ),
+        ),
         Field('What for', Input(controller: desc, hint: 'e.g. Blank tees · 100 pcs', onChanged: (_) => setState(() {}))),
         Field('Paid to', Input(controller: payee, hint: 'Supplier, shop, person')),
         Row(children: [
