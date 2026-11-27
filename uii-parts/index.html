@@ -5772,7 +5772,7 @@
         { f: "SUM(" + rng("C", n) + ")", v: pcs, s: "totN_" + m }, T(""), T(""), T(cu || ""),
         cu ? { f: "SUM(" + rng("G", n) + ")", v: bag[cu], s: "totM_" + m } : T(cu === "" ? "" : bagText(bag))]] : [];
       // local parts of this machine: their own table under the imported ones, same sheet
-      var after = [], locList = loc ? [] : sheet[m].filter(function (r) { return hasContent(r) && r.local; });
+      var after = [], locList = [];   // local parts are left out of the Excel files (they stay in the hidden copy)
       if (locList.length) {
         var L0 = HEAD_ROW + 1 + n + totals.length + 3, lpcs = 0, lbag = {};
         after.push([null, 14]);
@@ -5862,9 +5862,7 @@
     });
     // local parts: their own sheets, only when there are some
     // local parts now sit under the imported ones on the machine's own sheet
-    var localTx = txList.filter(function (t) { return t.local; });
-    if (localTx.length) sheets.push(txSheet("Local " + TX + "s", "UII — Local parts " + TX + "s", localTx, true, "ALL"));
-    sheets.push(txSheet("All " + TX + "s", "UII — All " + TX + "s", txList, true, "ALL"));
+    sheets.push(txSheet("All " + TX + "s", "UII — All " + TX + "s", txList.filter(function (t) { return !t.local; }), true, "ALL"));
     // hidden copy of this month so the file can be restored into the site
     var mp = [], mt = [];
     MACHINES.forEach(function (m) { sheet[m].forEach(function (r) { var b = rowBody(r); b.id = r.id; mp.push(b); }); });
@@ -5966,8 +5964,8 @@
       band("UII \u2014 " + monthLabel(k), "title_ALL", 38);
       band("Every machine: its parts, then its transactions this month \u00B7 " + stamp, "sub_ALL", 22);
       MACHINES.forEach(function (m) {
-        var parts = allParts[k] ? allParts[k][m].filter(hasContent) : [];
-        var txs = (allTx[k] || []).filter(function (t) { return t.machine === m && !t.source; }).slice().reverse();
+        var parts = allParts[k] ? allParts[k][m].filter(function (p) { return hasContent(p) && !p.local; }) : [];
+        var txs = (allTx[k] || []).filter(function (t) { return t.machine === m && !t.source && !t.local; }).slice().reverse();
         if (!parts.length && !txs.length) return;
         blank(14);
         band(m, "title_" + m, 32);
@@ -6027,7 +6025,7 @@
     function noPrice(r) { var p = unitPrice(r); return p === null || p === 0; }
     var sheets = MACHINES.map(function (m) {
       var rows = [], cn = 0, cr = 0, cp = 0;
-      sheet[m].filter(function (r) { return hasContent(r) && (noName(r) || noRef(r) || noPrice(r)); }).forEach(function (r) {
+      sheet[m].filter(function (r) { return hasContent(r) && !r.local && (noName(r) || noRef(r) || noPrice(r)); }).forEach(function (r) {
         var i = rows.length, what = [];
         if (noName(r)) { what.push("Name"); cn++; }
         if (noRef(r)) { what.push("Reference"); cr++; }
@@ -6048,37 +6046,34 @@
     });
     return packXlsx(sheets);
   }
-  // ---- Stock value: what the parts on the shelves are worth, per machine (open month) ----
+  // ---- Stock value: what the (imported) parts on the shelves are worth, per machine (open month) ----
   function buildValueWorkbook() {
     var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
     function z(name, i) { return name + (i % 2 ? "Z" : ""); }
     function one(bag) { var c = Object.keys(bag); return c.length === 1 ? c[0] : c.length ? null : ""; }
     function cell(bag, st) { var c = one(bag); return c ? { v: Math.round(bag[c] * 100) / 100, s: st } : { v: c === "" ? 0 : Object.keys(bag).map(function (k) { return money(bag[k], k); }).join(" + "), s: st }; }
-    var rows = [], allI = {}, allL = {}, allT = {}, nI = 0, nL = 0, noPrice = 0, cur = {};
+    var rows = [], all = {}, nAll = 0, pcsAll = 0, noPrice = 0;
     MACHINES.forEach(function (m, i) {
-      var bi = {}, bl = {}, bt = {}, pi = 0, pl = 0, np = 0;
-      sheet[m].filter(hasContent).forEach(function (r) {
+      var bag = {}, n = 0, pcs = 0, np = 0;
+      sheet[m].filter(function (r) { return hasContent(r) && !r.local; }).forEach(function (r) {
         var p = unitPrice(r), q = /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : 0, c = r.currency || lastCurrency();
-        if (r.local) pl++; else pi++;
+        n++; pcs += q;
         if (p === null || p === 0) { np++; return; }
-        cur[c] = 1;
-        addMoney(r.local ? bl : bi, c, q * p); addMoney(bt, c, q * p);
-        addMoney(r.local ? allL : allI, c, q * p); addMoney(allT, c, q * p);
+        addMoney(bag, c, q * p); addMoney(all, c, q * p);
       });
-      nI += pi; nL += pl; noPrice += np;
-      rows.push([{ v: m, s: z("bold", i) }, { v: pi, s: z("center", i) }, cell(bi, z("money", i)), { v: pl, s: z("center", i) }, cell(bl, z("money", i)),
-        cell(bt, z("moneyBold", i)), { v: Object.keys(bt).join(", "), s: z("center", i) }, { v: np || "", s: np ? z("qtyNeg", i) : z("center", i) }]);
+      nAll += n; pcsAll += pcs; noPrice += np;
+      rows.push([{ v: m, s: z("bold", i) }, { v: n, s: z("center", i) }, { v: pcs, s: z("center", i) }, cell(bag, z("moneyBold", i)),
+        { v: Object.keys(bag).join(", "), s: z("center", i) }, { v: np || "", s: np ? z("qtyNeg", i) : z("center", i) }]);
     });
-    var T = function (v) { return { v: v, s: "totN_ALL" }; }, R0 = HEAD_ROW + 1, R1 = HEAD_ROW + MACHINES.length, single = one(allT);
-    var sum = function (col, bag) { return single ? { f: "SUM(" + col + R0 + ":" + col + R1 + ")", v: Math.round((bag[single] || 0) * 100) / 100, s: "totM_ALL" } : cell(bag, "totN_ALL"); };
-    var totals = [[{ v: "All machines", s: "totL_ALL" }, { f: "SUM(B" + R0 + ":B" + R1 + ")", v: nI, s: "totN_ALL" }, sum("C", allI),
-      { f: "SUM(D" + R0 + ":D" + R1 + ")", v: nL, s: "totN_ALL" }, sum("E", allL), sum("F", allT), T(Object.keys(allT).join(", ")), T(noPrice || "")]];
+    var R0 = HEAD_ROW + 1, R1 = HEAD_ROW + MACHINES.length, single = one(all), T = function (v) { return { v: v, s: "totN_ALL" }; };
+    var totals = [[{ v: "All machines", s: "totL_ALL" }, { f: "SUM(B" + R0 + ":B" + R1 + ")", v: nAll, s: "totN_ALL" }, { f: "SUM(C" + R0 + ":C" + R1 + ")", v: pcsAll, s: "totN_ALL" },
+      single ? { f: "SUM(D" + R0 + ":D" + R1 + ")", v: Math.round((all[single] || 0) * 100) / 100, s: "totM_ALL" } : cell(all, "totN_ALL"),
+      T(Object.keys(all).join(", ")), T(noPrice || "")]];
     return packXlsx([{ name: "Stock value", xml: sheetXml({
       title: "UII \u2014 Stock value \u00B7 " + monthLabel(month),
       subtitle: "Quantity \u00D7 unit price of every part on the shelves" + (noPrice ? " \u00B7 " + noPrice + (noPrice === 1 ? " part has" : " parts have") + " no price and " + (noPrice === 1 ? "is" : "are") + " not counted" : "") + " \u00B7 " + stamp,
       theme: "ALL", rows: rows, totals: totals,
-      columns: [{ name: "Machine", width: 14 }, { name: "Imported parts", width: 15 }, { name: "Imported value", width: 17 }, { name: "Local parts", width: 13 },
-        { name: "Local value", width: 16 }, { name: "Total value", width: 18 }, { name: "Currency", width: 11 }, { name: "No price", width: 11 }]
+      columns: [{ name: "Machine", width: 14 }, { name: "Parts", width: 10 }, { name: "Pieces", width: 11 }, { name: "Stock value", width: 18 }, { name: "Currency", width: 11 }, { name: "No price", width: 11 }]
     }) }]);
   }
   // Hidden "_data" sheet: a marker in A1, then the JSON split to fit Excel's cell size
