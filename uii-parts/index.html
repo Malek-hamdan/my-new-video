@@ -5921,18 +5921,18 @@
       var rows = list.map(function (x, i) {
         var r = x.r, t = totalOf(r);
         return [{ v: x.m, s: z("center", i) }, { v: r.name + (r.local ? " (Local)" : ""), s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) }, { v: numOrText(r.min), s: z("center", i) },
+          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) },
           { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) }, { v: t === null ? "" : t, s: z("moneyBold", i) }];
       });
       var n = list.length, pcs = 0, bag = {};
       list.forEach(function (x) { if (/^\d+$/.test(x.r.quantity)) pcs += parseInt(x.r.quantity, 10); var t = totalOf(x.r); if (t !== null) addMoney(bag, x.r.currency || lastCurrency(), t); });
       var cur = Object.keys(bag), T = function (v) { return { v: v, s: "totN_ALL" }; };
-      var totalCell = cur.length === 1 ? { f: "SUM(H" + R0 + ":H" + (R0 + n - 1) + ")", v: bag[cur[0]], s: "totM_ALL" } : T(cur.map(function (c) { return money(bag[c], c); }).join(" + "));
-      var totals = [[{ v: "Total \u00B7 " + n + (n === 1 ? " part" : " parts"), s: "totL_ALL" }, T(""), T(""), { f: "SUM(D" + R0 + ":D" + (R0 + n - 1) + ")", v: pcs, s: "totN_ALL" }, T(""), T(""), T(cur.length === 1 ? cur[0] : ""), totalCell]];
+      var totalCell = cur.length === 1 ? { f: "SUM(G" + R0 + ":G" + (R0 + n - 1) + ")", v: bag[cur[0]], s: "totM_ALL" } : T(cur.map(function (c) { return money(bag[c], c); }).join(" + "));
+      var totals = [[{ v: "Total \u00B7 " + n + (n === 1 ? " part" : " parts"), s: "totL_ALL" }, T(""), T(""), { f: "SUM(D" + R0 + ":D" + (R0 + n - 1) + ")", v: pcs, s: "totN_ALL" }, T(""), T(cur.length === 1 ? cur[0] : ""), totalCell]];
       var name = monthLabel(k); while (used[name]) name += "_"; used[name] = 1;
       sheets.push({ name: name, xml: sheetXml({
         title: "UII \u2014 " + monthLabel(k), subtitle: "All machines \u00B7 " + n + (n === 1 ? " part" : " parts") + " \u00B7 " + stamp, theme: "ALL", rows: rows, totals: totals,
-        columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 42 }, { name: "Reference", width: 22 }, { name: "Quantity", width: 11 }, { name: "Min", width: 9 },
+        columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 42 }, { name: "Reference", width: 22 }, { name: "Quantity", width: 11 },
           { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Total price", width: 15 }]
       }) });
     });
