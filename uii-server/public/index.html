@@ -6382,33 +6382,33 @@
     if (!sheets.length) sheets.push({ name: "Empty", xml: sheetXml({ title: "UII", subtitle: "No parts yet", theme: "ALL", rows: [], columns: [{ name: "Machine", width: 11 }] }) });
     return packXlsx(sheets);
   }
-  // ---- TEMPORARY: parts with no name, no reference or no price (open month); remove with its button ----
+  // ---- TEMPORARY: per machine, its parts with no name, no reference or no price (open month); remove with its button ----
   function buildMissingWorkbook() {
     var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
     function z(name, i) { return name + (i % 2 ? "Z" : ""); }
     var MISS = { v: "Missing", s: "typeOut" };
-    var checks = [
-      { name: "No name", test: function (r) { return !String(r.name).trim(); } },
-      { name: "No reference", test: function (r) { return !String(r.reference).trim(); } },
-      { name: "No price", test: function (r) { var p = unitPrice(r); return p === null || p === 0; } }
-    ];
-    var sheets = checks.map(function (c) {
-      var rows = [];
-      MACHINES.forEach(function (m) {
-        sheet[m].filter(function (r) { return hasContent(r) && c.test(r); }).forEach(function (r) {
-          var i = rows.length;
-          rows.push([{ v: m, s: z("center", i) },
-            String(r.name).trim() ? { v: r.name + (r.local ? " (Local)" : ""), s: z("text", i) } : MISS,
-            String(r.reference).trim() ? { v: r.reference, s: z("center", i) } : MISS,
-            { v: numOrText(r.quantity), s: z("bold", i) },
-            c.name === "No price" ? MISS : { v: priceVal(r.price), s: z("money", i) },
-            { v: r.currency, s: z("center", i) }]);
-        });
+    function noName(r) { return !String(r.name).trim(); }
+    function noRef(r) { return !String(r.reference).trim(); }
+    function noPrice(r) { var p = unitPrice(r); return p === null || p === 0; }
+    var sheets = MACHINES.map(function (m) {
+      var rows = [], cn = 0, cr = 0, cp = 0;
+      sheet[m].filter(function (r) { return hasContent(r) && (noName(r) || noRef(r) || noPrice(r)); }).forEach(function (r) {
+        var i = rows.length, what = [];
+        if (noName(r)) { what.push("Name"); cn++; }
+        if (noRef(r)) { what.push("Reference"); cr++; }
+        if (noPrice(r)) { what.push("Price"); cp++; }
+        rows.push([noName(r) ? MISS : { v: r.name + (r.local ? " (Local)" : ""), s: z("text", i) },
+          noRef(r) ? MISS : { v: r.reference, s: z("center", i) },
+          { v: numOrText(r.quantity), s: z("bold", i) },
+          noPrice(r) ? MISS : { v: priceVal(r.price), s: z("money", i) },
+          { v: r.currency, s: z("center", i) },
+          { v: what.join(", "), s: z("text", i) }]);
       });
-      return { name: c.name, xml: sheetXml({
-        title: "UII \u2014 Parts with " + c.name.toLowerCase().replace("no ", "no "),
-        subtitle: monthLabel(month) + " \u00B7 " + rows.length + (rows.length === 1 ? " part" : " parts") + " \u00B7 " + stamp, theme: "ALL", rows: rows,
-        columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 40 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }]
+      return { name: m, xml: sheetXml({
+        title: "UII \u2014 " + m + " \u00B7 parts with missing information",
+        subtitle: monthLabel(month) + " \u00B7 " + rows.length + (rows.length === 1 ? " part" : " parts") + " \u00B7 no name " + cn + " \u00B7 no reference " + cr + " \u00B7 no price " + cp + " \u00B7 " + stamp,
+        theme: m, rows: rows,
+        columns: [{ name: "Name", width: 40 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Missing", width: 24 }]
       }) };
     });
     return packXlsx(sheets);
