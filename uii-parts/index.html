@@ -1534,6 +1534,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 5M15 13l-6 5"/></svg>
       <span>Export all months</span>
     </button>
+    <button class="btn btn-export" id="valueBtn" type="button" title="Download what the parts are worth, per machine, as an Excel file">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 5M15 13l-6 5"/></svg>
+      <span>Stock value</span>
+    </button>
     <button class="btn btn-export" id="missingBtn" type="button" title="Temporary: parts with no name, no reference or no price">
       <span>Missing info</span>
     </button>
@@ -6044,6 +6048,39 @@
     });
     return packXlsx(sheets);
   }
+  // ---- Stock value: what the parts on the shelves are worth, per machine (open month) ----
+  function buildValueWorkbook() {
+    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    function z(name, i) { return name + (i % 2 ? "Z" : ""); }
+    function one(bag) { var c = Object.keys(bag); return c.length === 1 ? c[0] : c.length ? null : ""; }
+    function cell(bag, st) { var c = one(bag); return c ? { v: Math.round(bag[c] * 100) / 100, s: st } : { v: c === "" ? 0 : Object.keys(bag).map(function (k) { return money(bag[k], k); }).join(" + "), s: st }; }
+    var rows = [], allI = {}, allL = {}, allT = {}, nI = 0, nL = 0, noPrice = 0, cur = {};
+    MACHINES.forEach(function (m, i) {
+      var bi = {}, bl = {}, bt = {}, pi = 0, pl = 0, np = 0;
+      sheet[m].filter(hasContent).forEach(function (r) {
+        var p = unitPrice(r), q = /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : 0, c = r.currency || lastCurrency();
+        if (r.local) pl++; else pi++;
+        if (p === null || p === 0) { np++; return; }
+        cur[c] = 1;
+        addMoney(r.local ? bl : bi, c, q * p); addMoney(bt, c, q * p);
+        addMoney(r.local ? allL : allI, c, q * p); addMoney(allT, c, q * p);
+      });
+      nI += pi; nL += pl; noPrice += np;
+      rows.push([{ v: m, s: z("bold", i) }, { v: pi, s: z("center", i) }, cell(bi, z("money", i)), { v: pl, s: z("center", i) }, cell(bl, z("money", i)),
+        cell(bt, z("moneyBold", i)), { v: Object.keys(bt).join(", "), s: z("center", i) }, { v: np || "", s: np ? z("qtyNeg", i) : z("center", i) }]);
+    });
+    var T = function (v) { return { v: v, s: "totN_ALL" }; }, R0 = HEAD_ROW + 1, R1 = HEAD_ROW + MACHINES.length, single = one(allT);
+    var sum = function (col, bag) { return single ? { f: "SUM(" + col + R0 + ":" + col + R1 + ")", v: Math.round((bag[single] || 0) * 100) / 100, s: "totM_ALL" } : cell(bag, "totN_ALL"); };
+    var totals = [[{ v: "All machines", s: "totL_ALL" }, { f: "SUM(B" + R0 + ":B" + R1 + ")", v: nI, s: "totN_ALL" }, sum("C", allI),
+      { f: "SUM(D" + R0 + ":D" + R1 + ")", v: nL, s: "totN_ALL" }, sum("E", allL), sum("F", allT), T(Object.keys(allT).join(", ")), T(noPrice || "")]];
+    return packXlsx([{ name: "Stock value", xml: sheetXml({
+      title: "UII \u2014 Stock value \u00B7 " + monthLabel(month),
+      subtitle: "Quantity \u00D7 unit price of every part on the shelves" + (noPrice ? " \u00B7 " + noPrice + (noPrice === 1 ? " part has" : " parts have") + " no price and " + (noPrice === 1 ? "is" : "are") + " not counted" : "") + " \u00B7 " + stamp,
+      theme: "ALL", rows: rows, totals: totals,
+      columns: [{ name: "Machine", width: 14 }, { name: "Imported parts", width: 15 }, { name: "Imported value", width: 17 }, { name: "Local parts", width: 13 },
+        { name: "Local value", width: 16 }, { name: "Total value", width: 18 }, { name: "Currency", width: 11 }, { name: "No price", width: 11 }]
+    }) }]);
+  }
   // Hidden "_data" sheet: a marker in A1, then the JSON split to fit Excel's cell size
   var MONTH_MARK = "UII-MONTH-v1";
   function dataSheet(mark, obj) {
@@ -6261,6 +6298,9 @@
   document.getElementById("missingBtn").addEventListener("click", function () {
     if (missingGone()) return;
     saveFile("UII-missing-info-" + month + ".xlsx", buildMissingWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
+  });
+  document.getElementById("valueBtn").addEventListener("click", function () {
+    saveFile("UII-stock-value-" + month + ".xlsx", buildValueWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
   document.getElementById("exportAllBtn").addEventListener("click", function () {
     var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
