@@ -5710,7 +5710,7 @@
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
     out += '<sheetPr><tabColor rgb="FF' + XL_THEMES[th][0] + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
     var freeze = spec.rows.length > 0;
-    out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0">' + (freeze ? '<pane ySplit="' + HEAD_ROW + '" topLeftCell="A' + (HEAD_ROW + 1) + '" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft"/>' : "") + "</sheetView></sheetViews>";
+    out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>';   // nothing frozen: the title and headings scroll away with the rows
     out += '<sheetFormatPr defaultRowHeight="18"/>';
     out += "<cols>" + spec.columns.map(function (c, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.width + '" customWidth="1"/>'; }).join("") + "</cols>";
     out += "<sheetData>" + lines.join("") + "</sheetData>";
