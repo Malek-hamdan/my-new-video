@@ -5851,6 +5851,11 @@
     var r = HEAD_ROW + 1;
     spec.rows.forEach(function (cells) { row(r++, cells, 26); });
     (spec.totals || []).forEach(function (cells) { row(r++, cells, 28); });
+    var extraMerge = [];
+    (spec.after || []).forEach(function (x) {      // a second table under the first: [cells, height, merged]
+      if (!x[0]) { lines.push('<row r="' + r + '" ht="' + (x[1] || 12) + '" customHeight="1"/>'); r++; return; }
+      if (x[2]) { spanRow(r, x[0][0], x[1]); extraMerge.push("A" + r + ":" + last + r); r++; } else row(r++, x[0], x[1]);
+    });
 
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
     out += '<sheetPr><tabColor rgb="FF' + XL_THEMES[th][0] + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
@@ -5860,7 +5865,7 @@
     out += "<cols>" + spec.columns.map(function (c, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.width + '" customWidth="1"/>'; }).join("") + "</cols>";
     out += "<sheetData>" + lines.join("") + "</sheetData>";
     if (freeze) out += '<autoFilter ref="A' + HEAD_ROW + ":" + last + (HEAD_ROW + spec.rows.length) + '"/>';
-    out += '<mergeCells count="2"><mergeCell ref="A1:' + last + '1"/><mergeCell ref="A2:' + last + '2"/></mergeCells>';
+    out += '<mergeCells count="' + (2 + extraMerge.length) + '"><mergeCell ref="A1:' + last + '1"/><mergeCell ref="A2:' + last + '2"/>' + extraMerge.map(function (x) { return '<mergeCell ref="' + x + '"/>'; }).join("") + "</mergeCells>";
     out += '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>';
     out += '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
     return out + "</worksheet>";
@@ -5904,7 +5909,34 @@
       var totals = n ? [[{ v: "Total · " + plural(n, "part", "parts"), s: "totL_" + m }, T(""),
         { f: "SUM(" + rng("C", n) + ")", v: pcs, s: "totN_" + m }, T(""), T(""), T(cu || ""),
         cu ? { f: "SUM(" + rng("G", n) + ")", v: bag[cu], s: "totM_" + m } : T(cu === "" ? "" : bagText(bag))]] : [];
+      // local parts of this machine: their own table under the imported ones, same sheet
+      var after = [], locList = loc ? [] : sheet[m].filter(function (r) { return hasContent(r) && r.local; });
+      if (locList.length) {
+        var L0 = HEAD_ROW + 1 + n + totals.length + 3, lpcs = 0, lbag = {};
+        after.push([null, 14]);
+        after.push([[{ v: "Local parts \u00B7 " + plural(locList.length, "part", "parts"), s: "title_" + m }], 30, true]);
+        after.push([["Name", "Reference", "Quantity", "Min", "Unit price", "Currency", "Total price"].map(function (h) { return { v: h, s: "head_" + m }; }), 32]);
+        locList.forEach(function (r, i) {
+          var zr = String(r.quantity).trim() === "0", zz = function (q) { return zr ? q + "Zero" : z(q, i); };
+          if (/^\d+$/.test(r.quantity)) lpcs += parseInt(r.quantity, 10);
+          var t = totalOf(r); if (t !== null) addMoney(lbag, r.currency || lastCurrency(), t);
+          after.push([[{ v: r.name, s: zz("text") }, { v: r.reference, s: zz("center") },
+            { v: numOrText(r.quantity), s: zr ? "qtyZero" : isLow(r) ? z("qtyNeg", i) : z("bold", i) },
+            { v: numOrText(r.min), s: zz("center") }, { v: priceVal(r.price), s: zz("money") }, { v: r.currency, s: zz("center") },
+            { v: t === null ? "" : t, s: zz("moneyBold") }], 26]);
+        });
+        var L1 = L0 + locList.length - 1, lcu = one(lbag);
+        after.push([[{ v: "Total local \u00B7 " + plural(locList.length, "part", "parts"), s: "totL_" + m }, T(""),
+          { f: "SUM(C" + L0 + ":C" + L1 + ")", v: lpcs, s: "totN_" + m }, T(""), T(""), T(lcu || ""),
+          lcu ? { f: "SUM(G" + L0 + ":G" + L1 + ")", v: lbag[lcu], s: "totM_" + m } : T(lcu === "" ? "" : bagText(lbag))], 28]);
+        var all = {}; [bag, lbag].forEach(function (b) { Object.keys(b).forEach(function (c) { addMoney(all, c, b[c]); }); });
+        var acu = one(all);
+        after.push([null, 10]);
+        after.push([[{ v: "Stock value \u00B7 imported + local", s: "totL_" + m }, T(""), { v: pcs + lpcs, s: "totN_" + m }, T(""), T(""), T(acu || ""),
+          acu ? { v: Math.round(all[acu] * 100) / 100, s: "totM_" + m } : T(acu === "" ? "" : bagText(all))], 30]);
+      }
       return { name: m + (loc ? " Local" : ""), xml: sheetXml({
+        after: after,
         title: "UII — " + m + (loc ? " · Local parts" : ""),
         subtitle: (loc ? "Local parts stock · " : "Spare parts stock · ") + label + " · " + plural(n, "part", "parts") + (low ? " · " + low + " at 0 or below Min" : "") + " · " + stamp,
         theme: m, rows: rows, totals: totals,
@@ -5967,7 +5999,7 @@
       sheets.push(txSheet(m + " " + TX, "UII — " + m + " " + TX, txList.filter(function (t) { return t.machine === m && !t.local; }), false, m));
     });
     // local parts: their own sheets, only when there are some
-    MACHINES.forEach(function (m) { if (sheet[m].some(function (r) { return r.local && hasContent(r); })) sheets.push(partsSheet(m, true)); });
+    // local parts now sit under the imported ones on the machine's own sheet
     var localTx = txList.filter(function (t) { return t.local; });
     if (localTx.length) sheets.push(txSheet("Local " + TX + "s", "UII — Local parts " + TX + "s", localTx, true, "ALL"));
     sheets.push(txSheet("All " + TX + "s", "UII — All " + TX + "s", txList, true, "ALL"));
