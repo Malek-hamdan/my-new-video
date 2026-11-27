@@ -1751,6 +1751,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 5M15 13l-6 5"/></svg>
       <span>Export all months</span>
     </button>
+    <button class="btn btn-export" id="missingBtn" type="button" title="Temporary: parts with no name, no reference or no price">
+      <span>Missing info</span>
+    </button>
     <button class="btn pend-btn" id="pendBtn" type="button" hidden title="Receive and Transfer waiting for approval"><span>Waiting</span><b class="pend-n">0</b></button>
     <button class="btn" id="actBtn" type="button" title="Who changed what, and when"><span>Activity</span></button>
     <button class="btn" id="usersBtn" type="button" title="Accounts and what each person may do"><span>Users</span></button>
@@ -6379,6 +6382,37 @@
     if (!sheets.length) sheets.push({ name: "Empty", xml: sheetXml({ title: "UII", subtitle: "No parts yet", theme: "ALL", rows: [], columns: [{ name: "Machine", width: 11 }] }) });
     return packXlsx(sheets);
   }
+  // ---- TEMPORARY: parts with no name, no reference or no price (open month); remove with its button ----
+  function buildMissingWorkbook() {
+    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    function z(name, i) { return name + (i % 2 ? "Z" : ""); }
+    var MISS = { v: "Missing", s: "typeOut" };
+    var checks = [
+      { name: "No name", test: function (r) { return !String(r.name).trim(); } },
+      { name: "No reference", test: function (r) { return !String(r.reference).trim(); } },
+      { name: "No price", test: function (r) { var p = unitPrice(r); return p === null || p === 0; } }
+    ];
+    var sheets = checks.map(function (c) {
+      var rows = [];
+      MACHINES.forEach(function (m) {
+        sheet[m].filter(function (r) { return hasContent(r) && c.test(r); }).forEach(function (r) {
+          var i = rows.length;
+          rows.push([{ v: m, s: z("center", i) },
+            String(r.name).trim() ? { v: r.name + (r.local ? " (Local)" : ""), s: z("text", i) } : MISS,
+            String(r.reference).trim() ? { v: r.reference, s: z("center", i) } : MISS,
+            { v: numOrText(r.quantity), s: z("bold", i) },
+            c.name === "No price" ? MISS : { v: priceVal(r.price), s: z("money", i) },
+            { v: r.currency, s: z("center", i) }]);
+        });
+      });
+      return { name: c.name, xml: sheetXml({
+        title: "UII \u2014 Parts with " + c.name.toLowerCase().replace("no ", "no "),
+        subtitle: monthLabel(month) + " \u00B7 " + rows.length + (rows.length === 1 ? " part" : " parts") + " \u00B7 " + stamp, theme: "ALL", rows: rows,
+        columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 40 }, { name: "Reference", width: 24 }, { name: "Quantity", width: 11 }, { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }]
+      }) };
+    });
+    return packXlsx(sheets);
+  }
   // Hidden "_data" sheet: a marker in A1, then the JSON split to fit Excel's cell size
   var MONTH_MARK = "UII-MONTH-v1";
   function dataSheet(mark, obj) {
@@ -6588,6 +6622,9 @@
     flushWrites();
     if (sideView) { saveFile(SIDE[sideView].file, buildSideWorkbook(sideView), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export"); return; }
     saveFile(exportFilename(), buildWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export");
+  });
+  document.getElementById("missingBtn").addEventListener("click", function () {   // TEMPORARY
+    saveFile("UII-missing-info-" + month + ".xlsx", buildMissingWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
   document.getElementById("exportAllBtn").addEventListener("click", function () {
     var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };

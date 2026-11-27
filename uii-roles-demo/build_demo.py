@@ -142,10 +142,10 @@ rep('''    <p>Enter the password to open the parts register.</p>
     <button class="btn btn-primary gate-btn" type="submit">Sign in</button>
     <div class="gate-note">No sign up. Accounts are made by the administrator.</div>''')
 rep('<div class="wrap">\n  <header>', '<div class="demo-strip">DEMO &middot; accounts and roles test &middot; separate from the real site</div>\n<div class="wrap">\n  <header>')
-rep('''      <span>Export all months</span>
+rep('''      <span>Missing info</span>
     </button>
     </div>
-  </header>''', '''      <span>Export all months</span>
+  </header>''', '''      <span>Missing info</span>
     </button>
     <button class="btn pend-btn" id="pendBtn" type="button" hidden title="Receive and Transfer waiting for approval"><span>Waiting</span><b class="pend-n">0</b></button>
     <button class="btn" id="actBtn" type="button" title="Who changed what, and when"><span>Activity</span></button>
