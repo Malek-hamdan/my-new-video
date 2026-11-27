@@ -6222,7 +6222,12 @@
     if (sideView) { saveFile(SIDE[sideView].file, buildSideWorkbook(sideView), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export"); return; }
     saveFile(exportFilename(), buildWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export");
   });
-  document.getElementById("missingBtn").addEventListener("click", function () {   // TEMPORARY
+  // TEMPORARY: the Missing info button goes away by itself from 1 Jan 2027
+  var MISSING_END = new Date(2027, 0, 1).getTime();
+  function missingGone() { if (Date.now() < MISSING_END) return false; var b = document.getElementById("missingBtn"); if (b) b.remove(); return true; }
+  missingGone(); setInterval(missingGone, 600000);
+  document.getElementById("missingBtn").addEventListener("click", function () {
+    if (missingGone()) return;
     saveFile("UII-missing-info-" + month + ".xlsx", buildMissingWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
   document.getElementById("exportAllBtn").addEventListener("click", function () {
