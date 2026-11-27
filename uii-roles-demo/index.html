@@ -5733,16 +5733,17 @@
   // ---- Workbook styling ----
   // fonts / fills / borders are listed once; XF names map to cellXfs indexes
   var XL_FONTS = [
-    '<font><sz val="12"/><color rgb="FF1F2937"/><name val="Calibri"/></font>',                 // 0 body
-    '<font><b/><sz val="20"/><color rgb="FF1F3864"/><name val="Calibri"/></font>',             // 1 title
-    '<font><sz val="11"/><color rgb="FF6B7280"/><name val="Calibri"/></font>',                 // 2 subtitle
-    '<font><b/><sz val="12"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>',             // 3 header
-    '<font><b/><sz val="12"/><color rgb="FF1E7B45"/><name val="Calibri"/></font>',             // 4 green
-    '<font><b/><sz val="12"/><color rgb="FFC0392B"/><name val="Calibri"/></font>',             // 5 red
-    '<font><b/><sz val="12"/><color rgb="FF1F2937"/><name val="Calibri"/></font>',             // 6 bold body
-    '<font><b/><sz val="20"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>'              // 7 title on colour
+    // formal look: black text on white, no colours
+    '<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>',                 // 0 body
+    '<font><b/><sz val="16"/><color rgb="FF000000"/><name val="Calibri"/></font>',             // 1 title
+    '<font><i/><sz val="10"/><color rgb="FF000000"/><name val="Calibri"/></font>',             // 2 subtitle
+    '<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>',             // 3 header
+    '<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>',                 // 4 in
+    '<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>',                 // 5 out
+    '<font><b/><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>',             // 6 bold body
+    '<font><b/><sz val="16"/><color rgb="FF000000"/><name val="Calibri"/></font>'              // 7 title
   ];
-  function solid(rgb) { return '<fill><patternFill patternType="solid"><fgColor rgb="FF' + rgb + '"/><bgColor indexed="64"/></patternFill></fill>'; }
+  function solid(rgb) { return '<fill><patternFill patternType="none"/></fill>'; }   // formal look: no cell colours
   var XL_FILLS = [
     '<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>',
     solid("1F3864"),  // 2 header navy
@@ -5753,8 +5754,8 @@
   ];
   var XL_BORDERS = [
     '<border><left/><right/><top/><bottom/><diagonal/></border>',
-    '<border><left style="thin"><color rgb="FFD5DCE8"/></left><right style="thin"><color rgb="FFD5DCE8"/></right><top style="thin"><color rgb="FFD5DCE8"/></top><bottom style="thin"><color rgb="FFD5DCE8"/></bottom><diagonal/></border>',
-    '<border><left style="thin"><color rgb="FFD5DCE8"/></left><right style="thin"><color rgb="FFD5DCE8"/></right><top style="medium"><color rgb="FF1F3864"/></top><bottom style="thin"><color rgb="FFD5DCE8"/></bottom><diagonal/></border>'
+    '<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>',
+    '<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="medium"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>'
   ];
   var XL_XF = {};
   var XL_XF_LIST = [];
@@ -5799,7 +5800,7 @@
     ALL: ["374151", "EEF0F3"], UII: ["1F3864", "E8EDF6"], CONS: ["6D3FC0", "F1ECF8"],
     USED: ["A0661B", "FBF1E3"], EQUIP: ["0F766E", "E6F4F2"] };
   Object.keys(XL_THEMES).forEach(function (t) {
-    var c = XL_THEMES[t][0], line = '<color rgb="FF' + c + '"/>', grey = '<color rgb="FFD5DCE8"/>';
+    var c = XL_THEMES[t][0], line = '<color rgb="FF000000"/>', grey = '<color rgb="FF000000"/>';
     XL_FILLS.push(solid(c), solid(XL_THEMES[t][1]));
     var fc = XL_FILLS.length - 2, fl = XL_FILLS.length - 1;
     XL_BORDERS.push('<border><left style="thin">' + grey + '</left><right style="thin">' + grey + '</right><top style="thin">' + grey + '</top><bottom style="medium">' + line + '</bottom><diagonal/></border>',
@@ -5862,7 +5863,7 @@
     });
 
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
-    out += '<sheetPr><tabColor rgb="FF' + XL_THEMES[th][0] + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
+    out += '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
     var freeze = spec.rows.length > 0;
     out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>';   // nothing frozen: the title and headings scroll away with the rows
     out += '<sheetFormatPr defaultRowHeight="18"/>';
@@ -6145,7 +6146,7 @@
         row([{ v: "In " + tin + " \u00B7 Out " + tout, s: "totL_" + m }, T(""), T(""), T(""), T(""), T(""), T(""), T(""), T("")], 26);
       });
       var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
-      xml += '<sheetPr><tabColor rgb="FF' + XL_THEMES.ALL[0] + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
+      xml += '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
       xml += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="18"/>';
       xml += "<cols>" + COLS.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols>";
       xml += "<sheetData>" + lines.join("") + "</sheetData>";
