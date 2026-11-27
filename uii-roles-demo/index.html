@@ -6052,31 +6052,70 @@
     sheets.push(dataSheet(BACKUP_MARK, all));
     return packXlsx(sheets);
   }
-  // ---- Export all months: one sheet per month, every part of every machine with its price ----
+  // ---- Export all months: one sheet per month; in it each machine: its parts, then its transactions that month ----
   function buildAllMonthsWorkbook() {
     var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
     function z(name, i) { return name + (i % 2 ? "Z" : ""); }
-    var R0 = HEAD_ROW + 1, sheets = [], used = {};
-    MONTHS.filter(function (k) { return allParts[k] && MACHINES.some(function (m) { return allParts[k][m].some(hasContent); }); }).forEach(function (k) {
-      var list = [];
-      MACHINES.forEach(function (m) { allParts[k][m].filter(hasContent).forEach(function (r) { list.push({ m: m, r: r }); }); });
-      var rows = list.map(function (x, i) {
-        var r = x.r, t = totalOf(r);
-        return [{ v: x.m, s: z("center", i) }, { v: r.name + (r.local ? " (Local)" : ""), s: z("text", i) }, { v: r.reference, s: z("center", i) },
-          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) },
-          { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) }, { v: t === null ? "" : t, s: z("moneyBold", i) }];
+    var COLS = [13, 38, 22, 11, 12, 10, 15, 15, 12], N = COLS.length, last = colName(N - 1), sheets = [], used = {};
+    MONTHS.filter(function (k) { return (allParts[k] && MACHINES.some(function (m) { return allParts[k][m].some(hasContent); })) || (allTx[k] || []).length; }).forEach(function (k) {
+      var lines = [], merges = [], r = 1;
+      function row(cells, h) {
+        while (cells.length < N) cells.push({ v: "", s: cells.length ? cells[cells.length - 1].s : "default" });
+        lines.push('<row r="' + r + '"' + (h ? ' ht="' + h + '" customHeight="1"' : "") + ">" + cells.map(function (c, i) { return cellXml(colName(i) + r, c); }).join("") + "</row>");
+        return r++;
+      }
+      function band(text, st, h) { var x = row([{ v: text, s: st }], h); merges.push("A" + x + ":" + last + x); }
+      function blank(h) { lines.push('<row r="' + r + '" ht="' + (h || 10) + '" customHeight="1"/>'); r++; }
+      band("UII \u2014 " + monthLabel(k), "title_ALL", 38);
+      band("Every machine: its parts, then its transactions this month \u00B7 " + stamp, "sub_ALL", 22);
+      MACHINES.forEach(function (m) {
+        var parts = allParts[k] ? allParts[k][m].filter(hasContent) : [];
+        var txs = (allTx[k] || []).filter(function (t) { return t.machine === m && !t.source; }).slice().reverse();
+        if (!parts.length && !txs.length) return;
+        blank(14);
+        band(m, "title_" + m, 32);
+        // parts
+        row(["Machine", "Name", "Reference", "Quantity", "Unit price", "Currency", "Total price"].map(function (h) { return { v: h, s: "head_" + m }; }).concat([{ v: "", s: "default" }, { v: "", s: "default" }]), 28);
+        var p0 = r, pcs = 0, bag = {};
+        parts.forEach(function (p, i) {
+          var t = totalOf(p);
+          if (/^\d+$/.test(p.quantity)) pcs += parseInt(p.quantity, 10);
+          if (t !== null) addMoney(bag, p.currency || lastCurrency(), t);
+          row([{ v: m, s: z("center", i) }, { v: p.name + (p.local ? " (Local)" : ""), s: z("text", i) }, { v: p.reference, s: z("center", i) },
+            { v: numOrText(p.quantity), s: isLow(p) ? z("qtyNeg", i) : z("bold", i) }, { v: priceVal(p.price), s: z("money", i) },
+            { v: p.currency, s: z("center", i) }, { v: t === null ? "" : t, s: z("moneyBold", i) }, { v: "", s: "default" }, { v: "", s: "default" }], 24);
+        });
+        var cur = Object.keys(bag), T = function (v) { return { v: v, s: "totN_" + m }; };
+        if (parts.length) row([{ v: "Total \u00B7 " + parts.length + (parts.length === 1 ? " part" : " parts"), s: "totL_" + m }, T(""), T(""),
+          { f: "SUM(D" + p0 + ":D" + (r - 1) + ")", v: pcs, s: "totN_" + m }, T(""), T(cur.length === 1 ? cur[0] : ""),
+          cur.length === 1 ? { f: "SUM(G" + p0 + ":G" + (r - 1) + ")", v: bag[cur[0]], s: "totM_" + m } : T(cur.map(function (c) { return money(bag[c], c); }).join(" + ")),
+          { v: "", s: "default" }, { v: "", s: "default" }], 26);
+        // transactions of this machine this month
+        blank(8);
+        row([{ v: m + " transactions \u00B7 " + monthLabel(k) + " \u00B7 " + txs.length + (txs.length === 1 ? " entry" : " entries"), s: "sub_" + m }]);
+        merges.push("A" + (r - 1) + ":" + last + (r - 1));
+        if (!txs.length) { row([{ v: "No transactions this month", s: "text" }]); return; }
+        row(["Date", "Name", "Reference", "Quantity", "Type", "Line", "Issued by", "Received by", "Stock after"].map(function (h) { return { v: h, s: "head_" + m }; }), 28);
+        var tin = 0, tout = 0;
+        txs.forEach(function (t, i) {
+          var part = partIn(k, t.partId), isIn = t.change > 0;
+          if (isIn) tin += t.change; else tout -= t.change;
+          row([{ v: txDate(t), s: z("center", i) }, { v: (part && part.name ? part.name : t.name) + (t.local ? " (Local)" : ""), s: z("text", i) },
+            { v: part && part.reference ? part.reference : t.reference, s: z("center", i) }, { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
+            { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" }, { v: t.line ? "Line " + t.line : "", s: z("center", i) },
+            { v: t.by || "", s: z("center", i) }, { v: t.to || "", s: z("center", i) }, { v: t.after, s: z("center", i) }], 24);
+        });
+        row([{ v: "In " + tin + " \u00B7 Out " + tout, s: "totL_" + m }, T(""), T(""), T(""), T(""), T(""), T(""), T(""), T("")], 26);
       });
-      var n = list.length, pcs = 0, bag = {};
-      list.forEach(function (x) { if (/^\d+$/.test(x.r.quantity)) pcs += parseInt(x.r.quantity, 10); var t = totalOf(x.r); if (t !== null) addMoney(bag, x.r.currency || lastCurrency(), t); });
-      var cur = Object.keys(bag), T = function (v) { return { v: v, s: "totN_ALL" }; };
-      var totalCell = cur.length === 1 ? { f: "SUM(G" + R0 + ":G" + (R0 + n - 1) + ")", v: bag[cur[0]], s: "totM_ALL" } : T(cur.map(function (c) { return money(bag[c], c); }).join(" + "));
-      var totals = [[{ v: "Total \u00B7 " + n + (n === 1 ? " part" : " parts"), s: "totL_ALL" }, T(""), T(""), { f: "SUM(D" + R0 + ":D" + (R0 + n - 1) + ")", v: pcs, s: "totN_ALL" }, T(""), T(cur.length === 1 ? cur[0] : ""), totalCell]];
+      var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+      xml += '<sheetPr><tabColor rgb="FF' + XL_THEMES.ALL[0] + '"/><pageSetUpPr fitToPage="1"/></sheetPr>';
+      xml += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="18"/>';
+      xml += "<cols>" + COLS.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols>";
+      xml += "<sheetData>" + lines.join("") + "</sheetData>";
+      xml += '<mergeCells count="' + merges.length + '">' + merges.map(function (x) { return '<mergeCell ref="' + x + '"/>'; }).join("") + "</mergeCells>";
+      xml += '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
       var name = monthLabel(k); while (used[name]) name += "_"; used[name] = 1;
-      sheets.push({ name: name, xml: sheetXml({
-        title: "UII \u2014 " + monthLabel(k), subtitle: "All machines \u00B7 " + n + (n === 1 ? " part" : " parts") + " \u00B7 " + stamp, theme: "ALL", rows: rows, totals: totals,
-        columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 42 }, { name: "Reference", width: 22 }, { name: "Quantity", width: 11 },
-          { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Total price", width: 15 }]
-      }) });
+      sheets.push({ name: name, xml: xml });
     });
     if (!sheets.length) sheets.push({ name: "Empty", xml: sheetXml({ title: "UII", subtitle: "No parts yet", theme: "ALL", rows: [], columns: [{ name: "Machine", width: 11 }] }) });
     return packXlsx(sheets);
