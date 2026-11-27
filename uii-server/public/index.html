@@ -1747,6 +1747,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 5M15 13l-6 5"/></svg>
       <span id="exportLabel">Export to Excel</span>
     </button>
+    <button class="btn btn-export" id="exportAllBtn" type="button" title="Download every month as an Excel file, one sheet per month">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 5M15 13l-6 5"/></svg>
+      <span>Export all months</span>
+    </button>
     <button class="btn pend-btn" id="pendBtn" type="button" hidden title="Receive and Transfer waiting for approval"><span>Waiting</span><b class="pend-n">0</b></button>
     <button class="btn" id="actBtn" type="button" title="Who changed what, and when"><span>Activity</span></button>
     <button class="btn" id="usersBtn" type="button" title="Accounts and what each person may do"><span>Users</span></button>
@@ -6307,6 +6311,35 @@
     sheets.push(dataSheet(BACKUP_MARK, all));
     return packXlsx(sheets);
   }
+  // ---- Export all months: one sheet per month, every part of every machine with its price ----
+  function buildAllMonthsWorkbook() {
+    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    function z(name, i) { return name + (i % 2 ? "Z" : ""); }
+    var R0 = HEAD_ROW + 1, sheets = [], used = {};
+    MONTHS.filter(function (k) { return allParts[k] && MACHINES.some(function (m) { return allParts[k][m].some(hasContent); }); }).forEach(function (k) {
+      var list = [];
+      MACHINES.forEach(function (m) { allParts[k][m].filter(hasContent).forEach(function (r) { list.push({ m: m, r: r }); }); });
+      var rows = list.map(function (x, i) {
+        var r = x.r, t = totalOf(r);
+        return [{ v: x.m, s: z("center", i) }, { v: r.name + (r.local ? " (Local)" : ""), s: z("text", i) }, { v: r.reference, s: z("center", i) },
+          { v: numOrText(r.quantity), s: isLow(r) ? z("qtyNeg", i) : z("bold", i) }, { v: numOrText(r.min), s: z("center", i) },
+          { v: priceVal(r.price), s: z("money", i) }, { v: r.currency, s: z("center", i) }, { v: t === null ? "" : t, s: z("moneyBold", i) }];
+      });
+      var n = list.length, pcs = 0, bag = {};
+      list.forEach(function (x) { if (/^\d+$/.test(x.r.quantity)) pcs += parseInt(x.r.quantity, 10); var t = totalOf(x.r); if (t !== null) addMoney(bag, x.r.currency || lastCurrency(), t); });
+      var cur = Object.keys(bag), T = function (v) { return { v: v, s: "totN_ALL" }; };
+      var totalCell = cur.length === 1 ? { f: "SUM(H" + R0 + ":H" + (R0 + n - 1) + ")", v: bag[cur[0]], s: "totM_ALL" } : T(cur.map(function (c) { return money(bag[c], c); }).join(" + "));
+      var totals = [[{ v: "Total \u00B7 " + n + (n === 1 ? " part" : " parts"), s: "totL_ALL" }, T(""), T(""), { f: "SUM(D" + R0 + ":D" + (R0 + n - 1) + ")", v: pcs, s: "totN_ALL" }, T(""), T(""), T(cur.length === 1 ? cur[0] : ""), totalCell]];
+      var name = monthLabel(k); while (used[name]) name += "_"; used[name] = 1;
+      sheets.push({ name: name, xml: sheetXml({
+        title: "UII \u2014 " + monthLabel(k), subtitle: "All machines \u00B7 " + n + (n === 1 ? " part" : " parts") + " \u00B7 " + stamp, theme: "ALL", rows: rows, totals: totals,
+        columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 42 }, { name: "Reference", width: 22 }, { name: "Quantity", width: 11 }, { name: "Min", width: 9 },
+          { name: "Unit price", width: 13 }, { name: "Currency", width: 10 }, { name: "Total price", width: 15 }]
+      }) });
+    });
+    if (!sheets.length) sheets.push({ name: "Empty", xml: sheetXml({ title: "UII", subtitle: "No parts yet", theme: "ALL", rows: [], columns: [{ name: "Machine", width: 11 }] }) });
+    return packXlsx(sheets);
+  }
   // Hidden "_data" sheet: a marker in A1, then the JSON split to fit Excel's cell size
   var MONTH_MARK = "UII-MONTH-v1";
   function dataSheet(mark, obj) {
@@ -6516,6 +6549,10 @@
     flushWrites();
     if (sideView) { saveFile(SIDE[sideView].file, buildSideWorkbook(sideView), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export"); return; }
     saveFile(exportFilename(), buildWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", exportBtn, "Excel export");
+  });
+  document.getElementById("exportAllBtn").addEventListener("click", function () {
+    var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
+    saveFile("UII-all-months-" + d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + ".xlsx", buildAllMonthsWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
   function updateExportLabel() {
     if (sideView) {
