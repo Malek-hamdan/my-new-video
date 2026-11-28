@@ -4,9 +4,9 @@
 # daily data copies, then asks for the first admin's username and password (typed here, never stored in a file).
 set -euo pipefail
 
-REV="8c495c2c5d597d4a0beb6b54f8762b0af015e386"
+REV="7cd526ba4ef35578e0f2f67ac97c9d9426f2d180"
 SUM_SERVER="9dab9f2383f9dd79cbaf206603f83e0d481d6e48e0f3a3110dcb64dbe6bcc3e4"
-SUM_PAGE="7abf48883ab2e7b5d08b5b507a33111fb75c633b2cd37a77089d3ffb2475ab0c"
+SUM_PAGE="dac102fbdac2354c7e5916f6a3d8f6238139628dcfaa864f04ecc35437d32f0a"
 ASSETS="manifest.webmanifest:40bec7e1780bc6d073ba70c1dd65276319bf51c0bc16e5679ca17cb131e311eb icon-192.png:79f941979922fc3e432eda86ae40d11652a0f1b8b6838a65e1037851c2fdb6a5 icon-512.png:5fa63fbc6f6d88d7635cc43b938e9d928f0614ac8174c463801d95aa2a64d91d icon-maskable-512.png:35be84a9550cc1c60fd3f8482c02038c23dc284fcab4b630387571644f308535 apple-touch-icon.png:efaee9db10aae282818246c01e84c7a11db6d4f9d52546452563db513fd9eba7 favicon-32.png:0c1fa49992ae2cea934d28b0a9b4dbecb1692cca1c6fb228d80bba4d29952e24 favicon.ico:0c1fa49992ae2cea934d28b0a9b4dbecb1692cca1c6fb228d80bba4d29952e24 sw.js:c1f725de4bfc6c88b8a52846ad461a0c271c762acecd3a20f2c36e772aa35b67"
 # Node.js: from nodejs.org, checked against its fingerprint (the same version as update.sh)
 NODE_VER="v24.22.3"
