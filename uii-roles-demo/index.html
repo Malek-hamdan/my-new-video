@@ -4091,18 +4091,9 @@
     var t = String(r.price).trim().replace(",", ".");
     return /^\d+(\.\d+)?$/.test(t) || /^\d*\.\d+$/.test(t) ? parseFloat(t) : null;
   }
-  // Quantity this month's sheet started with plus everything received.
-  // Parts used (Out) do not lower it, so Total price keeps the value as entered.
-  function receivedQty(r) {
-    var base = r.baseline ? r.quantity : r.loggedQty;
-    if (!/^\d+$/.test(base)) return null;
-    var used = 0;
-    (allTx[r.month] || []).forEach(function (t) { if (t.partId === r.id && t.change < 0) used -= t.change; });
-    return parseInt(base, 10) + used;
-  }
-  // Total price = received quantity x unit price; null until both are known
+  // Total price = quantity on hand x unit price (what the stock of this part is worth now); null until both are known
   function totalOf(r) {
-    var p = unitPrice(r), q = receivedQty(r);
+    var p = unitPrice(r), q = /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : null;
     if (p === null || q === null) return null;
     return Math.round(q * p * 100) / 100;
   }
@@ -6458,11 +6449,13 @@
   // TEMPORARY: the Missing info button goes away by itself from 1 Jan 2027
   var MISSING_END = new Date(2027, 0, 1).getTime();
   function missingGone() { if (Date.now() < MISSING_END) return false; var b = document.getElementById("missingBtn"); if (b) b.remove(); return true; }
-  missingGone(); setInterval(missingGone, 600000);
-  document.getElementById("missingBtn").addEventListener("click", function () {
+  // the click is set up first: the button may be gone already (from 1 Jan 2027), and then there is nothing to set up
+  var missingBtn = document.getElementById("missingBtn");
+  if (missingBtn) missingBtn.addEventListener("click", function () {
     if (missingGone()) return;
     saveFile("UII-missing-info-" + month + ".xlsx", buildMissingWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
+  missingGone(); setInterval(missingGone, 600000);
   document.getElementById("valueBtn").addEventListener("click", function () {
     saveFile("UII-stock-value-" + month + ".xlsx", buildValueWorkbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
   });
