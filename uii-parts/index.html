@@ -5713,12 +5713,11 @@
 
     var out = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
     out += '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
-    var freeze = spec.rows.length > 0;
     out += '<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>';   // nothing frozen: the title and headings scroll away with the rows
     out += '<sheetFormatPr defaultRowHeight="18"/>';
     out += "<cols>" + spec.columns.map(function (c, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + c.width + '" customWidth="1"/>'; }).join("") + "</cols>";
     out += "<sheetData>" + lines.join("") + "</sheetData>";
-    if (freeze) out += '<autoFilter ref="A' + HEAD_ROW + ":" + last + (HEAD_ROW + spec.rows.length) + '"/>';
+    // no filter buttons on the headings (a formal look); the heading row still repeats on every printed page
     out += '<mergeCells count="' + (2 + extraMerge.length) + '"><mergeCell ref="A1:' + last + '1"/><mergeCell ref="A2:' + last + '2"/>' + extraMerge.map(function (x) { return '<mergeCell ref="' + x + '"/>'; }).join("") + "</mergeCells>";
     out += '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>';
     out += '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
@@ -6011,7 +6010,7 @@
       xml += '<mergeCells count="' + merges.length + '">' + merges.map(function (x) { return '<mergeCell ref="' + x + '"/>'; }).join("") + "</mergeCells>";
       xml += '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
       var name = monthLabel(k); while (used[name]) name += "_"; used[name] = 1;
-      sheets.push({ name: name, xml: xml });
+      sheets.push({ name: name, xml: xml, free: true });   // several tables on one sheet: no heading row to repeat
     });
     if (!sheets.length) sheets.push({ name: "Empty", xml: sheetXml({ title: "UII", subtitle: "No parts yet", theme: "ALL", rows: [], columns: [{ name: "Machine", width: 11 }] }) });
     return packXlsx(sheets);
@@ -6227,11 +6226,10 @@
   function definedNames(sheets) {
     var out = "";
     sheets.forEach(function (sh, i) {
-      var m = /<autoFilter ref="A(\d+):([A-Z]+)(\d+)"/.exec(sh.xml);
-      if (!m) return;
+      // a sheet made by sheetXml has its heading row at HEAD_ROW (32 high): print it on every page
+      if (sh.hidden || sh.free || sh.xml.indexOf('<row r="' + HEAD_ROW + '" ht="32"') < 0) return;
       var q = "'" + xmlEsc(sh.name).replace(/'/g, "''") + "'";
-      out += '<definedName name="_xlnm._FilterDatabase" localSheetId="' + i + '" hidden="1">' + q + "!$A$" + m[1] + ":$" + m[2] + "$" + m[3] + "</definedName>" +
-        '<definedName name="_xlnm.Print_Titles" localSheetId="' + i + '">' + q + "!$" + m[1] + ":$" + m[1] + "</definedName>";
+      out += '<definedName name="_xlnm.Print_Titles" localSheetId="' + i + '">' + q + "!$" + HEAD_ROW + ":$" + HEAD_ROW + "</definedName>";
     });
     return out ? "<definedNames>" + out + "</definedNames>" : "";
   }
