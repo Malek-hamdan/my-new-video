@@ -1,0 +1,14 @@
+/* Notifications window (server page only) */
+.nt-btn[hidden], #usersNtBtn[hidden] { display: none !important; }
+.nt-card { max-width: 1100px; }
+.nt-body h4 { margin: 16px 0 6px; }
+.nt-state { font-weight: 700; margin: 4px 0 8px; }
+.nt-msg { min-height: 1.2em; margin: 6px 0 0; color: var(--muted, #667085); }
+.nt-early { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-weight: 600; }
+.nt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.nt-table td, .nt-table th { white-space: nowrap; vertical-align: middle; }
+.nt-table .nt-c { text-align: center; }
+.nt-table input[type=checkbox] { width: 18px; height: 18px; }
+.nt-shift input[type=time] { width: 7.2em; padding: 4px 6px; border: 1px solid var(--border, #d0d5dd); border-radius: 6px; background: var(--surface, #fff); color: inherit; font: inherit; }
+.nt-days label { display: inline-flex; align-items: center; gap: 3px; margin-right: 6px; font-size: 13px; }
+@media print { #ntBtn, #ntDlg { display: none !important; } }
