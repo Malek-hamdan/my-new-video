@@ -531,7 +531,8 @@
     pendSave(doc);
     logAct("Asked: " + pendWhat(doc), partLabel({ machine: doc.machine, name: doc.partName, reference: doc.reference }), "", "waiting for approval");
     trDlg.hidden = true;
-    setStatus("Sent for approval. The stock changes when it is approved.", "saved");
+    // once notifications are on (1 Jan 2027), the person is thanked by name
+    setStatus(window.uiiNotifyLive ? "Thank you, " + String(me.name || me.username).trim().split(/\s+/)[0] + ". Sent for approval." : "Sent for approval. The stock changes when it is approved.", "saved");
     return true;
   }
   function pendApprove(d) {
@@ -561,6 +562,20 @@
     pendSave(nd);
     logAct("Rejected " + d.name + ": " + pendWhat(d), partLabel({ machine: d.machine, name: d.partName, reference: d.reference }), "", "");
   }
+  // from a notification: approve or reject one request (the month of its part is opened first)
+  window.uiiPendHas = function (id) { return !!pend[id]; };
+  window.uiiSay = function (msg, kind) { setStatus(msg, kind || "saved"); };
+  window.uiiPendAct = function (id, act) {
+    var d = pend[id];
+    if (!d) return Promise.resolve("That request is no longer here.");
+    if (!can("approve")) return Promise.resolve("Only an approver can do this.");
+    if (d.status !== "waiting") return Promise.resolve("Already " + d.status + (d.decidedBy ? " by " + d.decidedBy : "") + ".");
+    if (act === "reject") { pendReject(d); return Promise.resolve(""); }
+    return new Promise(function (done) {
+      function go() { var e = pendApprove(d); renderPending(); done(e); }
+      if (d.kind === "part" && d.month && d.month !== month) { selectMonth(d.month); setTimeout(go, 150); } else go();
+    });
+  };
   function renderPending() {
     var box = document.getElementById("pendList"), all = pendMine();
     var note = document.getElementById("pendNote");

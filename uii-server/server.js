@@ -4,13 +4,14 @@
 //   PORT  (default 3000, listens on 127.0.0.1 only; Caddy sits in front with HTTPS)
 //   DATA  (default ./data) folder for the collections, accounts and sessions
 // Make or reset an admin from the shell:  uii-admin   (stops the service, runs "server.js make-admin" as the uii user, starts it again)
-const http = require("http"), crypto = require("crypto"), fs = require("fs"), path = require("path");
+const http = require("http"), https = require("https"), crypto = require("crypto"), fs = require("fs"), path = require("path");
 
 const PORT = +process.env.PORT || 3000;
 const DATA = path.resolve(process.env.DATA || path.join(__dirname, "data"));
 const PAGE = path.join(__dirname, "public", "index.html");
 const ASSETS = { "/manifest.webmanifest": "application/manifest+json", "/icon-192.png": "image/png", "/icon-512.png": "image/png",
-  "/icon-maskable-512.png": "image/png", "/apple-touch-icon.png": "image/png", "/favicon-32.png": "image/png", "/favicon.ico": "image/png" };
+  "/icon-maskable-512.png": "image/png", "/apple-touch-icon.png": "image/png", "/favicon-32.png": "image/png", "/favicon.ico": "image/png",
+  "/sw.js": "text/javascript; charset=utf-8" };
 const DAYS = 90, COOKIE = "uiis", MAX_BODY = 1024 * 1024, MAX_LOGIN_BODY = 2048;
 const COLL_RE = /^[A-Za-z][A-Za-z0-9_-]{0,40}$/, ID_RE = /^[A-Za-z0-9._:-]{1,120}$/;
 // names that mean something special to JavaScript objects: never an id, a username or a field name
@@ -553,6 +554,7 @@ function applyWrite(me, coll, id, d, del) {
   }
   commit(coll, id, d);                                    // the account first; only then sign that person out
   audit(me, coll, id, cur ? "change" : "add", cur ? changedKeys(cur, d) : undefined);
+  try { notifyAfterWrite(me, coll, id, d, cur); } catch (e) { console.error("[notify] " + e.message); }
   if (coll === "users" && ((body.hash && hadPw) || d.active === false)) {
     try { dropSessionsOf(id); closeLive(id); } catch (e) { console.error("[storage] could not sign out " + id + ": " + e.message); }
   }
@@ -620,7 +622,7 @@ function currentPage() {
     pageState.buf = buf; pageState.mtime = st.mtimeMs;
     pageState.etag = '"' + crypto.createHash("sha1").update(buf).digest("hex") + '"';
     pageState.csp = ["default-src 'none'", "script-src " + hashes(/<script>([\s\S]*?)<\/script>/g), "style-src " + hashes(/<style>([\s\S]*?)<\/style>/g),
-      "style-src-attr 'unsafe-inline'", "img-src 'self' data: blob:", "font-src 'self' data:", "connect-src 'self'", "manifest-src 'self'",
+      "style-src-attr 'unsafe-inline'", "img-src 'self' data: blob:", "font-src 'self' data:", "connect-src 'self'", "manifest-src 'self'", "worker-src 'self'",
       "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"].join("; ");
   }
   return pageState;
@@ -644,7 +646,7 @@ const server = http.createServer(async (req, res) => {
       if (ipRate(ipOf(req), "page", 300)) return send(res, 429, { code: "rate_limited" });
       return fs.readFile(path.join(__dirname, "public", p.slice(1)), (e, buf) => {
         if (e) return send(res, 404, "not found");
-        res.writeHead(200, { "Content-Type": ASSETS[p], "Cache-Control": "public, max-age=86400" }); res.end(buf);
+        res.writeHead(200, { "Content-Type": ASSETS[p], "Cache-Control": p === "/sw.js" ? "no-cache" : "public, max-age=86400" }); res.end(buf);
       });
     }
     if (!p.startsWith("/api/")) return send(res, 404, "not found");
@@ -680,6 +682,7 @@ const server = http.createServer(async (req, res) => {
 
     if (p === "/api/me") return send(res, 200, { username: me.username });
     if (p === "/api/chat" || p.startsWith("/api/chat/")) return await handleChat(req, res, me, url, p);
+    if (p === "/api/notify" || p.startsWith("/api/notify/")) return await handleNotify(req, res, me, url, p);
 
     if (p === "/api/live" && req.method === "GET") {
       const cs = new Set(String(url.searchParams.get("c") || "").split(",").filter(c => KNOWN.has(c) || c === "chat"));
@@ -968,6 +971,265 @@ async function handleChat(req, res, me, url, p) {
   return bad(404);
 }
 
+// ---------- notifications (Web Push to phones and computers) ----------
+// Off for everyone until 1 Jan 2027 (or until an admin starts them early); a test to one's own device works any time.
+// Who gets what is set per person by an admin (notifyprefs); the devices are in pushsubs; both stay on the server.
+// The message is encrypted for each device (RFC 8291) and signed with this server's own key (VAPID, vapid.json).
+const NOTIFY_START = Date.UTC(2027, 0, 1);
+const VAPID_FILE = path.join(DATA, "vapid.json");
+let vapid = null;
+function vapidKeys() {
+  if (vapid) return vapid;
+  let v = null;
+  try { v = JSON.parse(fs.readFileSync(VAPID_FILE, "utf8")); } catch (e) {}
+  if (!v || !v.jwk || !v.pub) {
+    const { privateKey } = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const jwk = privateKey.export({ format: "jwk" });
+    v = { jwk, pub: Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, "base64url"), Buffer.from(jwk.y, "base64url")]).toString("base64url"), made: Date.now() };
+    writeFileDurable(VAPID_FILE, JSON.stringify(v));
+  }
+  v.key = crypto.createPrivateKey({ key: v.jwk, format: "jwk" });
+  vapid = v;
+  return vapid;
+}
+const hmac256 = (k, d) => crypto.createHmac("sha256", k).update(d).digest();
+// RFC 8291 / RFC 8188 "aes128gcm": one record; opts (fixed salt and key) only for the test against the RFC example
+function pushEncrypt(payload, uaPublic, authSecret, opts) {
+  opts = opts || {};
+  const ecdh = crypto.createECDH("prime256v1");
+  if (opts.asPriv) ecdh.setPrivateKey(opts.asPriv); else ecdh.generateKeys();
+  const asPublic = ecdh.getPublicKey(), secret = ecdh.computeSecret(uaPublic);
+  const ikm = hmac256(hmac256(authSecret, secret), Buffer.concat([Buffer.from("WebPush: info\0"), uaPublic, asPublic, Buffer.from([1])]));
+  const salt = opts.salt || crypto.randomBytes(16), prk = hmac256(salt, ikm);
+  const cek = hmac256(prk, Buffer.from("Content-Encoding: aes128gcm\0\x01")).subarray(0, 16);
+  const nonce = hmac256(prk, Buffer.from("Content-Encoding: nonce\0\x01")).subarray(0, 12);
+  const c = crypto.createCipheriv("aes-128-gcm", cek, nonce);
+  const ct = Buffer.concat([c.update(Buffer.concat([Buffer.from(payload), Buffer.from([2])])), c.final(), c.getAuthTag()]);
+  const head = Buffer.alloc(21); salt.copy(head, 0); head.writeUInt32BE(4096, 16); head[20] = asPublic.length;
+  return Buffer.concat([head, asPublic, ct]);
+}
+const vapidCache = new Map();
+function vapidAuth(endpoint) {
+  const aud = new URL(endpoint).origin, now = Math.floor(Date.now() / 1000), c = vapidCache.get(aud);
+  if (c && c.exp - now > 3600) return c.h;
+  const v = vapidKeys(), exp = now + 12 * 3600, enc = o => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const st = load("notifystate").get("site") || {};
+  const data = enc({ typ: "JWT", alg: "ES256" }) + "." + enc({ aud, exp, sub: st.origin || "https://localhost" });
+  const sig = crypto.sign("sha256", Buffer.from(data), { key: v.key, dsaEncoding: "ieee-p1363" }).toString("base64url");
+  const h = "vapid t=" + data + "." + sig + ", k=" + v.pub;
+  vapidCache.set(aud, { exp, h });
+  return h;
+}
+// only the browsers' own push services: nothing else on the internet (or on this machine) can be made a target
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^([a-z0-9-]+\.)*push\.services\.mozilla\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/, /^([a-z0-9-]+\.)*push\.apple\.com$/];
+function pushEndpointOk(u) {
+  if (typeof u !== "string" || u.length > 1000) return false;
+  try {
+    const x = new URL(u);
+    if (process.env.UII_PUSH_TEST === "1" && x.protocol === "http:" && x.hostname === "127.0.0.1") return true;   // tests only
+    return x.protocol === "https:" && !x.port && !x.username && !x.password && PUSH_HOSTS.some(r => r.test(x.hostname));
+  } catch (e) { return false; }
+}
+function pushSend(sub, payload, urgency) {
+  return new Promise(resolve => {
+    let body;
+    try { body = pushEncrypt(JSON.stringify(payload), Buffer.from(sub.p256dh, "base64url"), Buffer.from(sub.auth, "base64url")); } catch (e) { return resolve(0); }
+    let u; try { u = new URL(sub.endpoint); } catch (e) { return resolve(0); }
+    const req = (u.protocol === "http:" ? http : https).request(u, { method: "POST", timeout: 15000, headers: {
+      "Content-Type": "application/octet-stream", "Content-Encoding": "aes128gcm", "Content-Length": body.length, TTL: "86400",
+      Urgency: urgency || "normal", Authorization: vapidAuth(sub.endpoint) } }, r => { r.resume(); resolve(r.statusCode || 0); });
+    req.on("timeout", () => req.destroy());
+    req.on("error", () => resolve(0));
+    req.end(body);
+  });
+}
+async function pushToUser(username, payload, urgency) {
+  if (isBroken("pushsubs")) return 0;
+  let sent = 0;
+  for (const [id, s] of Array.from(load("pushsubs")).filter(([, x]) => x.user === username)) {
+    const code = await pushSend(s, payload, urgency);
+    if (code === 404 || code === 410) commit("pushsubs", id);           // the device let it go
+    else if (code >= 200 && code < 300) sent++;
+    else console.error("[notify] push to a device of " + username + " answered " + code);
+  }
+  return sent;
+}
+function notifyFeature() { return (load("meta").get("features") || {}).notify === true; }
+function notifyLive() { return Date.now() >= NOTIFY_START || notifyFeature(); }
+const HM_RE = /^([01]\d|2[0-3]):[0-5]\d$/, DAYS_RE = /^([0-6](,[0-6]){0,6})?$/;
+function prefsOf(u) {
+  const p = load("notifyprefs").get(u) || {};
+  return { on: p.on === true, receive: p.receive !== false, transfer: p.transfer !== false, approvals: p.approvals !== false, stock: p.stock !== false,
+    shiftStart: HM_RE.test(p.shiftStart || "") ? p.shiftStart : "", shiftEnd: HM_RE.test(p.shiftEnd || "") ? p.shiftEnd : "", shiftDays: DAYS_RE.test(p.shiftDays || "") ? p.shiftDays || "" : "" };
+}
+function notifyPeople(cat, exclude, also) {
+  const out = [];
+  for (const [k, u] of load("users")) {
+    if (u.active === false || exclude.has(k)) continue;
+    const p = prefsOf(k);
+    if (!p.on || (cat && !p[cat]) || (also && !also(u))) continue;
+    out.push(k);
+  }
+  return out;
+}
+function notifyAll(people, payload, urgency) { people.forEach(k => { pushToUser(k, payload, urgency).catch(e => console.error("[notify] " + e.message)); }); }
+const firstName = n => String(n || "").trim().split(/\s+/)[0] || "";
+const signed = (q, inn) => (inn ? "+" : "−") + q;
+// A movement waits 4 seconds before it is announced: when it is an approver applying someone's request,
+// the request's decision arrives right with it and the notice then carries the requester's name.
+const recentDecisions = [];
+function notifyAfterWrite(me, coll, id, d, cur) {
+  if (!notifyLive() || !d) return;
+  if (coll === "transactions" && !cur && !d.source && Number(d.change)) {
+    const item = { d, at: Date.now(), actor: me.name || me.username, user: me.username };
+    const t = setTimeout(() => { try { announceMove(item); } catch (e) { console.error("[notify] " + e.message); } }, 4000); if (t.unref) t.unref();
+  }
+  if (coll === "pendops" && !cur && d.status === "waiting") announceRequest(id, d);
+  if (coll === "pendops" && cur && cur.status === "waiting" && (d.status === "approved" || d.status === "rejected")) {
+    recentDecisions.push({ at: Date.now(), d, by: me.username });
+    while (recentDecisions.length && Date.now() - recentDecisions[0].at > 60e3) recentDecisions.shift();
+    const p = prefsOf(d.user), ok = d.status === "approved";
+    if (p.on) notifyAll([d.user], { title: "Request " + (ok ? "Approved" : "Rejected") + " – " + (d.partName || "Part"),
+      body: (d.mode === "in" ? "Receive " : "Transfer ") + signed(d.qty, d.mode === "in") + (d.machine ? " · Machine " + d.machine : "") + "\n" + (ok ? "Approved" : "Rejected") + " by " + (me.name || me.username),
+      tag: "req-" + id }, ok ? "normal" : "high");
+  }
+}
+function announceMove(item) {
+  const t = item.d, ch = Number(t.change), inn = ch > 0, q = Math.abs(ch);
+  const dec = recentDecisions.find(x => !x.used && x.d.status === "approved" && x.by === item.user && String(x.d.partId) === String(t.partId) &&
+    Number(x.d.qty) === q && (x.d.mode === "in") === inn && Math.abs(x.at - item.at) < 20e3);
+  let actor = item.actor; const ex = new Set([item.user]);
+  if (dec) { dec.used = true; actor = dec.d.name || dec.d.user; ex.add(dec.d.user); }
+  const part = load("parts").get(String(t.partId)) || {};
+  const name = part.name || t.name || "Part", ref = part.reference || t.reference || "", mach = t.machine || part.machine || "";
+  const after = wholeNum(t.after);
+  notifyAll(notifyPeople(inn ? "receive" : "transfer", ex), { title: actor + " – " + (inn ? "Goods Received" : "Stock Issued"),
+    body: name + (ref ? " · Ref " + ref : "") + "\n" + (mach ? "Machine " + mach + " · " : "") + "Quantity " + signed(q, inn) + (after === null ? "" : " · Available " + after) });
+  if (!inn && after !== null) {
+    const min = wholeNum(part.min), out = after === 0, low = !out && min !== null && after < min;
+    if (out || low) notifyAll(notifyPeople("stock", ex), { title: name + " – " + (out ? "Out of Stock" : "Below Minimum"),
+      body: (ref ? "Ref " + ref + "\n" : "") + (mach ? "Machine " + mach + " · " : "") + "Available " + after + (min !== null ? " · Min " + min : ""), tag: "stock-" + t.partId }, "high");
+  }
+}
+function announceRequest(id, d) {
+  const part = load("parts").get(String(d.partId)) || {}, avail = wholeNum(part.quantity);
+  notifyAll(notifyPeople("approvals", new Set([d.user, d.createdBy]), u => can(u, "approve")), {
+    title: (d.name || d.user) + " – Approval Required",
+    body: (d.partName || "Part") + (d.reference ? " · Ref " + d.reference : "") + "\n" + (d.machine ? "Machine " + d.machine + " · " : "") +
+      (d.mode === "in" ? "Receive " : "Transfer ") + signed(d.qty, d.mode === "in") + (avail === null ? "" : " · Available " + avail),
+    tag: "req-" + id, pend: id }, "high");
+}
+// ---- the thank-you at the end of each person's shift (times are the server's clock: UTC, the same as Accra) ----
+function hmToMin(v) { return HM_RE.test(v || "") ? +v.slice(0, 2) * 60 + +v.slice(3) : null; }
+function shiftSummary(user, from, to) {
+  let inn = 0, out = 0;
+  const approved = [];
+  for (const [, p] of load("pendops")) {
+    if (p.status === "approved" && p.decidedTs >= from - 60e3) approved.push(p);
+    if (p.user === user && p.ts >= from && p.ts <= to && p.status !== "rejected") { if (p.mode === "in") inn++; else out++; }
+  }
+  for (const [, t] of load("transactions")) {
+    if (t._by !== user || t.source || !(t.ts >= from && t.ts <= to)) continue;
+    const ch = Number(t.change); if (!ch) continue;
+    // an approver applying someone else's request: that movement counts for the person who asked
+    if (approved.some(p => String(p.partId) === String(t.partId) && Number(p.qty) === Math.abs(ch) && Math.abs(p.decidedTs - t.ts) < 30e3)) continue;
+    if (ch > 0) inn++; else out++;
+  }
+  return { inn, out };
+}
+function shiftTick(nowMs) {
+  if (!notifyLive() || isBroken("notifystate")) return;
+  const now = new Date(nowMs || Date.now()), hm = now.getUTCHours() * 60 + now.getUTCMinutes();
+  for (const [k, u] of load("users")) {
+    if (u.active === false) continue;
+    const p = prefsOf(k), s = hmToMin(p.shiftStart), e = hmToMin(p.shiftEnd);
+    if (!p.on || s === null || e === null || s === e || hm < e || hm > e + 30) continue;   // up to 30 minutes late (a restart)
+    const startDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (e < s) startDay.setUTCDate(startDay.getUTCDate() - 1);                          // a night shift began yesterday
+    if (p.shiftDays.split(",").indexOf(String(startDay.getUTCDay())) < 0) continue;
+    const id = "thx-" + k + "-" + startDay.toISOString().slice(0, 10);
+    if (load("notifystate").get(id)) continue;
+    commit("notifystate", id, { at: now.getTime() });
+    const from = startDay.getTime() + s * 60e3, to = startDay.getTime() + (e < s ? 1440 + e : e) * 60e3;
+    const c = shiftSummary(k, from, to), n = c.inn + c.out;
+    const parts = [n + (n === 1 ? " movement" : " movements") + " recorded"];
+    if (c.inn) parts.push(c.inn + " received");
+    if (c.out) parts.push(c.out + " issued");
+    notifyAll([k], { title: "Thank you for today, " + firstName(u.name || k),
+      body: (n ? parts.join(" · ") + "\n" : "") + (e < 12 * 60 ? "Have a good rest." : "Have a good evening."), tag: "thanks" });
+  }
+  // old markers go after two weeks
+  if (now.getUTCMinutes() === 0) for (const [id, v] of Array.from(load("notifystate"))) if (id.startsWith("thx-") && now.getTime() - v.at > 14 * 86400e3) commit("notifystate", id);
+}
+async function handleNotify(req, res, me, url, p) {
+  const admin = can(me, "users"), sub = p.slice("/api/notify".length).replace(/^\//, ""), getMethod = req.method === "GET", post = req.method === "POST";
+  const bad = c => send(res, c || 400, { code: c === 403 ? "not_granted" : c === 404 ? "not_found" : c === 429 ? "rate_limited" : "invalid_argument" });
+  if (["pushsubs", "notifyprefs", "notifystate", "meta"].some(isBroken)) return send(res, 503, { code: "unavailable" });
+  const body = async () => { const b = await readBody(req, 8192); return b && typeof b === "object" && !Array.isArray(b) ? b : null; };
+  const mySubs = () => Array.from(load("pushsubs")).filter(([, x]) => x.user === me.username);
+  if (sub === "boot" && getMethod) {
+    return send(res, 200, { live: notifyLive(), early: notifyFeature(), start: NOTIFY_START, key: vapidKeys().pub, admin, prefs: prefsOf(me.username), devices: mySubs().length });
+  }
+  if (sub === "subscribe" && post) {
+    const b = await body(); if (!b) return bad();
+    const k = b.keys || {}, pk = typeof k.p256dh === "string" ? Buffer.from(k.p256dh, "base64url") : null, au = typeof k.auth === "string" ? Buffer.from(k.auth, "base64url") : null;
+    if (!pushEndpointOk(b.endpoint) || !pk || pk.length !== 65 || pk[0] !== 4 || !au || au.length !== 16) return bad();
+    if (overRate(me.username, "pushsub", 30)) return bad(429);
+    const host = String(req.headers.host || "");
+    if (/^[a-z0-9.-]{1,200}$/i.test(host) && host !== "127.0.0.1" && host !== "localhost") {
+      const st = load("notifystate").get("site") || {};
+      if (st.origin !== "https://" + host) { commit("notifystate", "site", { origin: "https://" + host, at: Date.now() }); vapidCache.clear(); }
+    }
+    const id = "s" + crypto.createHash("sha256").update(b.endpoint).digest("hex").slice(0, 32);
+    const mine = mySubs().filter(([sid]) => sid !== id).sort((a, c) => a[1].created - c[1].created);
+    while (mine.length >= 8) commit("pushsubs", mine.shift()[0]);   // at most 8 devices a person
+    const cur = load("pushsubs").get(id);
+    if (cur && cur.user !== me.username) commit("pushsubs", id);   // the device changed hands
+    commit("pushsubs", id, { user: me.username, endpoint: b.endpoint, p256dh: k.p256dh, auth: k.auth, created: Date.now(), ua: shortText(String(b.ua || ""), 120) ? String(b.ua || "") : "" });
+    audit(me, "pushsubs", id, "device on");
+    return send(res, 200, { ok: true, devices: mySubs().length });
+  }
+  if (sub === "unsubscribe" && post) {
+    const b = await body(); if (!b || typeof b.endpoint !== "string") return bad();
+    const id = "s" + crypto.createHash("sha256").update(b.endpoint).digest("hex").slice(0, 32), cur = load("pushsubs").get(id);
+    if (cur && cur.user === me.username) { commit("pushsubs", id); audit(me, "pushsubs", id, "device off"); }
+    return send(res, 200, { ok: true, devices: mySubs().length });
+  }
+  if (sub === "test" && post) {
+    if (overRate(me.username, "pushtest", 10)) return bad(429);
+    const n = await pushToUser(me.username, { title: "UII Parts – Test", body: "Notifications work on this device.", tag: "test" });
+    return send(res, 200, { ok: true, sent: n, devices: mySubs().length });
+  }
+  if (sub === "people" && getMethod) {
+    if (!admin) return bad(403);
+    const devs = {}; for (const [, x] of load("pushsubs")) devs[x.user] = (devs[x.user] || 0) + 1;
+    const people = Array.from(load("users")).filter(([, u]) => u.active !== false).map(([k, u]) => ({ username: k, name: u.name || k, approver: can(u, "approve"), prefs: prefsOf(k), devices: devs[k] || 0 }));
+    return send(res, 200, { people });
+  }
+  if (sub === "prefs" && post) {
+    if (!admin) return bad(403);
+    const b = await body(); if (!b || typeof b.username !== "string" || !load("users").get(b.username)) return bad();
+    const v = {};
+    for (const f of ["on", "receive", "transfer", "approvals", "stock"]) { if (typeof b[f] !== "boolean") return bad(); v[f] = b[f]; }
+    for (const f of ["shiftStart", "shiftEnd"]) { const x = String(b[f] || ""); if (x && !HM_RE.test(x)) return bad(); v[f] = x; }
+    const days = String(b.shiftDays || ""); if (!DAYS_RE.test(days)) return bad(); v.shiftDays = days;
+    commit("notifyprefs", b.username, Object.assign(v, { by: me.username, at: Date.now() }));
+    audit(me, "notifyprefs", b.username, "change");
+    return send(res, 200, { ok: true, prefs: prefsOf(b.username) });
+  }
+  if (sub === "tick" && post && process.env.UII_PUSH_TEST === "1" && admin) {   // tests only: run the end-of-shift check at a given time
+    const b = await body(); shiftTick(b && b.now); return send(res, 200, { ok: true });
+  }
+  if (sub === "switch" && post) {
+    if (!admin) return bad(403);
+    const b = await body(); if (!b || typeof b.on !== "boolean") return bad();
+    commit("meta", "features", Object.assign({}, load("meta").get("features") || {}, { notify: b.on, notifyBy: me.username, notifyAt: Date.now() }));
+    audit(me, "meta", "features", "notify " + (b.on ? "on" : "off"));
+    return send(res, 200, { ok: true, live: notifyLive() });
+  }
+  return bad(404);
+}
+
 // ---------- make or reset an admin from the shell ----------
 async function makeAdmin() {
   if (typeof process.getuid === "function" && process.getuid() === 0 && !process.env.UII_ALLOW_ROOT) { console.error("Do not run this as root (the data files would become root's). Use the command: uii-admin"); process.exit(1); }
@@ -1002,5 +1264,5 @@ async function makeAdmin() {
 }
 
 if (process.argv[2] === "make-admin") makeAdmin();
-else { openStore(); buildChatIndex(); pruneCopies(); pruneActivity(); setInterval(pruneCopies, 6 * 3600e3).unref(); setInterval(pruneActivity, 6 * 3600e3).unref();
+else { openStore(); buildChatIndex(); pruneCopies(); pruneActivity(); setInterval(() => { try { shiftTick(); } catch (e) { console.error("[notify] " + e.message); } }, 60e3).unref(); setInterval(pruneCopies, 6 * 3600e3).unref(); setInterval(pruneActivity, 6 * 3600e3).unref();
   server.headersTimeout = 15e3; server.requestTimeout = 30e3; server.keepAliveTimeout = 5e3; server.maxConnections = 300; server.listen(PORT, "127.0.0.1", () => console.log("UII Parts on 127.0.0.1:" + PORT + ", data in " + DATA)); }
