@@ -6217,7 +6217,7 @@
       var cols = [{ name: "Date", width: 13 }];
       if (withMachine) cols.push({ name: "Machine", width: 11 });
       cols = cols.concat([{ name: "Name", width: 34 }, { name: "Reference", width: 20 }, { name: "Type", width: 8 }, { name: "Quantity", width: 10 }, { name: "Line", width: 8 },
-        { name: "Issued by", width: 14 }, { name: "Received by", width: 14 }, { name: "Recorded by", width: 14 }, { name: "Slip", width: 11 },
+        { name: "Issued by", width: 14 }, { name: "Received by", width: 14 }, { name: "Recorded by", width: 14 },
         { name: "Currency", width: 10 }, { name: "Value", width: 13 }, { name: "Stock after", width: 11 }]);
       var col = function (h) { for (var i = 0; i < cols.length; i++) if (cols[i].name === h) return colName(i); };
       var rows = list.map(function (t, i) {
@@ -6230,7 +6230,7 @@
           { v: isIn ? "In" : "Out", s: isIn ? "typeIn" : "typeOut" },
           { v: t.change, s: z(isIn ? "qtyPos" : "qtyNeg", i) },
           { v: t.line ? "Line " + t.line : "", s: z("center", i) },
-          { v: t.by || "", s: z("center", i) }, { v: t.to || "", s: z("center", i) }, { v: t.me || "", s: z("center", i) }, { v: t.slip || "", s: z("center", i) },
+          { v: t.by || "", s: z("center", i) }, { v: t.to || "", s: z("center", i) }, { v: t.me || "", s: z("center", i) },
           { v: part ? part.currency : "", s: z("center", i) },
           { v: val === null ? "" : val, s: z("moneyBold", i) },
           { v: t.after, s: z("center", i) }]);
