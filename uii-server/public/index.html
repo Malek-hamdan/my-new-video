@@ -6256,7 +6256,7 @@
         totals.push(line("Total out", "Out", -tout, vout, "totOut_" + tab));
       }
       return { name: name, xml: sheetXml({
-        title: title, subtitle: "Transactions · " + label + " · " + plural(n, "entry", "entries") + " · " + stamp,
+        title: title, subtitle: null,                    // no line under the title
         theme: tab, rows: rows, totals: totals, columns: cols
       }) };
     }
