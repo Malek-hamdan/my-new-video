@@ -191,8 +191,8 @@ rep('''  function addRow(received) {
     if (!(received ? can("receive") || can("edit") : can("edit"))) return;
     if (received && can("needsOk") && !can("edit")) return;
     if (sideView) { addSide(); return; }''')
-rep('''    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency(), local: origin === "loc" }, active);''',
-    '''    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: lastCurrency(), local: origin === "loc" }, active);
+rep('''    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: origin === "loc" ? LOCAL_CUR : lastCurrency(), local: origin === "loc" }, active);''',
+    '''    var row = clean({ id: uid(), month: month, created: Date.now(), loggedQty: "", baseline: !received, arrival: !!received, currency: origin === "loc" ? LOCAL_CUR : lastCurrency(), local: origin === "loc" }, active);
     if (received) mineNew[row.id] = 1;''')
 rep('''  function deleteRow(id) {
 ''', '''  function deleteRow(id) {
