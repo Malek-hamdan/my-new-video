@@ -8616,6 +8616,7 @@
     var b = S.boot; body.textContent = "";
     var note = el("p", "muted-p");
     note.textContent = b.live ? (b.early && Date.now() < b.start ? "Notifications are on (started early by an administrator)." : "Notifications are on.")
+      : b.admin ? "Until " + fmtDate(b.start) + " only administrators get notifications, so you can see how they look. Everyone else starts on " + fmtDate(b.start) + "."
       : "Notifications start on " + fmtDate(b.start) + ". You can turn them on for this device now and send yourself a test.";
     body.appendChild(note);
 

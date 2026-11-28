@@ -972,7 +972,8 @@ async function handleChat(req, res, me, url, p) {
 }
 
 // ---------- notifications (Web Push to phones and computers) ----------
-// Off for everyone until 1 Jan 2027 (or until an admin starts them early); a test to one's own device works any time.
+// Until 1 Jan 2027 only administrators get them (to see how they look); everyone else from then on (or when an
+// admin starts them early). A test to one's own device works any time.
 // Who gets what is set per person by an admin (notifyprefs); the devices are in pushsubs; both stay on the server.
 // The message is encrypted for each device (RFC 8291) and signed with this server's own key (VAPID, vapid.json).
 const NOTIFY_START = Date.UTC(2027, 0, 1);
@@ -1056,16 +1057,19 @@ async function pushToUser(username, payload, urgency) {
 }
 function notifyFeature() { return (load("meta").get("features") || {}).notify === true; }
 function notifyLive() { return Date.now() >= NOTIFY_START || notifyFeature(); }
+// may this person get notifications now? everyone once live; before that, administrators only
+function notifyNow(u) { return !!u && u.active !== false && (notifyLive() || can(u, "users")); }
 const HM_RE = /^([01]\d|2[0-3]):[0-5]\d$/, DAYS_RE = /^([0-6](,[0-6]){0,6})?$/;
 function prefsOf(u) {
-  const p = load("notifyprefs").get(u) || {};
-  return { on: p.on === true, receive: p.receive !== false, transfer: p.transfer !== false, approvals: p.approvals !== false, stock: p.stock !== false,
+  const p = load("notifyprefs").get(u) || {}, acc = load("users").get(u);
+  // an administrator is on until they turn it off; everyone else is off until an administrator turns them on
+  return { on: p.on === true || (p.on === undefined && can(acc, "users")), receive: p.receive !== false, transfer: p.transfer !== false, approvals: p.approvals !== false, stock: p.stock !== false,
     shiftStart: HM_RE.test(p.shiftStart || "") ? p.shiftStart : "", shiftEnd: HM_RE.test(p.shiftEnd || "") ? p.shiftEnd : "", shiftDays: DAYS_RE.test(p.shiftDays || "") ? p.shiftDays || "" : "" };
 }
 function notifyPeople(cat, exclude, also) {
   const out = [];
   for (const [k, u] of load("users")) {
-    if (u.active === false || exclude.has(k)) continue;
+    if (!notifyNow(u) || exclude.has(k)) continue;
     const p = prefsOf(k);
     if (!p.on || (cat && !p[cat]) || (also && !also(u))) continue;
     out.push(k);
@@ -1079,7 +1083,7 @@ const signed = (q, inn) => (inn ? "+" : "−") + q;
 // the request's decision arrives right with it and the notice then carries the requester's name.
 const recentDecisions = [];
 function notifyAfterWrite(me, coll, id, d, cur) {
-  if (!notifyLive() || !d) return;
+  if (!d) return;
   if (coll === "transactions" && !cur && !d.source && Number(d.change)) {
     const item = { d, at: Date.now(), actor: me.name || me.username, user: me.username };
     const t = setTimeout(() => { try { announceMove(item); } catch (e) { console.error("[notify] " + e.message); } }, 4000); if (t.unref) t.unref();
@@ -1089,7 +1093,7 @@ function notifyAfterWrite(me, coll, id, d, cur) {
     recentDecisions.push({ at: Date.now(), d, by: me.username });
     while (recentDecisions.length && Date.now() - recentDecisions[0].at > 60e3) recentDecisions.shift();
     const p = prefsOf(d.user), ok = d.status === "approved";
-    if (p.on) notifyAll([d.user], { title: "Request " + (ok ? "Approved" : "Rejected") + " – " + (d.partName || "Part"),
+    if (p.on && notifyNow(load("users").get(d.user))) notifyAll([d.user], { title: "Request " + (ok ? "Approved" : "Rejected") + " – " + (d.partName || "Part"),
       body: (d.mode === "in" ? "Receive " : "Transfer ") + signed(d.qty, d.mode === "in") + (d.machine ? " · Machine " + d.machine : "") + "\n" + (ok ? "Approved" : "Rejected") + " by " + (me.name || me.username),
       tag: "req-" + id }, ok ? "normal" : "high");
   }
@@ -1138,10 +1142,10 @@ function shiftSummary(user, from, to) {
   return { inn, out };
 }
 function shiftTick(nowMs) {
-  if (!notifyLive() || isBroken("notifystate")) return;
+  if (isBroken("notifystate")) return;
   const now = new Date(nowMs || Date.now()), hm = now.getUTCHours() * 60 + now.getUTCMinutes();
   for (const [k, u] of load("users")) {
-    if (u.active === false) continue;
+    if (!notifyNow(u)) continue;
     const p = prefsOf(k), s = hmToMin(p.shiftStart), e = hmToMin(p.shiftEnd);
     if (!p.on || s === null || e === null || s === e || hm < e || hm > e + 30) continue;   // up to 30 minutes late (a restart)
     const startDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
