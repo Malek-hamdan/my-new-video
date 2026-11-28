@@ -685,6 +685,24 @@
   .sum-tabs button { padding: 8px 18px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
   .sum-tabs button[aria-selected="true"] { background: rgba(91,157,255,0.16); color: var(--text); }
   .sum-tabs button.has-flag { color: #f0a35b; }
+  /* Not used */
+  .un-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 10px; font-weight: 600; }
+  .un-pick .un-n { min-width: 44px; justify-content: center; }
+  .un-pick .un-n[aria-pressed="true"] { background: var(--accent, #0f4c81); color: #fff; border-color: transparent; }
+  .un-own { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+  .un-own input { width: 64px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+  .un-warn { margin: 8px 0; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(240,163,91,0.5); background: rgba(240,163,91,0.1); }
+  .un-sum { margin: 10px 0 6px; font-size: 15px; }
+  .un-empty { margin: 12px 0; color: var(--muted); }
+  .un-m { margin: 18px 0 4px; font-size: 16px; }
+  .un-o { margin: 6px 0 4px; color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .un-scroll { overflow-x: auto; }
+  .un-t { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .un-t th, .un-t td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+  .un-t th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .un-t td.c, .un-t th:nth-child(n+3) { text-align: center; }
+  body.sum-view table.un-t { display: table !important; }
+  .un-t thead, .un-t thead th, .un-t thead tr { position: static !important; top: auto !important; }
   .sum-tabs button.has-flag[aria-selected="true"] { color: #f6c08f; }
   .sum-empty { padding: 18px; color: var(--muted); }
   /* Machine rating scorecard at the top of Summary */
@@ -4192,7 +4210,122 @@
     splitSummary(box);
     updateCounts();
   }
-  // Summary in three separate parts, one open at a time, so nothing is piled on top of each other
+  // ---- Not used: parts in stock that nobody has taken out (Transfer) for the chosen number of months.
+  // Counted from the first records. A part first seen less than that long ago is not judged yet. ----
+  var UNUSED_KEY = "uiip-unused-months";
+  function unusedMonths() { try { var n = parseInt(localStorage.getItem(UNUSED_KEY), 10); return n >= 1 && n <= 60 ? n : 6; } catch (e) { return 6; } }
+  function isoAddMonths(d, n) {
+    var y = +d.slice(0, 4), m = +d.slice(5, 7) - 1 + n, day = +d.slice(8, 10);
+    var last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(y, m, Math.min(day, last))).toISOString().slice(0, 10);
+  }
+  function unusedData(n) {
+    var today = new Date().toISOString().slice(0, 10), endOfMonth = new Date(Date.UTC(+month.slice(0, 4), +month.slice(5, 7), 0)).toISOString().slice(0, 10);
+    var ref = today.slice(0, 7) === month ? today : endOfMonth < today ? endOfMonth : today, cutoff = isoAddMonths(ref, -n);
+    var keys = MONTHS.filter(function (k) { return k <= month; });
+    var first = keys.filter(function (k) { return (allTx[k] || []).length || (allParts[k] && MACHINES.some(function (m) { return allParts[k][m].some(hasContent); })); })[0] || month;
+    var recorded = Math.max(0, Math.floor((Date.UTC(+ref.slice(0, 4), +ref.slice(5, 7) - 1, +ref.slice(8, 10)) - Date.UTC(+first.slice(0, 4), +first.slice(5, 7) - 1, 1)) / (30.44 * 864e5)));
+    var out = { n: n, ref: ref, cutoff: cutoff, first: first, recorded: recorded, machines: [], tooNew: 0, imp: {}, loc: {}, count: 0 };
+    MACHINES.forEach(function (m) {
+      // one part = one Reference (a record without one joins the part with the same name), as in the analysis
+      var refOfName = {};
+      keys.forEach(function (k) {
+        (allParts[k] && allParts[k][m] || []).forEach(function (r) { if (r.reference && r.name) refOfName[String(r.name).trim().toUpperCase()] = String(r.reference).trim().toUpperCase(); });
+      });
+      var key = function (x) { var r = String(x.reference || "").trim().toUpperCase(), nm = String(x.name || "").trim().toUpperCase(); return r || refOfName[nm] || nm || "?"; };
+      var since = {}, last = {};
+      keys.forEach(function (k) {
+        (allParts[k] && allParts[k][m] || []).forEach(function (r) { if (hasContent(r)) { var kk = key(r); if (!since[kk] || k < since[kk]) since[kk] = k; } });
+        (allTx[k] || []).forEach(function (t) {
+          if (t.source || t.machine !== m || txDate(t) > ref) return;
+          var kk = key(t); if (!since[kk] || k < since[kk]) since[kk] = k;
+          if (t.change < 0 && (!last[kk] || txDate(t) > last[kk])) last[kk] = txDate(t);
+        });
+      });
+      var rows = { imp: [], loc: [] };
+      sheet[m].forEach(function (r) {
+        var q = /^\d+$/.test(String(r.quantity)) ? parseInt(r.quantity, 10) : 0;
+        if (!hasContent(r) || q <= 0) return;
+        var kk = key(r), used = last[kk] || "";
+        if (used && used >= cutoff) return;                          // taken out within the period: in use
+        if ((since[kk] || month) + "-01" > cutoff) { out.tooNew++; return; }   // not on the list long enough to judge
+        var p = unitPrice(r), c = r.local ? LOCAL_CUR : r.currency || lastCurrency(), v = p === null ? null : Math.round(q * p * 100) / 100;
+        rows[r.local ? "loc" : "imp"].push({ r: r, q: q, p: p, cur: c, v: v, last: used, since: since[kk] || month });
+        if (v !== null) addMoney(out[r.local ? "loc" : "imp"], c, v);
+        out.count++;
+      });
+      ["imp", "loc"].forEach(function (o) { rows[o].sort(function (a, b) { return (b.v || 0) - (a.v || 0); }); });
+      if (rows.imp.length || rows.loc.length) out.machines.push({ m: m, imp: rows.imp, loc: rows.loc });
+    });
+    return out;
+  }
+  function unDay(d) { return d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : "Never"; }
+  function unusedSection() {
+    var wrap = document.createElement("div");
+    function draw() {
+      var n = unusedMonths(), d = unusedData(n), e = function (v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+      var tied = [moneyBag(d.imp), moneyBag(d.loc)].filter(function (x) { return x !== "—"; }).join(" + ") || "—";
+      var h = '<div class="score un"><div class="sc-head"><div><div class="sc-eyebrow">Not used</div><div class="sc-title">Parts in stock that nobody has taken out for ' + n + (n === 1 ? " month" : " months") + '</div></div>' +
+        '<div class="sc-basis">From the Transfer records since ' + e(monthLabel(d.first)) + '<br>No Transfer out since ' + e(unDay(d.cutoff)) + '</div></div>';
+      h += '<div class="un-pick" role="group" aria-label="Period">Not used for:';
+      [3, 6, 9, 12].forEach(function (x) { h += ' <button type="button" class="btn un-n" data-n="' + x + '" aria-pressed="' + (x === n) + '">' + x + '</button>'; });
+      h += ' <label class="un-own"><input type="number" min="1" max="60" step="1" value="' + ([3, 6, 9, 12].indexOf(n) < 0 ? n : "") + '" placeholder="__" aria-label="Number of months"> months</label>';
+      h += ' <button type="button" class="btn btn-export un-xl">Excel</button></div>';
+      if (d.recorded < n) h += '<div class="un-warn">Only ' + d.recorded + (d.recorded === 1 ? " month" : " months") + ' recorded so far. A part may look unused only because it is rare: check before taking it off the stock.</div>';
+      h += '<div class="un-sum"><b>' + d.count + (d.count === 1 ? " part" : " parts") + '</b> · ' + e(tied) + ' sitting unused' + (d.tooNew ? ' · ' + d.tooNew + ' newer ' + (d.tooNew === 1 ? "part" : "parts") + ' not judged yet' : "") + '</div>';
+      if (!d.machines.length) h += '<div class="un-empty">Every part in stock was taken out at least once in the last ' + n + (n === 1 ? " month" : " months") + '.</div>';
+      d.machines.forEach(function (mc) {
+        h += '<h4 class="un-m">' + e(mc.m) + '</h4>';
+        [["imp", "Imported parts"], ["loc", "Local parts"]].forEach(function (o) {
+          if (!mc[o[0]].length) return;
+          h += '<div class="un-o">' + o[1] + '</div><div class="un-scroll"><table class="un-t"><thead><tr><th>Name</th><th>Reference</th><th>Quantity</th><th>Value</th><th>Last used</th><th>On the list since</th></tr></thead><tbody>';
+          mc[o[0]].forEach(function (x) {
+            h += '<tr><td>' + e(x.r.name) + '</td><td>' + e(x.r.reference) + '</td><td class="c">' + x.q + '</td><td class="c">' + (x.v === null ? "No price" : e(money(x.v, x.cur))) + '</td><td class="c">' + e(unDay(x.last)) + '</td><td class="c">' + e(monthLabel(x.since)) + '</td></tr>';
+          });
+          h += '</tbody></table></div>';
+        });
+      });
+      wrap.innerHTML = h + '</div>';
+      wrap.querySelectorAll(".un-n").forEach(function (b) { b.addEventListener("click", function () { set(+b.getAttribute("data-n")); }); });
+      var own = wrap.querySelector(".un-own input");
+      // redrawn a moment later: redrawing while the box is still being left would remove it twice
+      own.addEventListener("change", function () { var v = parseInt(own.value, 10); if (v >= 1 && v <= 60 && v !== n) setTimeout(function () { set(v); }, 0); });
+      wrap.querySelector(".un-xl").addEventListener("click", function () {
+        saveFile("UII-not-used-" + n + "-months-" + month + ".xlsx", buildUnusedWorkbook(d), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", this, "Excel export");
+      });
+    }
+    function set(v) { try { localStorage.setItem(UNUSED_KEY, String(v)); } catch (e) {} draw(); }
+    draw();
+    return wrap;
+  }
+  function buildUnusedWorkbook(d) {
+    var stamp = "Exported " + fmtTime(Date.now()).replace("  ", " at ");
+    function z(name, i) { return name + (i % 2 ? "Z" : ""); }
+    var rows = [], after = [];
+    function line(x, i) {
+      return [{ v: x.m, s: z("center", i) }, { v: x.r.name, s: z("text", i) }, { v: x.r.reference, s: z("center", i) }, { v: x.q, s: z("bold", i) },
+        { v: x.p === null ? "" : x.p, s: z("money", i) }, { v: curLabel(x.cur), s: z("center", i) }, { v: x.v === null ? "No price" : x.v, s: z("moneyBold", i) },
+        { v: unDay(x.last), s: z("center", i) }, { v: monthLabel(x.since), s: z("center", i) }];
+    }
+    var imp = [], loc = [];
+    d.machines.forEach(function (mc) { mc.imp.forEach(function (x) { imp.push(Object.assign({ m: mc.m }, x)); }); mc.loc.forEach(function (x) { loc.push(Object.assign({ m: mc.m }, x)); }); });
+    imp.forEach(function (x, i) { rows.push(line(x, i)); });
+    var head = ["Machine", "Name", "Reference", "Quantity", "Unit price", "Currency", "Value", "Last used", "On the list since"];
+    if (loc.length) {
+      after.push([null, 14]);
+      after.push([[{ v: "Local parts · " + loc.length + (loc.length === 1 ? " part" : " parts"), s: "title_ALL" }], 30, true]);
+      after.push([head.map(function (h) { return { v: h, s: "head_ALL" }; }), 32]);
+      loc.forEach(function (x, i) { after.push([line(x, i), 26]); });
+    }
+    return packXlsx([{ name: "Not used", xml: sheetXml({
+      title: "UII — Not used for " + d.n + (d.n === 1 ? " month" : " months"),
+      subtitle: "No Transfer out since " + unDay(d.cutoff) + " · records since " + monthLabel(d.first) + (d.recorded < d.n ? " (only " + d.recorded + " months recorded)" : "") + " · " + stamp,
+      theme: "ALL", rows: rows, after: after,
+      columns: [{ name: "Machine", width: 11 }, { name: "Name", width: 38 }, { name: "Reference", width: 22 }, { name: "Quantity", width: 10 }, { name: "Unit price", width: 12 },
+        { name: "Currency", width: 10 }, { name: "Value", width: 14 }, { name: "Last used", width: 13 }, { name: "On the list since", width: 17 }]
+    }) }]);
+  }
+  // Summary in separate parts, one open at a time, so nothing is piled on top of each other
   var SUM_PART_KEY = "uiip-summary-part";
   function splitSummary(box) {
     // the countdown note sits above the three parts
@@ -4200,19 +4333,20 @@
     if (note) box.removeChild(note);
     var top = box.firstChild, rating = top.firstChild, analysis = top.children[1] || null, details = [];
     for (var c = top.nextSibling; c; c = c.nextSibling) details.push(c);
-    var sec = { rating: document.createElement("div"), analysis: document.createElement("div"), details: document.createElement("div") };
+    var sec = { rating: document.createElement("div"), analysis: document.createElement("div"), details: document.createElement("div"), unused: document.createElement("div") };
     sec.rating.appendChild(rating);
     if (analysis) sec.analysis.appendChild(analysis);
     else sec.analysis.innerHTML = '<div class="score sum-empty">' + (scoreEarly ? "The analysis starts once the rating has " + RATE_MIN_MONTHS + " earlier months with data to compare with. Until then, see the early signals under Rating." :
       "No machine is rated High or Very high this month, so there is nothing to act on. The analysis appears here when one is.") + "</div>";
     details.forEach(function (d) { sec.details.appendChild(d); });
+    sec.unused.appendChild(unusedSection());
     var flagged = analysis ? analysis.querySelectorAll(".an-m").length : 0;
     var nav = document.createElement("div");
     nav.className = "sum-tabs";
     nav.setAttribute("role", "tablist");
     var cur = "rating";
     try { var saved = localStorage.getItem(SUM_PART_KEY); if (sec[saved]) cur = saved; } catch (e) {}
-    [["rating", "Rating"], ["analysis", "Analysis" + (flagged ? " \u00B7 " + flagged : "")], ["details", "Details"]].forEach(function (t) {
+    [["rating", "Rating"], ["analysis", "Analysis" + (flagged ? " \u00B7 " + flagged : "")], ["details", "Details"], ["unused", "Not used"]].forEach(function (t) {
       var b = document.createElement("button");
       b.type = "button"; b.textContent = t[1]; b.setAttribute("role", "tab"); b.setAttribute("data-part", t[0]);
       if (t[0] === "analysis" && flagged) b.classList.add("has-flag");
@@ -4226,7 +4360,7 @@
     box.innerHTML = "";
     if (note) box.appendChild(note);
     box.appendChild(nav);
-    ["rating", "analysis", "details"].forEach(function (k) { box.appendChild(sec[k]); });
+    ["rating", "analysis", "details", "unused"].forEach(function (k) { box.appendChild(sec[k]); });
     show(cur);
   }
 
